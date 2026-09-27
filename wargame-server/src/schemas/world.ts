@@ -57,7 +57,7 @@ export const Infrastructure = z.object({
   owners: z.array(FactionId), geometryRef: z.string(), zoneId: ZoneId,
   status: z.enum(['operational', 'degraded', 'offline']), strategicValue: z.number(), flowShareIta: z.number().optional(),
 });
-export const Zone = z.object({ id: ZoneId, name: z.string(), polygonRef: z.string(), center: LatLon, seaState: z.number(), weatherSeed: z.number(), controlledBy: FactionId.nullable(), tension: z.number() });
+export const Zone = z.object({ id: ZoneId, name: z.string(), terrain: z.enum(['sea', 'land']).default('sea'), polygonRef: z.string(), center: LatLon, seaState: z.number(), weatherSeed: z.number(), controlledBy: FactionId.nullable(), tension: z.number() });
 
 export const Relation = z.object({ trust: z.number(), tension: z.number(), tradeDependency: z.number(), lastIncidentTurn: Turn.nullable(), notes: z.array(z.string()) });
 export const RelationMatrix = z.record(FactionId, z.record(FactionId, Relation));

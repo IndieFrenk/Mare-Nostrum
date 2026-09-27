@@ -24,6 +24,9 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
       if (u.readiness < 40 && !['REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN'].includes(ord.kind)) risks.push(`${u.name}: prontezza ${u.readiness}%`);
       if (u.status === 'ready' && !['REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN'].includes(ord.kind)) cost += u.opCostPerTurn * mult;
     }
+    const dest = 'zoneId' in ord ? ord.zoneId : ord.kind === 'MOVE' && typeof ord.to === 'string' ? ord.to : null;
+    if (dest && s.zones[dest]?.terrain === 'land' && unitIds.some((id) => ['sea', 'subsurface'].includes(s.units[id]?.domain ?? '')))
+      errors.push(`${ord.id}: ${dest} è una zona terrestre, non raggiungibile da unità navali`);
     switch (ord.kind) {
       case 'MOVE': if (typeof ord.to === 'string') zoneOk(ord.to); break;
       case 'PATROL': case 'PRESENCE': case 'SHOW_OF_FORCE': case 'BLOCKADE': case 'EXCLUSION_ZONE': case 'AIR_DEFENSE': case 'EVACUATION':

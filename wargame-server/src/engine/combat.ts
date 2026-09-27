@@ -81,7 +81,7 @@ export function detectInteractions(ctx: TurnCtx) {
       if (!rel) continue;
       const roe = (f: string) => fs.get(f)!.map((u) => (u.currentTask as { roe?: string; kind?: string } | null));
       const free = [...roe(a), ...roe(b)].some((t) => t?.roe === 'WEAPONS_FREE');
-      const coercive = [...roe(a), ...roe(b)].some((t) => t?.kind === 'BLOCKADE' || t?.kind === 'EXCLUSION_ZONE' || t?.kind === 'SHOW_OF_FORCE');
+      const coercive = rel.tension >= 30 && [...roe(a), ...roe(b)].some((t) => t?.kind === 'BLOCKADE' || t?.kind === 'EXCLUSION_ZONE' || t?.kind === 'SHOW_OF_FORCE');
       if (rel.tension >= PARAMS.engagement.tensionForHostile && (free || (coercive && ctx.rng.chance(`escalation a fuoco ${a}/${b} in ${zoneId}`, 0.3).ok))) {
         openEngagement(ctx, zoneId, [{ factionId: a, unitIds: fs.get(a)!.map((u) => u.id) }, { factionId: b, unitIds: fs.get(b)!.map((u) => u.id) }]);
       } else if (rel.tension >= 45 || coercive) {

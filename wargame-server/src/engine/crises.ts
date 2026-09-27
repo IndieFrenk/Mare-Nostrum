@@ -11,6 +11,8 @@ export function evolveCrises(ctx: TurnCtx) {
     else if (r.total <= PARAMS.crisisDriftDown) ctx.escalate(c.id, -1, 'deriva: raffreddamento');
   }
   const table = ctx.scenario.events;
+  const touched = new Set<string>();
+  const escalateOnce = (id: string, delta: number, cause: string) => { if (!touched.has(id)) { touched.add(id); ctx.escalate(id, delta, cause); } };
   for (const z of Object.values(ctx.state.zones)) {
     const rows = table.filter((e) => e.zones.includes(z.id) && e.minTension <= z.tension);
     if (!rows.length || !ctx.rng.chance(`evento casuale in ${z.id}`, PARAMS.randomEventChance * (0.5 + z.tension / 100)).ok) continue;
@@ -18,8 +20,8 @@ export function evolveCrises(ctx: TurnCtx) {
     let x = ctx.rng.next() * total;
     const ev = rows.find((e) => (x -= e.weight) < 0) ?? rows[0];
     ctx.emit('RANDOM_EVENT', 'world', { eventId: ev.id, text: ev.text, zoneId: z.id }, { targets: [z.id] });
-    if (ev.crisis) ctx.escalate(ev.crisis[0], ev.crisis[1], ev.text);
-    if (ev.crisisAny) for (const c of Object.values(ctx.state.crises).filter((c) => c.zoneIds.includes(z.id))) ctx.escalate(c.id, ev.crisisAny, ev.text);
+    if (ev.crisis) escalateOnce(ev.crisis[0], ev.crisis[1], ev.text);
+    if (ev.crisisAny) for (const c of Object.values(ctx.state.crises).filter((c) => c.zoneIds.includes(z.id))) escalateOnce(c.id, ev.crisisAny, ev.text);
     if (ev.infra && ctx.state.infrastructure[ev.infra[0]]?.status === 'operational') ctx.emit('INFRA_STATUS', 'world', { infraId: ev.infra[0], status: ev.infra[1], cause: ev.text }, { targets: [ev.infra[0]] });
     if (ev.indicators) ctx.emit('INDICATORS_CHANGED', 'world', { delta: ev.indicators });
   }

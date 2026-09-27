@@ -627,6 +627,14 @@
      "name": {
       "type": "string"
      },
+     "terrain": {
+      "default": "sea",
+      "type": "string",
+      "enum": [
+       "sea",
+       "land"
+      ]
+     },
      "polygonRef": {
       "type": "string"
      },

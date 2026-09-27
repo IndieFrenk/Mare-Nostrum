@@ -72,6 +72,17 @@ describe('motore: 5 turni headless con mock', () => {
   });
 });
 
+describe('validatori', () => {
+  it('le navi non possono essere mandate in zone terrestri', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'v', seed: 'v' });
+    const v = await e.validate(c.id, { military: [{ id: 'x', kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'SAHEL', roe: 'WEAPONS_TIGHT' }], diplomacy: [], procurement: [], statements: [] });
+    expect(v.errors.join()).toContain('zona terrestre');
+    const air = await e.validate(c.id, { military: [{ id: 'y', kind: 'PATROL', unitIds: ['ITA-MQ9'], zoneId: 'SAHEL', roe: 'WEAPONS_TIGHT' }], diplomacy: [], procurement: [], statements: [] });
+    expect(air.valid).toBe(true);
+  });
+});
+
 describe('CMO', () => {
   it('uno strike ≥8 vettori va in CMO_PENDING, l\'AAR sblocca e aggiorna perdite/munizioni/ledger', async () => {
     const e = makeEngine();

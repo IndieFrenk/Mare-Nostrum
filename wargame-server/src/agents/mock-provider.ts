@@ -39,7 +39,7 @@ function faction(m: M) {
   const h = hashString(`${m.seed}:${m.factionId}:${m.turn}`);
   const legal = m.legal as M;
   const crises = (m.situation.crisi as M[]).sort((a, b) => b.escalation - a.escalation);
-  const zone = crises[0]?.zones[0] ?? legal.zones[0];
+  const zone = crises.flatMap((c) => c.zones as string[]).find((z) => legal.seaZones.includes(z)) ?? legal.seaZones[0];
   const ship = (legal.units as M[]).find((u) => u.status === 'ready' && ['frigate', 'destroyer', 'opv'].includes(u.type) && u.readiness >= 50);
   const tired = (legal.units as M[]).filter((u) => u.status === 'deployed' && u.readiness < 40).map((u) => u.id);
   const military: M[] = [];
@@ -75,7 +75,7 @@ function parser(m: M) {
   const text = String(m.text).toLowerCase();
   const legal = m.legal as M;
   const units = (legal.units as M[]).filter((u) => text.includes(u.id.toLowerCase()) || text.includes(String(u.name).toLowerCase().split(' (')[0]));
-  const zone = (legal.zones as string[]).find((z) => text.includes(z.toLowerCase()) || text.includes(z.toLowerCase().replace(/_/g, ' ')));
+  const zone = [...legal.seaZones, ...legal.landZones].find((z) => text.includes(z.toLowerCase()) || text.includes(z.toLowerCase().replace(/_/g, ' ')));
   const military: M[] = [];
   const ambiguities: string[] = [];
   if (!units.length) ambiguities.push('Nessuna unità riconosciuta nella direttiva.');

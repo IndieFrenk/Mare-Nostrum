@@ -11,7 +11,8 @@
    "seaState": 3,
    "weatherSeed": 13,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "ADRIATICO",
@@ -24,7 +25,8 @@
    "seaState": 3,
    "weatherSeed": 110,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "IONIO",
@@ -37,7 +39,8 @@
    "seaState": 3,
    "weatherSeed": 207,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "CANALE_SICILIA",
@@ -50,7 +53,8 @@
    "seaState": 3,
    "weatherSeed": 304,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "MAR_LIBICO",
@@ -63,7 +67,8 @@
    "seaState": 3,
    "weatherSeed": 401,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "LIBIA_TERRA",
@@ -76,7 +81,8 @@
    "seaState": 0,
    "weatherSeed": 498,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "land"
   },
   {
    "id": "MED_OCCIDENTALE",
@@ -89,7 +95,8 @@
    "seaState": 3,
    "weatherSeed": 595,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "EGEO",
@@ -102,7 +109,8 @@
    "seaState": 3,
    "weatherSeed": 692,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "MEDITERRANEO_ORIENTALE",
@@ -115,7 +123,8 @@
    "seaState": 3,
    "weatherSeed": 789,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "MAR_ROSSO",
@@ -128,7 +137,8 @@
    "seaState": 3,
    "weatherSeed": 886,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "MAR_NERO",
@@ -141,7 +151,8 @@
    "seaState": 3,
    "weatherSeed": 983,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "GOLFO",
@@ -154,7 +165,8 @@
    "seaState": 3,
    "weatherSeed": 1080,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "sea"
   },
   {
    "id": "SAHEL",
@@ -167,7 +179,8 @@
    "seaState": 0,
    "weatherSeed": 1177,
    "controlledBy": null,
-   "tension": 20
+   "tension": 20,
+   "terrain": "land"
   }
  ],
  "bases": [

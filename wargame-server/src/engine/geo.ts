@@ -11,8 +11,9 @@ export function lerp(a: LatLon, b: LatLon, t: number): LatLon {
   return { lat: +(a.lat + (b.lat - a.lat) * t).toFixed(3), lon: +(a.lon + (b.lon - a.lon) * t).toFixed(3) };
 }
 
-export function nearestZone(s: WorldState, p: LatLon): string {
-  return Object.values(s.zones).reduce((best, z) => (distanceKm(p, z.center) < distanceKm(p, s.zones[best].center) ? z.id : best), Object.keys(s.zones)[0]);
+export function nearestZone(s: WorldState, p: LatLon, terrain?: 'sea' | 'land'): string {
+  const zs = Object.values(s.zones).filter((z) => !terrain || z.terrain === terrain);
+  return zs.reduce((best, z) => (distanceKm(p, z.center) < distanceKm(p, best.center) ? z : best), zs[0]).id;
 }
 
 /** Sposta un punto di `km` lungo una direzione casuale data da `u` ∈ [0,1). */
