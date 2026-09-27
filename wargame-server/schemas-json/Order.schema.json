@@ -1,0 +1,410 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "oneOf": [
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "MOVE"
+    },
+    "to": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "lat": {
+         "type": "number"
+        },
+        "lon": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "lat",
+        "lon"
+       ]
+      }
+     ]
+    },
+    "speed": {
+     "type": "string",
+     "enum": [
+      "slow",
+      "cruise",
+      "flank"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "to",
+    "speed"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "PATROL",
+      "PRESENCE",
+      "SHOW_OF_FORCE"
+     ]
+    },
+    "zoneId": {
+     "type": "string"
+    },
+    "roe": {
+     "type": "string",
+     "enum": [
+      "WEAPONS_HOLD",
+      "WEAPONS_TIGHT",
+      "WEAPONS_FREE"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "zoneId",
+    "roe"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "ESCORT"
+    },
+    "protect": {
+     "type": "string"
+    },
+    "roe": {
+     "type": "string",
+     "enum": [
+      "WEAPONS_HOLD",
+      "WEAPONS_TIGHT",
+      "WEAPONS_FREE"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "protect",
+    "roe"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "BLOCKADE",
+      "EXCLUSION_ZONE"
+     ]
+    },
+    "zoneId": {
+     "type": "string"
+    },
+    "roe": {
+     "type": "string",
+     "enum": [
+      "WEAPONS_HOLD",
+      "WEAPONS_TIGHT",
+      "WEAPONS_FREE"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "zoneId",
+    "roe"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "STRIKE"
+    },
+    "targetRef": {
+     "type": "string"
+    },
+    "munitions": {
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "roe": {
+     "type": "string",
+     "enum": [
+      "WEAPONS_HOLD",
+      "WEAPONS_TIGHT",
+      "WEAPONS_FREE"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "targetRef",
+    "munitions",
+    "roe"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "const": "ISR"
+    },
+    "assetIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "zoneId": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "assetIds",
+    "zoneId"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "SOF_OP"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "zoneId": {
+     "type": "string"
+    },
+    "deniability": {
+     "type": "string",
+     "enum": [
+      "overt",
+      "covert"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "objective",
+    "zoneId",
+    "deniability"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "const": "CYBER_OP"
+    },
+    "target": {
+     "type": "string",
+     "minLength": 2
+    },
+    "targetRef": {
+     "type": "string"
+    },
+    "effect": {
+     "type": "string",
+     "enum": [
+      "espionage",
+      "disruption",
+      "defense_hardening"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "kind",
+    "target",
+    "targetRef",
+    "effect"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "AIR_DEFENSE"
+    },
+    "zoneId": {
+     "type": "string"
+    },
+    "alert": {
+     "type": "string",
+     "enum": [
+      "low",
+      "high"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "zoneId",
+    "alert"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "REPAIR",
+      "RETURN_TO_BASE",
+      "STAND_DOWN"
+     ]
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind"
+   ]
+  },
+  {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "unitIds": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "const": "EVACUATION"
+    },
+    "zoneId": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "id",
+    "unitIds",
+    "kind",
+    "zoneId"
+   ]
+  }
+ ]
+}

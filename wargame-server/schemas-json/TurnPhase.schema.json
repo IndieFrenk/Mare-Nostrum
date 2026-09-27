@@ -1,0 +1,15 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "string",
+ "enum": [
+  "OPEN",
+  "INTEL",
+  "BRIEFING",
+  "PLAYER_ORDERS",
+  "AI_DECISIONS",
+  "ADJUDICATION",
+  "CMO_PENDING",
+  "DEBRIEF",
+  "CLOSED"
+ ]
+}

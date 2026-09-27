@@ -1,0 +1,69 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "rngIndex": {
+   "type": "integer",
+   "minimum": -9007199254740991,
+   "maximum": 9007199254740991
+  },
+  "purpose": {
+   "type": "string"
+  },
+  "formula": {
+   "type": "string"
+  },
+  "modifiers": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "value": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "name",
+     "value"
+    ]
+   }
+  },
+  "raw": {
+   "type": "array",
+   "items": {
+    "type": "number"
+   }
+  },
+  "total": {
+   "type": "number"
+  },
+  "threshold": {
+   "type": "number"
+  },
+  "outcome": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "rngIndex",
+  "purpose",
+  "formula",
+  "modifiers",
+  "raw",
+  "total",
+  "outcome"
+ ]
+}

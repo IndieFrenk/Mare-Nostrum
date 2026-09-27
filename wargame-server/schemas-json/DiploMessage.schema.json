@@ -1,0 +1,43 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "from": {
+   "type": "string",
+   "minLength": 2
+  },
+  "to": {
+   "type": "string",
+   "minLength": 2
+  },
+  "channel": {
+   "type": "string",
+   "enum": [
+    "official",
+    "backchannel"
+   ]
+  },
+  "text": {
+   "type": "string"
+  },
+  "actionRef": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "from",
+  "to",
+  "channel",
+  "text"
+ ]
+}

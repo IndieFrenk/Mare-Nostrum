@@ -1,0 +1,58 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "name": {
+   "type": "string"
+  },
+  "factionId": {
+   "type": "string",
+   "minLength": 2
+  },
+  "location": {
+   "type": "object",
+   "properties": {
+    "lat": {
+     "type": "number"
+    },
+    "lon": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "lat",
+    "lon"
+   ]
+  },
+  "type": {
+   "type": "string",
+   "enum": [
+    "naval",
+    "air",
+    "joint"
+   ]
+  },
+  "capacity": {
+   "type": "number"
+  },
+  "damage": {
+   "type": "number"
+  },
+  "zoneId": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "name",
+  "factionId",
+  "location",
+  "type",
+  "capacity",
+  "damage",
+  "zoneId"
+ ]
+}

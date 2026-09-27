@@ -1,0 +1,29 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "audience": {
+   "type": "string"
+  },
+  "text": {
+   "type": "string"
+  },
+  "tone": {
+   "type": "string",
+   "enum": [
+    "conciliatory",
+    "firm",
+    "threatening"
+   ]
+  }
+ },
+ "required": [
+  "id",
+  "audience",
+  "text",
+  "tone"
+ ]
+}

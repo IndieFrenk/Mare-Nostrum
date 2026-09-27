@@ -1,0 +1,287 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "TRANSMED",
+   "properties": {
+    "id": "TRANSMED",
+    "name": "Gasdotto TransMed (Enrico Mattei)",
+    "type": "pipeline"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      8.0,
+      36.8
+     ],
+     [
+      11.0,
+      37.1
+     ],
+     [
+      12.6,
+      37.6
+     ],
+     [
+      13.4,
+      38.1
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "GREENSTREAM",
+   "properties": {
+    "id": "GREENSTREAM",
+    "name": "Gasdotto Greenstream",
+    "type": "pipeline"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      12.3,
+      32.9
+     ],
+     [
+      13.0,
+      35.0
+     ],
+     [
+      14.25,
+      37.07
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "TAP",
+   "properties": {
+    "id": "TAP",
+    "name": "Gasdotto TAP",
+    "type": "pipeline"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      19.5,
+      40.9
+     ],
+     [
+      18.5,
+      40.4
+     ],
+     [
+      18.3,
+      40.3
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MELLITAH",
+   "properties": {
+    "id": "MELLITAH",
+    "name": "Complesso Mellitah / Bahr Essalam (ENI)",
+    "type": "gas_field"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     12.25,
+     32.87
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ZOHR",
+   "properties": {
+    "id": "ZOHR",
+    "name": "Giacimento Zohr (ENI)",
+    "type": "gas_field"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.3,
+     31.9
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CAVI_MAZARA",
+   "properties": {
+    "id": "CAVI_MAZARA",
+    "name": "Hub cavi sottomarini Sicilia (Mazara/Catania)",
+    "type": "subsea_cable"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      12.59,
+      37.65
+     ],
+     [
+      20.0,
+      34.0
+     ],
+     [
+      29.9,
+      31.2
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CAVI_BLUEMED",
+   "properties": {
+    "id": "CAVI_BLUEMED",
+    "name": "Cavo BlueMed/2Africa",
+    "type": "subsea_cable"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      9.8,
+      44.1
+     ],
+     [
+      15.1,
+      37.5
+     ],
+     [
+      24.0,
+      35.5
+     ],
+     [
+      32.3,
+      31.3
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "OLT_LIVORNO",
+   "properties": {
+    "id": "OLT_LIVORNO",
+    "name": "Terminale GNL OLT Livorno",
+    "type": "lng_terminal"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     10.1,
+     43.65
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "RAVENNA_FSRU",
+   "properties": {
+    "id": "RAVENNA_FSRU",
+    "name": "FSRU Ravenna",
+    "type": "lng_terminal"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     12.5,
+     44.5
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "GIOIA_TAURO",
+   "properties": {
+    "id": "GIOIA_TAURO",
+    "name": "Porto di Gioia Tauro",
+    "type": "port"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     15.9,
+     38.45
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "SUEZ",
+   "properties": {
+    "id": "SUEZ",
+    "name": "Canale di Suez",
+    "type": "chokepoint"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.35,
+     30.5
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "BAB_EL_MANDEB",
+   "properties": {
+    "id": "BAB_EL_MANDEB",
+    "name": "Bab el-Mandeb",
+    "type": "chokepoint"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     43.3,
+     12.6
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CANALE_SICILIA_CP",
+   "properties": {
+    "id": "CANALE_SICILIA_CP",
+    "name": "Stretto di Sicilia",
+    "type": "chokepoint"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     11.6,
+     37.2
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "HORMUZ",
+   "properties": {
+    "id": "HORMUZ",
+    "name": "Stretto di Hormuz",
+    "type": "chokepoint"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     56.4,
+     26.5
+    ]
+   }
+  }
+ ]
+}

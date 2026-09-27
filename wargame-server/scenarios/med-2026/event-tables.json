@@ -1,0 +1,125 @@
+{
+ "default": [
+  {
+   "id": "MIGR_WAVE",
+   "weight": 3,
+   "minTension": 0,
+   "text": "Ondata di partenze di migranti",
+   "crisis": [
+    "SAHEL_MIG",
+    1
+   ],
+   "indicators": {
+    "migrationPressure": 8
+   },
+   "zones": [
+    "CANALE_SICILIA",
+    "MAR_LIBICO",
+    "SAHEL"
+   ]
+  },
+  {
+   "id": "HOUTHI_ATTACK",
+   "weight": 3,
+   "minTension": 30,
+   "text": "Attacco con droni a mercantile",
+   "crisis": [
+    "RED_SEA",
+    1
+   ],
+   "indicators": {
+    "medShippingRisk": 8,
+    "brentUsd": 3
+   },
+   "zones": [
+    "MAR_ROSSO"
+   ]
+  },
+  {
+   "id": "CABLE_FAULT",
+   "weight": 1,
+   "minTension": 20,
+   "text": "Guasto sospetto a cavo sottomarino",
+   "crisis": [
+    "SUBSEA",
+    1
+   ],
+   "infra": [
+    "CAVI_MAZARA",
+    "degraded"
+   ],
+   "zones": [
+    "CANALE_SICILIA",
+    "IONIO"
+   ]
+  },
+  {
+   "id": "MILITIA_CLASH",
+   "weight": 2,
+   "minTension": 30,
+   "text": "Scontri tra milizie vicino a Mellitah",
+   "crisis": [
+    "LBY_OFFSHORE",
+    1
+   ],
+   "zones": [
+    "MAR_LIBICO",
+    "LIBIA_TERRA"
+   ]
+  },
+  {
+   "id": "MELLITAH_SHUTDOWN",
+   "weight": 1,
+   "minTension": 50,
+   "text": "Blocco degli impianti di Mellitah",
+   "crisis": [
+    "LBY_OFFSHORE",
+    1
+   ],
+   "infra": [
+    "MELLITAH",
+    "degraded"
+   ],
+   "indicators": {
+    "ttfEurMwh": 4
+   },
+   "zones": [
+    "MAR_LIBICO",
+    "LIBIA_TERRA"
+   ]
+  },
+  {
+   "id": "AEGEAN_NOTAM",
+   "weight": 2,
+   "minTension": 30,
+   "text": "NOTAM contrapposti e violazioni di spazio aereo",
+   "crisis": [
+    "EAST_MED",
+    1
+   ],
+   "zones": [
+    "EGEO",
+    "MEDITERRANEO_ORIENTALE"
+   ]
+  },
+  {
+   "id": "DEESCALATION_TALKS",
+   "weight": 2,
+   "minTension": 0,
+   "text": "Colloqui tecnici di deconfliction",
+   "crisisAny": -1,
+   "zones": [
+    "EGEO",
+    "MEDITERRANEO_ORIENTALE",
+    "MAR_LIBICO"
+   ]
+  },
+  {
+   "id": "CALM_SEAS",
+   "weight": 4,
+   "minTension": 0,
+   "text": "Settimana senza incidenti rilevanti",
+   "zones": []
+  }
+ ]
+}

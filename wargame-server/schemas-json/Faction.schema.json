@@ -1,0 +1,255 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string",
+   "minLength": 2
+  },
+  "name": {
+   "type": "string"
+  },
+  "kind": {
+   "type": "string",
+   "enum": [
+    "state",
+    "bloc",
+    "nonstate"
+   ]
+  },
+  "controller": {
+   "type": "string",
+   "enum": [
+    "human",
+    "ai",
+    "scripted"
+   ]
+  },
+  "agentRole": {
+   "anyOf": [
+    {
+     "type": "string",
+     "enum": [
+      "faction_major",
+      "faction_minor",
+      "gm_narrator",
+      "intel_analyst",
+      "order_parser",
+      "reflection",
+      "repair"
+     ]
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "profileRef": {
+   "type": "string"
+  },
+  "posture": {
+   "type": "integer",
+   "minimum": 1,
+   "maximum": 5
+  },
+  "budget": {
+   "type": "object",
+   "properties": {
+    "discretionary": {
+     "type": "number"
+    },
+    "perTurnIncome": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "discretionary",
+    "perTurnIncome"
+   ]
+  },
+  "stocks": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number"
+   }
+  },
+  "stability": {
+   "type": "number"
+  },
+  "credibility": {
+   "type": "number"
+  },
+  "objectives": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "priority": {
+      "anyOf": [
+       {
+        "type": "number",
+        "const": 1
+       },
+       {
+        "type": "number",
+        "const": 2
+       },
+       {
+        "type": "number",
+        "const": 3
+       }
+      ]
+     },
+     "metric": {
+      "type": "string"
+     },
+     "progress": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "id",
+     "text",
+     "priority",
+     "metric",
+     "progress"
+    ]
+   }
+  },
+  "redLines": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "trigger": {
+      "type": "string"
+     },
+     "response": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "text",
+     "trigger",
+     "response"
+    ]
+   }
+  },
+  "isrAssets": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "SAR_SAT",
+       "EO_SAT",
+       "AEW",
+       "MPA",
+       "MALE_DRONE",
+       "SIGINT",
+       "HUMINT_NET",
+       "OTH_RADAR"
+      ]
+     },
+     "coverage": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "revisitTurns": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+     },
+     "quality": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     },
+     "tasking": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "id",
+     "type",
+     "coverage",
+     "revisitTurns",
+     "quality",
+     "tasking"
+    ]
+   }
+  },
+  "cyber": {
+   "type": "object",
+   "properties": {
+    "offense": {
+     "type": "number"
+    },
+    "defense": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "offense",
+    "defense"
+   ]
+  },
+  "alliances": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "crossedRedLines": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "id",
+  "name",
+  "kind",
+  "controller",
+  "agentRole",
+  "profileRef",
+  "posture",
+  "budget",
+  "stocks",
+  "stability",
+  "credibility",
+  "objectives",
+  "redLines",
+  "isrAssets",
+  "cyber",
+  "alliances"
+ ]
+}

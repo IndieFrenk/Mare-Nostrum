@@ -1,0 +1,61 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "name": {
+   "type": "string"
+  },
+  "type": {
+   "type": "string",
+   "enum": [
+    "pipeline",
+    "subsea_cable",
+    "lng_terminal",
+    "oil_field",
+    "gas_field",
+    "port",
+    "chokepoint"
+   ]
+  },
+  "owners": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "minLength": 2
+   }
+  },
+  "geometryRef": {
+   "type": "string"
+  },
+  "zoneId": {
+   "type": "string"
+  },
+  "status": {
+   "type": "string",
+   "enum": [
+    "operational",
+    "degraded",
+    "offline"
+   ]
+  },
+  "strategicValue": {
+   "type": "number"
+  },
+  "flowShareIta": {
+   "type": "number"
+  }
+ },
+ "required": [
+  "id",
+  "name",
+  "type",
+  "owners",
+  "geometryRef",
+  "zoneId",
+  "status",
+  "strategicValue"
+ ]
+}

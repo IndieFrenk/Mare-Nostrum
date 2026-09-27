@@ -1,0 +1,69 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "source": {
+   "type": "string",
+   "enum": [
+    "radar",
+    "sar",
+    "eo",
+    "sigint",
+    "humint",
+    "ais",
+    "sonar",
+    "osint"
+   ]
+  },
+  "reliability": {
+   "type": "string",
+   "pattern": "^[A-F][1-6]$"
+  },
+  "classification": {
+   "type": "string",
+   "enum": [
+    "NS",
+    "NR",
+    "NC",
+    "NS-SEGRETO"
+   ]
+  },
+  "title": {
+   "type": "string"
+  },
+  "body": {
+   "type": "string"
+  },
+  "relatedContacts": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "factsRef": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "source",
+  "reliability",
+  "classification",
+  "title",
+  "body",
+  "relatedContacts",
+  "factsRef"
+ ]
+}

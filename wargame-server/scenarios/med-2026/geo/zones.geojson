@@ -1,0 +1,472 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "TIRRENO",
+   "properties": {
+    "id": "TIRRENO",
+    "name": "Mar Tirreno"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       8.5,
+       37.8
+      ],
+      [
+       15.8,
+       37.8
+      ],
+      [
+       15.8,
+       44.2
+      ],
+      [
+       8.5,
+       44.2
+      ],
+      [
+       8.5,
+       37.8
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ADRIATICO",
+   "properties": {
+    "id": "ADRIATICO",
+    "name": "Mar Adriatico"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       12.2,
+       40.0
+      ],
+      [
+       19.8,
+       40.0
+      ],
+      [
+       13.5,
+       45.8
+      ],
+      [
+       12.2,
+       45.8
+      ],
+      [
+       12.2,
+       40.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "IONIO",
+   "properties": {
+    "id": "IONIO",
+    "name": "Mar Ionio"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       15.2,
+       35.0
+      ],
+      [
+       22.5,
+       35.0
+      ],
+      [
+       22.5,
+       40.0
+      ],
+      [
+       16.0,
+       40.5
+      ],
+      [
+       15.2,
+       35.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CANALE_SICILIA",
+   "properties": {
+    "id": "CANALE_SICILIA",
+    "name": "Canale di Sicilia"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       9.5,
+       35.0
+      ],
+      [
+       15.2,
+       35.0
+      ],
+      [
+       15.2,
+       37.8
+      ],
+      [
+       9.5,
+       37.8
+      ],
+      [
+       9.5,
+       35.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MAR_LIBICO",
+   "properties": {
+    "id": "MAR_LIBICO",
+    "name": "Mar Libico"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       11.0,
+       32.2
+      ],
+      [
+       25.0,
+       31.0
+      ],
+      [
+       25.0,
+       35.0
+      ],
+      [
+       11.0,
+       35.0
+      ],
+      [
+       11.0,
+       32.2
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "LIBIA_TERRA",
+   "properties": {
+    "id": "LIBIA_TERRA",
+    "name": "Libia (entroterra)"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       10.0,
+       22.0
+      ],
+      [
+       25.0,
+       22.0
+      ],
+      [
+       25.0,
+       31.0
+      ],
+      [
+       10.0,
+       32.2
+      ],
+      [
+       10.0,
+       22.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MED_OCCIDENTALE",
+   "properties": {
+    "id": "MED_OCCIDENTALE",
+    "name": "Mediterraneo occidentale"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -2.0,
+       35.2
+      ],
+      [
+       8.5,
+       36.8
+      ],
+      [
+       8.5,
+       43.5
+      ],
+      [
+       -2.0,
+       40.0
+      ],
+      [
+       -2.0,
+       35.2
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "EGEO",
+   "properties": {
+    "id": "EGEO",
+    "name": "Mar Egeo"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       22.5,
+       35.0
+      ],
+      [
+       28.5,
+       35.0
+      ],
+      [
+       28.5,
+       41.0
+      ],
+      [
+       22.5,
+       41.0
+      ],
+      [
+       22.5,
+       35.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MEDITERRANEO_ORIENTALE",
+   "properties": {
+    "id": "MEDITERRANEO_ORIENTALE",
+    "name": "Mediterraneo orientale"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.0,
+       31.0
+      ],
+      [
+       36.2,
+       31.0
+      ],
+      [
+       36.2,
+       37.0
+      ],
+      [
+       28.5,
+       37.0
+      ],
+      [
+       25.0,
+       35.0
+      ],
+      [
+       25.0,
+       31.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MAR_ROSSO",
+   "properties": {
+    "id": "MAR_ROSSO",
+    "name": "Mar Rosso"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       32.3,
+       29.8
+      ],
+      [
+       35.0,
+       29.8
+      ],
+      [
+       43.5,
+       12.0
+      ],
+      [
+       43.5,
+       11.0
+      ],
+      [
+       41.0,
+       12.5
+      ],
+      [
+       32.3,
+       24.0
+      ],
+      [
+       32.3,
+       29.8
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "MAR_NERO",
+   "properties": {
+    "id": "MAR_NERO",
+    "name": "Mar Nero"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       28.0,
+       41.0
+      ],
+      [
+       41.5,
+       41.0
+      ],
+      [
+       41.5,
+       46.5
+      ],
+      [
+       28.0,
+       46.5
+      ],
+      [
+       28.0,
+       41.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "GOLFO",
+   "properties": {
+    "id": "GOLFO",
+    "name": "Golfo Persico e Hormuz"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       48.0,
+       24.0
+      ],
+      [
+       57.5,
+       24.0
+      ],
+      [
+       57.5,
+       30.0
+      ],
+      [
+       48.0,
+       30.0
+      ],
+      [
+       48.0,
+       24.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "SAHEL",
+   "properties": {
+    "id": "SAHEL",
+    "name": "Sahel"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -10.0,
+       10.0
+      ],
+      [
+       20.0,
+       10.0
+      ],
+      [
+       20.0,
+       22.0
+      ],
+      [
+       -10.0,
+       22.0
+      ],
+      [
+       -10.0,
+       10.0
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

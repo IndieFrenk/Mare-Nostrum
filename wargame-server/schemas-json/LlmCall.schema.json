@@ -1,0 +1,74 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "role": {
+   "type": "string",
+   "enum": [
+    "faction_major",
+    "faction_minor",
+    "gm_narrator",
+    "intel_analyst",
+    "order_parser",
+    "reflection",
+    "repair"
+   ]
+  },
+  "factionId": {
+   "type": "string",
+   "minLength": 2
+  },
+  "model": {
+   "type": "string"
+  },
+  "promptHash": {
+   "type": "string"
+  },
+  "request": {},
+  "response": {},
+  "ok": {
+   "type": "boolean"
+  },
+  "error": {
+   "type": "string"
+  },
+  "tokens": {
+   "type": "object",
+   "properties": {
+    "in": {
+     "type": "number"
+    },
+    "out": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "in",
+    "out"
+   ]
+  },
+  "latencyMs": {
+   "type": "number"
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "role",
+  "model",
+  "promptHash",
+  "request",
+  "response",
+  "ok",
+  "tokens",
+  "latencyMs"
+ ]
+}

@@ -1,0 +1,105 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "firstSeenTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "lastSeenTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "domain": {
+   "type": "string",
+   "enum": [
+    "sea",
+    "subsurface",
+    "air",
+    "land",
+    "space",
+    "cyber"
+   ]
+  },
+  "classification": {
+   "type": "string"
+  },
+  "estFaction": {
+   "type": "string"
+  },
+  "confidence": {
+   "type": "number"
+  },
+  "location": {
+   "type": "object",
+   "properties": {
+    "lat": {
+     "type": "number"
+    },
+    "lon": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "lat",
+    "lon"
+   ]
+  },
+  "errorKm": {
+   "type": "number"
+  },
+  "estCount": {
+   "type": "array",
+   "prefixItems": [
+    {
+     "type": "number"
+    },
+    {
+     "type": "number"
+    }
+   ],
+   "items": false,
+   "minItems": 2,
+   "maxItems": 2
+  },
+  "sources": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "enum": [
+     "radar",
+     "sar",
+     "eo",
+     "sigint",
+     "humint",
+     "ais",
+     "sonar",
+     "osint"
+    ]
+   }
+  },
+  "zoneId": {
+   "type": "string"
+  },
+  "truthUnitId": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "firstSeenTurn",
+  "lastSeenTurn",
+  "domain",
+  "classification",
+  "estFaction",
+  "confidence",
+  "location",
+  "errorKm",
+  "sources"
+ ]
+}
