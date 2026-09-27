@@ -24,7 +24,8 @@ const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
 export const api = {
   scenarios: () => req<{ id: string; name: string }[]>('GET', '/scenarios'),
   campaigns: () => req<{ id: string; name: string; parent: Campaign['parent'] }[]>('GET', '/campaigns'),
-  create: (b: { scenarioId: string; name: string; seed?: string; debugGodView?: boolean }) => req<Campaign>('POST', '/campaigns', b),
+  create: (b: { scenarioId: string; name: string; seed?: string; debugGodView?: boolean; cmoOnRequest?: boolean; turnLength?: 'week' | 'month' }) => req<Campaign>('POST', '/campaigns', b),
+  configure: (id: string, b: { turnLength?: 'week' | 'month'; cmoOnRequest?: boolean }) => req<Campaign>('POST', `${c(id)}/config`, b),
   campaign: (id: string) => req<Campaign>('GET', c(id)),
   overview: (id: string) => req<Overview>('GET', `${c(id)}/overview`),
   knowledge: (id: string) => req<FactionKnowledge>('GET', `${c(id)}/knowledge`),
@@ -37,7 +38,7 @@ export const api = {
   submit: (id: string, o: OrdersBody) => req<{ validation: Validation }>('POST', `${c(id)}/orders`, o),
   advance: (id: string) => req<Campaign>('POST', `${c(id)}/advance`),
   cmo: (id: string) => req<PendingCmo[]>('GET', `${c(id)}/cmo`),
-  cmoTextUrl: (id: string, engagementId: string) => `${BASE}${c(id)}/cmo?format=txt&engagementId=${encodeURIComponent(engagementId)}`,
+  cmoUrl: (id: string, engagementId: string, format: 'txt' | 'json') => `${BASE}${c(id)}/cmo?format=${format}&engagementId=${encodeURIComponent(engagementId)}`,
   aar: (id: string, engagementId: string, body: AfterActionReport | { autoResolve: true }) => req<unknown>('POST', `${c(id)}/cmo/${encodeURIComponent(engagementId)}/aar`, body),
   layer: (id: string, name: string, unitId?: string) => req<FC>('GET', `${c(id)}/layers/${name}.geojson${unitId ? `?unitId=${encodeURIComponent(unitId)}` : ''}`),
   fork: (id: string, fromTurn: number) => req<Campaign>('POST', `${c(id)}/fork`, { fromTurn }),

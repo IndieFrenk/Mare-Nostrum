@@ -22,7 +22,10 @@ export function countryCard(s: UiState, f: string) {
     const k = s.knowledge!;
     return h('div', { class: 'wg-float wg-country' }, h('header', {}, h('i', { style: `background:${FACTIONS.ITA!.color}` }), 'ITALIA', h('button', { onclick: () => set({ country: null }) }, '×')),
       h('p', {}, `Postura ${k.ownFaction.posture}/5 · stabilità ${k.ownFaction.stability} · credibilità ${k.ownFaction.credibility}`),
-      h('p', {}, `${k.ownUnits.filter((u) => u.status === 'deployed' || u.status === 'transit').length} unità schierate su ${k.ownUnits.length}`));
+      h('p', {}, `${k.ownUnits.filter((u) => u.status === 'deployed' || u.status === 'transit').length} unità schierate su ${k.ownUnits.length}`),
+      h('h4', {}, 'Obiettivi nazionali'),
+      h('div', { class: 'wg-meters' }, k.ownFaction.objectives.map((o) => meter(`P${o.priority} ${o.text}`, Math.round(o.progress * 100), 0, 100))),
+      k.ownFaction.redLines.length ? h('p', { class: 'wg-dim' }, `Linee rosse: ${k.ownFaction.redLines.map((r) => r.text).join('; ')}`) : null);
   }
   const act = (kind: 'REASSURANCE' | 'DEMARCHE' | 'THREAT') => () => addDiplo({ id: newId('d'), kind, target: f, message: text(), visibility: 'public' });
   return h('div', { class: 'wg-float wg-country' },

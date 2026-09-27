@@ -15,6 +15,8 @@ import { deliver } from './procurement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
+import { llmDefaults } from '../config.js';
+import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
 export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario }
 /** Porta verso gli agenti: il motore non conosce LLM, solo questo contratto. */
@@ -31,7 +33,6 @@ export class GameError extends Error { constructor(public code: string, message:
 
 export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Partial<Campaign['config']> }
 
-const DEFAULT_LLM = { model: 'default', temperature: 0.4, maxTokens: 2000, timeoutMs: 120_000 };
 
 export class Engine {
   onProgress: (campaignId: string, msg: Record<string, unknown>) => void = () => {};
@@ -41,14 +42,13 @@ export class Engine {
     const sc = loadScenario(o.scenarioId);
     const now = new Date().toISOString();
     const id = o.id ?? `c${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
-    const roles = ['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair'] as const;
     const campaign: Campaign = {
       schemaVersion: 1, id, name: o.name, scenarioId: o.scenarioId, seed: o.seed ?? id, rngCursor: 0, createdAt: now, updatedAt: now,
       currentTurn: 0, phase: 'CLOSED', date: sc.startDate, turnLength: o.turnLength ?? sc.turnLength, playerFaction: 'ITA', parent: null, status: 'active',
       config: {
         fogLevel: 'realistic', debugGodView: false, cmoThreshold: { majorShips: 1, aircraftPerSide: 4, missileSalvo: 8 },
-        llm: Object.fromEntries(roles.map((r) => [r, { ...DEFAULT_LLM, model: process.env[`LLM_MODEL_${r.toUpperCase()}`] ?? process.env.LLM_MODEL ?? 'default' }])) as Campaign['config']['llm'],
-        maxConcurrentAgents: 2, ...o.config,
+        llm: llmDefaults(),
+        maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config,
       },
     };
     const s = sc.world;
@@ -143,6 +143,8 @@ export class Engine {
       if (k) prev[f] = k.contacts as Contact[];
     }
     runDetection(ctx, prev);
+    contactEvents(ctx, prev);
+    confirmEnemyLosses(ctx);
     const extra = await this.previousExtras(ctx, c);
     for (const f of Object.values(ctx.state.factions).filter((f) => f.kind !== 'bloc')) {
       await this.store.saveKnowledge(c.id, buildKnowledge(ctx.state, f.id, ctx.truthContacts[f.id] ?? [], extra));
@@ -181,6 +183,8 @@ export class Engine {
 
   private async debrief(ctx: TurnCtx, c: Campaign) {
     applyEnergy(ctx);
+    updateObjectives(ctx);
+    checkThreats(ctx, [...(ctx.turn > 2 ? await this.store.getEvents(c.id, ctx.turn - 2) : []), ...(ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : []), ...(await this.store.getEvents(c.id, ctx.turn))]);
     await this.flush(ctx, c);
     const events = await this.store.getEvents(c.id, ctx.turn);
     const player = c.playerFaction;
@@ -247,6 +251,23 @@ export class Engine {
     const c = await this.store.getCampaign(id);
     if (fromTurn < 0 || fromTurn >= c.currentTurn + (c.phase === 'CLOSED' ? 1 : 0)) throw new GameError('BAD_TURN', `turno ${fromTurn} non chiuso`);
     return this.store.fork(id, fromTurn, `${id}-f${fromTurn}-${Date.now().toString(36)}`);
+  }
+
+  /** Cambi di configurazione in corsa (es. turno mensile→settimanale in crisi acuta, CMO su richiesta, modelli per ruolo). */
+  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; llm?: Record<string, Partial<Campaign['config']['llm'][keyof Campaign['config']['llm']]>> }) {
+    return this.store.withLock(id, async () => {
+      const c = await this.store.getCampaign(id);
+      if (patch.turnLength) c.turnLength = patch.turnLength;
+      const { llm, turnLength: _t, ...rest } = patch;
+      Object.assign(c.config, rest);
+      for (const [role, cfg] of Object.entries(llm ?? {})) {
+        if (!(role in c.config.llm)) throw new GameError('VALIDATION', `ruolo sconosciuto ${role}`);
+        Object.assign(c.config.llm[role as keyof typeof c.config.llm], cfg);
+      }
+      c.updatedAt = new Date().toISOString();
+      await this.store.saveCampaign(c);
+      return c;
+    });
   }
 
   async end(id: string) {

@@ -2,6 +2,7 @@ import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
+import { migrate } from './migrations/index.js';
 import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
@@ -54,7 +55,7 @@ export class JsonStore implements Store {
 
   private async read<T>(file: string, schema: ZodType<T>): Promise<T | null> {
     if (!existsSync(file)) return null;
-    return schema.parse(JSON.parse(await fs.readFile(file, 'utf8')));
+    return schema.parse(migrate(JSON.parse(await fs.readFile(file, 'utf8'))));
   }
 
   private async append(file: string, rows: unknown[], schema: ZodType) {
@@ -66,7 +67,7 @@ export class JsonStore implements Store {
 
   private async readLines<T>(file: string, schema: ZodType<T>): Promise<T[]> {
     if (!existsSync(file)) return [];
-    return (await fs.readFile(file, 'utf8')).split('\n').filter(Boolean).map((l) => schema.parse(JSON.parse(l)));
+    return (await fs.readFile(file, 'utf8')).split('\n').filter(Boolean).map((l) => schema.parse(migrate(JSON.parse(l))));
   }
 
   private must<T>(v: T | null, what: string): T {

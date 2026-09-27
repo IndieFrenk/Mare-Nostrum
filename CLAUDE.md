@@ -5,7 +5,8 @@ Spec: [docs/wargame/SPEC.md](docs/wargame/SPEC.md) · Stato: [docs/wargame/PROGR
 
 Comandi:
 - `npm --prefix wargame-server test` · `npm --prefix wargame-server run typecheck`
-- `npm run wargame:server` · `npm run dev:wargame` · `npm run wargame:all`
+- `npm run wargame:server` · `npm run dev:wargame` · `npm run wargame:all` · `npm run build:wargame`
+- `npm run wargame:llm-check` (OmniRoute, config in `wargame-server/.env`) · `npm --prefix wargame-server run geo:build` (coste/zone)
 - `npm --prefix wargame-server run sim -- --turns 5 --mock` · `... sim -- --replay <id>`
 
 Regole d'oro:

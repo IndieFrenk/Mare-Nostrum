@@ -86,7 +86,7 @@ function action(ctx: TurnCtx, f: string, m: Order) {
     Object.values(s.crises).filter((c) => c.zoneIds.includes(zoneId)).forEach((c) => ctx.escalate(c.id, 2, `strike di ${f} su ${m.targetRef}`));
     const player = ctx.campaign.playerFaction;
     const defenders = Object.values(s.units).filter((u) => u.factionId === victim && u.zoneId === zoneId && u.status !== 'destroyed').map((u) => u.id);
-    if ((f === player || victim === player) && victim && (n >= ctx.campaign.config.cmoThreshold.missileSalvo || unit)) {
+    if ((f === player || victim === player) && victim && (n >= ctx.campaign.config.cmoThreshold.missileSalvo || unit || ctx.campaign.config.cmoOnRequest)) {
       openEngagement(ctx, zoneId, [{ factionId: f, unitIds: m.unitIds }, { factionId: victim, unitIds: defenders.length ? defenders : unit ? [unit.id] : [] }], { missiles: n, orderId: m.id, objective: `Strike su ${m.targetRef}` });
       return;
     }

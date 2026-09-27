@@ -36,6 +36,8 @@ export class TurnCtx {
     };
     applyEvent(this.state, e);
     this.events.push(e);
+    if (type === 'UNIT_DAMAGED' && this.state.units[payload.unitId as string]?.status === 'destroyed')
+      this.emit('UNIT_DESTROYED', actor, { unitId: payload.unitId }, { targets: [payload.unitId as string], visibility: opts.visibility, causedBy: opts.causedBy });
     return e;
   }
 

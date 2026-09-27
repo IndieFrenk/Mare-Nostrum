@@ -26,9 +26,3 @@ export const NAMES: Record<string, string> = {
 };
 
 export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'DEU', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE'];
-
-/** Area approssimata controllata dall'LNA (Cirenaica e Fezzan), sovrapposta alla Libia. */
-export const LNA_AREA: GeoJSON.Feature = {
-  type: 'Feature', properties: { faction: 'LBY_LNA' },
-  geometry: { type: 'Polygon', coordinates: [[[19.0, 30.3], [20.0, 31.0], [20.1, 32.2], [21.5, 32.9], [23.0, 32.6], [25.1, 31.7], [25.0, 20.0], [18.0, 20.0], [16.5, 24.0], [17.8, 28.5], [19.0, 30.3]]] },
-};

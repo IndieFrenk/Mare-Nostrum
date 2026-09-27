@@ -12,6 +12,6 @@ export default defineConfig({
   },
   webServer: [
     { command: 'npm --prefix wargame-server start', url: 'http://127.0.0.1:8788/api/wg/scenarios', reuseExistingServer: false, env: { WARGAME_MOCK: '1', WARGAME_PORT: '8788', WARGAME_DATA_DIR: 'wargame-server/data/e2e' } },
-    { command: 'npx vite --port 5174 --strictPort', url: 'http://127.0.0.1:5174/wargame.html', reuseExistingServer: false, env: { VITE_VARIANT: 'wargame', VITE_WARGAME_API: 'http://127.0.0.1:8788' } },
+    { command: 'npx vite -c vite.wargame.config.ts --port 5174 --strictPort', url: 'http://127.0.0.1:5174/wargame.html', reuseExistingServer: false, env: { CI: '1', VITE_WARGAME_API: 'http://127.0.0.1:8788' } },
   ],
 });

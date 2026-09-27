@@ -2098,7 +2098,29 @@
    },
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-ITA-1",
+     "text": "Flussi di gas da TransMed e Greenstream operativi",
+     "priority": 1,
+     "metric": "infra(TRANSMED).status == operational && infra(GREENSTREAM).status == operational",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ITA-2",
+     "text": "Crisi del Mar Rosso sotto il livello 6",
+     "priority": 2,
+     "metric": "crisis(RED_SEA).escalation < 6",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ITA-3",
+     "text": "Pressione migratoria sotto 60",
+     "priority": 2,
+     "metric": "indicator(migrationPressure) < 60",
+     "progress": 0
+    }
+   ],
    "redLines": [
     {
      "id": "RL-ITA-ENI",
@@ -2204,7 +2226,22 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-USA-1",
+     "text": "Mar Rosso stabilizzato (escalation < 5)",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation < 5",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-USA-2",
+     "text": "Presenza navale nel Mar Rosso",
+     "priority": 2,
+     "metric": "units(USA, MAR_ROSSO) >= 1",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [
     {
@@ -2275,7 +2312,22 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-FRA-1",
+     "text": "Contenere la crisi del Sahel",
+     "priority": 1,
+     "metric": "crisis(SAHEL_MIG).escalation < 6",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-FRA-2",
+     "text": "Presenza nel Mediterraneo occidentale",
+     "priority": 3,
+     "metric": "units(FRA, MED_OCCIDENTALE) >= 1",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [
     {
@@ -2325,7 +2377,22 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-TUR-1",
+     "text": "Presenza navale nell'Egeo",
+     "priority": 1,
+     "metric": "units(TUR, EGEO) >= 2",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-TUR-2",
+     "text": "GNU stabile",
+     "priority": 2,
+     "metric": "faction(LBY_GNU).stability >= 35",
+     "progress": 0
+    }
+   ],
    "redLines": [
     {
      "id": "RL-TUR-EGEO",
@@ -2371,7 +2438,22 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-RUS-1",
+     "text": "Presenza nel Mediterraneo orientale",
+     "priority": 1,
+     "metric": "units(RUS, MEDITERRANEO_ORIENTALE) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-RUS-2",
+     "text": "LNA stabile",
+     "priority": 1,
+     "metric": "faction(LBY_LNA).stability >= 35",
+     "progress": 0
+    }
+   ],
    "redLines": [
     {
      "id": "RL-RUS-LNA",
@@ -2437,7 +2519,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-CHN-1",
+     "text": "Rotte commerciali sicure",
+     "priority": 1,
+     "metric": "indicator(medShippingRisk) < 60",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [
     {
@@ -2484,7 +2574,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-GBR-1",
+     "text": "Rotte di Suez aperte",
+     "priority": 1,
+     "metric": "infra(SUEZ).status == operational",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2510,7 +2608,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-GRC-1",
+     "text": "Tensione con la Turchia sotto 60",
+     "priority": 1,
+     "metric": "relation(GRC, TUR).tension < 60",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2537,7 +2643,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-EGY-1",
+     "text": "Canale di Suez operativo",
+     "priority": 1,
+     "metric": "infra(SUEZ).status == operational",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2561,7 +2675,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-ISR-1",
+     "text": "Contenere l'escalation del Mar Rosso",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation < 7",
+     "progress": 0
+    }
+   ],
    "redLines": [
     {
      "id": "RL-ISR-IRN",
@@ -2605,7 +2727,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-ALG-1",
+     "text": "Relazione di fiducia con l'Italia",
+     "priority": 2,
+     "metric": "relation(ALG, ITA).trust >= 30",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2629,7 +2759,15 @@
    "stocks": {},
    "stability": 40,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-TUN-1",
+     "text": "Sostegno economico italiano",
+     "priority": 2,
+     "metric": "relation(TUN, ITA).trust >= 30",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2653,7 +2791,15 @@
    "stocks": {},
    "stability": 40,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-LBY_GNU-1",
+     "text": "Stabilità interna",
+     "priority": 1,
+     "metric": "faction(LBY_GNU).stability >= 40",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2677,7 +2823,15 @@
    "stocks": {},
    "stability": 40,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-LBY_LNA-1",
+     "text": "Leva sui terminali energetici",
+     "priority": 2,
+     "metric": "crisis(LBY_OFFSHORE).escalation >= 4",
+     "progress": 0
+    }
+   ],
    "redLines": [],
    "isrAssets": [],
    "cyber": {
@@ -2701,7 +2855,15 @@
    "stocks": {},
    "stability": 70,
    "credibility": 60,
-   "objectives": [],
+   "objectives": [
+    {
+     "id": "OBJ-IRN-1",
+     "text": "Pressione sul Mar Rosso",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation >= 5",
+     "progress": 0
+    }
+   ],
    "redLines": [
     {
      "id": "RL-IRN-HORMUZ",

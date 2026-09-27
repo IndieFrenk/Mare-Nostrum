@@ -20,6 +20,7 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-res small { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; } .wg-res b { color: var(--gold); font-size: 14px; }
 .wg-spacer { flex: 1; }
 .wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
+.wg-len { font-size: 11px; margin-right: 6px; }
 .wg-play { width: 44px; height: 40px; font-size: 20px; background: linear-gradient(#e2c472, #a8853a); color: #1a1408; border: 2px solid #f0d890; border-radius: 50%; }
 
 /* menu sinistro a icone */
@@ -42,8 +43,8 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-float header button { margin-left: auto; } .wg-float header i { width: 18px; height: 12px; display: inline-block; border: 1px solid #000; }
 .wg-country { right: 10px; top: 200px; width: 320px; padding-bottom: 8px; } .wg-country > :not(header) { margin: 6px 10px; }
 .wg-country input { width: calc(100% - 20px); }
-.wg-meters { display: grid; gap: 4px; } .wg-meter { position: relative; background: #26271f; height: 18px; } .wg-meter b { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #7a2a22, #b89a3a, #3f8f4f); opacity: .7; }
-.wg-meter span { position: relative; z-index: 1; padding: 0 6px; font-size: 12px; }
+.wg-meters { display: grid; gap: 4px; } .wg-meter { position: relative; background: #26271f; min-height: 18px; } .wg-meter b { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #7a2a22, #b89a3a, #3f8f4f); opacity: .7; }
+.wg-meter span { position: relative; z-index: 1; display: block; padding: 1px 6px; font-size: 12px; }
 .wg-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 10px; }
 .wg-selection { left: 58px; bottom: 56px; width: 380px; max-height: 40vh; display: flex; flex-direction: column; }
 .wg-selection ul { list-style: none; margin: 0; padding: 4px; overflow: auto; } .wg-selection p { margin: 4px 10px; }

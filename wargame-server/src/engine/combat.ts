@@ -18,9 +18,10 @@ export function isMajor(ctx: TurnCtx, sides: Engagement['sides'], missiles = 0) 
 export function openEngagement(ctx: TurnCtx, zoneId: string, sides: Engagement['sides'], opts: { missiles?: number; orderId?: string; objective?: string } = {}): Engagement {
   const major = isMajor(ctx, sides, opts.missiles);
   const withPlayer = sides.some((s) => s.factionId === ctx.campaign.playerFaction);
+  const cmo = withPlayer && (major || ctx.campaign.config.cmoOnRequest);
   const eng: Engagement = {
     id: `ENG-${ctx.turn}-${Object.keys(ctx.state.engagements).length + 1}`, turn: ctx.turn, zoneId, location: ctx.state.zones[zoneId].center,
-    sides, scale: major ? 'major' : 'minor', resolution: major && withPlayer ? 'cmo' : 'auto', status: major && withPlayer ? 'pending_cmo' : 'resolved',
+    sides, scale: major ? 'major' : 'minor', resolution: cmo ? 'cmo' : 'auto', status: cmo ? 'pending_cmo' : 'resolved',
   };
   if (eng.resolution === 'cmo') eng.cmoPackage = buildCmoPackage(ctx, eng, opts.objective);
   ctx.emit('ENGAGEMENT_OPENED', sides[0].factionId, { engagement: eng }, { targets: sides.map((s) => s.factionId), causedBy: opts.orderId ? { orderId: opts.orderId } : null });

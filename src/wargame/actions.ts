@@ -1,7 +1,7 @@
 import { api, ApiError } from './api-client';
 import { emptyDraft, set, state } from './state/store';
 
-const LAYERS = ['units', 'contacts', 'crises', 'infrastructure', 'lanes', 'zones'];
+const LAYERS = ['units', 'contacts', 'crises', 'infrastructure', 'lanes', 'zones', 'control'];
 let closeStream: (() => void) | null = null;
 
 function remember(id: string | null) {
@@ -47,8 +47,8 @@ export async function refresh() {
   set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, layers: layerMap });
 }
 
-export const createCampaign = (name: string, seed: string, debugGodView: boolean) => guarded(async () => {
-  const c = await api.create({ scenarioId: 'med-2026', name, seed: seed || undefined, debugGodView });
+export const createCampaign = (name: string, seed: string, opts: { debugGodView: boolean; cmoOnRequest: boolean; turnLength: 'week' | 'month' }) => guarded(async () => {
+  const c = await api.create({ scenarioId: 'med-2026', name, seed: seed || undefined, ...opts });
   await openCampaign(c.id);
 });
 
@@ -89,3 +89,5 @@ export const resolveCmo = (engagementId: string, body: Parameters<typeof api.aar
 export const forkFrom = (turn: number) => guarded(async () => { const c = await api.fork(state.campaignId!, turn); await openCampaign(c.id); });
 export const endCampaign = () => guarded(async () => { await api.end(state.campaignId!); await refresh(); });
 export const leaveCampaign = () => { remember(null); closeStream?.(); set({ campaignId: null, campaign: null }); };
+
+export const configure = (patch: { turnLength?: 'week' | 'month'; cmoOnRequest?: boolean }) => guarded(async () => { set({ campaign: await api.configure(state.campaignId!, patch) }); });

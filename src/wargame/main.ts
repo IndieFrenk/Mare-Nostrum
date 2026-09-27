@@ -2,7 +2,7 @@
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
 import { api } from './api-client';
-import { createCampaign, leaveCampaign, openCampaign, rememberedCampaign, runTurn, selectUnit } from './actions';
+import { configure, createCampaign, leaveCampaign, openCampaign, rememberedCampaign, runTurn, selectUnit } from './actions';
 import { h, meur } from './dom';
 import { WarMap } from './layers/map';
 import { countryCard, orderToZone, selectionCard } from './panels/hud';
@@ -27,6 +27,7 @@ function topbar(s: UiState) {
     g ? [res('TTF', `${g.ttfEurMwh} €/MWh`, 'Prezzo gas'), res('Brent', `${g.brentUsd} $`, 'Prezzo petrolio'), res('Rotte', `${g.medShippingRisk}/100`, 'Rischio navigazione'), res('Migrazioni', `${g.migrationPressure}/100`, 'Pressione migratoria')] : null,
     h('div', { class: 'wg-spacer' }),
     h('div', { class: 'wg-date' }, h('b', {}, c.date), h('small', {}, `T${c.currentTurn} · ${c.phase}`)),
+    h('button', { class: 'wg-len', title: 'Durata del turno (passa a settimanale in crisi acuta)', onclick: () => configure({ turnLength: c.turnLength === 'week' ? 'month' : 'week' }) }, c.turnLength === 'week' ? 'Settimana' : 'Mese'),
     h('button', { class: 'wg-play', disabled: !canRun || s.busy, onclick: runTurn, 'aria-label': c.phase === 'CMO_PENDING' ? 'Prosegui' : 'Esegui turno' }, s.busy ? '…' : '▶'),
   );
 }
@@ -72,10 +73,12 @@ async function lobby() {
   const name = h('input', { placeholder: 'Nome campagna', value: 'Mare Nostrum 2026' });
   const seed = h('input', { placeholder: 'Seed (opzionale)' });
   const debug = h('input', { type: 'checkbox' });
+  const cmo = h('input', { type: 'checkbox' });
+  const len = h('select', {}, h('option', { value: 'week' }, 'turni settimanali'), h('option', { value: 'month' }, 'turni mensili'));
   root.replaceChildren(h('div', { id: 'wg-lobby', class: 'panel' },
     h('h1', {}, 'MARE NOSTRUM'), h('p', { class: 'wg-dim' }, 'Wargame geopolitico a turni · Mediterraneo allargato 2026 · Autorità Nazionale di Comando'),
     list === null ? h('p', { class: 'wg-err' }, 'wargame-server non raggiungibile: avvia `npm run wargame:server`.') : null,
-    h('h3', {}, 'Nuova campagna'), h('div', { class: 'wg-row' }, name, seed, h('label', {}, debug, ' debug god view'), h('button', { class: 'wg-primary', onclick: () => createCampaign(name.value, seed.value, debug.checked) }, 'Crea')),
+    h('h3', {}, 'Nuova campagna'), h('div', { class: 'wg-row' }, name, seed, len, h('label', {}, cmo, ' tutti gli ingaggi su CMO'), h('label', {}, debug, ' debug god view'), h('button', { class: 'wg-primary', onclick: () => createCampaign(name.value, seed.value, { debugGodView: debug.checked, cmoOnRequest: cmo.checked, turnLength: len.value as 'week' | 'month' }) }, 'Crea')),
     state.error ? h('p', { class: 'wg-err' }, state.error) : null,
     list?.length ? [h('h3', {}, 'Campagne esistenti'), h('ul', {}, list.map((c) => h('li', {}, h('a', { href: '#', onclick: (e: Event) => { e.preventDefault(); void openCampaign(c.id); } }, c.name), c.parent ? ` (ramo di ${c.parent.campaignId} T${c.parent.turn})` : '')))] : null));
 }

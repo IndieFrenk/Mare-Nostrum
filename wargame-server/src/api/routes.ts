@@ -34,8 +34,8 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
   app.get(`${P}/scenarios`, async () => listScenarios());
   app.get(`${P}/campaigns`, async () => store.listCampaigns());
   app.post<{ Body: unknown }>(`${P}/campaigns`, async (req) => {
-    const b = z.object({ scenarioId: z.string().default('med-2026'), name: z.string().min(1), seed: z.string().optional(), turnLength: z.enum(['week', 'month']).optional(), debugGodView: z.boolean().optional() }).parse(req.body);
-    return engine.createCampaign({ ...b, config: b.debugGodView ? { debugGodView: true } : undefined });
+    const b = z.object({ scenarioId: z.string().default('med-2026'), name: z.string().min(1), seed: z.string().optional(), turnLength: z.enum(['week', 'month']).optional(), debugGodView: z.boolean().optional(), cmoOnRequest: z.boolean().optional() }).parse(req.body);
+    return engine.createCampaign({ ...b, config: { debugGodView: b.debugGodView ?? false, cmoOnRequest: b.cmoOnRequest ?? false } });
   });
   app.get<Id>(`${P}/campaigns/:id`, async (req) => store.getCampaign(req.params.id));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/fork`, async (req) => engine.fork(req.params.id, z.object({ fromTurn: z.number().int() }).parse(req.body).fromTurn));
@@ -68,14 +68,22 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
   app.post<Id & { Body: { text: string } }>(`${P}/campaigns/:id/orders/parse`, async (req) => engine.parseOrders(req.params.id, z.object({ text: z.string().min(1) }).parse(req.body).text));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders/validate`, async (req) => engine.validate(req.params.id, OrdersBody.parse(req.body)));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders`, async (req) => engine.submitOrders(req.params.id, OrdersBody.parse(req.body)));
-  app.post<Id>(`${P}/campaigns/:id/advance`, async (req) => engine.advance(req.params.id));
+  app.post<Id>(`${P}/campaigns/:id/advance`, async (req) => {
+    try { return await engine.advance(req.params.id); } catch (e) { bus.emit(req.params.id, { error: (e as Error).message }); throw e; }
+  });
+  app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/config`, async (req) => engine.configure(req.params.id, z.object({
+    turnLength: z.enum(['week', 'month']).optional(), cmoOnRequest: z.boolean().optional(), debugGodView: z.boolean().optional(),
+    maxConcurrentAgents: z.number().int().min(1).max(16).optional(),
+    llm: z.record(z.string(), z.object({ model: z.string().optional(), temperature: z.number().optional(), maxTokens: z.number().optional(), timeoutMs: z.number().optional() })).optional(),
+  }).parse(req.body)));
   app.get<Id & { Querystring: { format?: string; engagementId?: string } }>(`${P}/campaigns/:id/cmo`, async (req, reply) => {
     const s = await store.getState(req.params.id);
     const pending = Object.values(s.engagements).filter((e) => e.status === 'pending_cmo').map((e) => ({ id: e.id, turn: e.turn, zoneId: e.zoneId, scale: e.scale, cmoPackage: e.cmoPackage! }));
-    if (req.query.format === 'txt') {
+    if (req.query.format === 'txt' || req.query.format === 'json') {
       const e = pending.find((p) => p.id === req.query.engagementId) ?? pending[0];
       if (!e) throw new GameError('NOT_FOUND', 'nessun ingaggio in attesa');
-      return reply.header('content-type', 'text/plain; charset=utf-8').header('content-disposition', `attachment; filename="${e.id}.txt"`).send(cmoText(e.cmoPackage));
+      const json = req.query.format === 'json';
+      return reply.header('content-type', json ? 'application/json' : 'text/plain; charset=utf-8').header('content-disposition', `attachment; filename="${e.id}.${req.query.format}"`).send(json ? JSON.stringify(e.cmoPackage, null, 2) : cmoText(e.cmoPackage));
     }
     return pending;
   });

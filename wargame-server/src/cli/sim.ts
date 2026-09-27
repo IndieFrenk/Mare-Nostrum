@@ -6,7 +6,7 @@ import { MockLLMProvider } from '../agents/mock-provider.js';
 import { OpenAiCompatProvider } from '../agents/llm-client.js';
 import { ReplayAgents } from '../agents/replay.js';
 import { JsonStore } from '../store/json-store.js';
-import type { Campaign } from '../schemas/index.js';
+import type { Campaign, LlmCall } from '../schemas/index.js';
 
 /** Simulazione headless: `sim -- --turns 5 --mock` · `sim -- --replay <id>` · smoke LLM reale senza --mock. */
 export async function runSim(engine: Engine, c: Campaign, turns: number, player?: (turn: number) => Promise<void>) {
@@ -46,9 +46,18 @@ async function main() {
   const c = await engine.createCampaign({ scenarioId: values.scenario!, name: `Sim ${new Date().toISOString()}`, seed: values.seed });
   const r = await runSim(engine, c, Number(values.turns));
   const s = await store.getState(r.campaign.id);
-  const decisions = await Promise.all(Object.keys(s.factions).map((f) => store.getDecision(r.campaign.id, 1, f)));
-  const tok = decisions.reduce((a, d) => a + (d?.usage.promptTokens ?? 0) + (d?.usage.completionTokens ?? 0), 0);
-  console.log(`campagna ${r.campaign.id}: turno ${r.campaign.currentTurn} (${r.campaign.phase}), ${r.ms} ms, FOED ${s.factions.ITA.budget.discretionary} M€, token T1 fazioni ${tok}`);
+  console.log(`campagna ${r.campaign.id}: turno ${r.campaign.currentTurn} (${r.campaign.phase}), ${r.ms} ms, FOED ${s.factions.ITA.budget.discretionary} M€`);
+  const { readdir, readFile } = await import('node:fs/promises');
+  const dir = store.dir(r.campaign.id, 'llm-log');
+  const calls = (await Promise.all((await readdir(dir).catch(() => [])).map((f) => readFile(`${dir}/${f}`, 'utf8'))))
+    .flatMap((t) => t.split('\n').filter(Boolean).map((l) => JSON.parse(l) as LlmCall));
+  const byRole = new Map<string, LlmCall[]>();
+  for (const c of calls) byRole.set(c.role, [...(byRole.get(c.role) ?? []), c]);
+  console.log('ruolo            chiamate  ok%   token in/out     latenza media');
+  for (const [role, cs] of byRole) {
+    const sum = (f: (c: LlmCall) => number) => cs.reduce((a, c) => a + f(c), 0);
+    console.log(`${role.padEnd(16)} ${String(cs.length).padStart(8)}  ${String(Math.round((100 * cs.filter((c) => c.ok).length) / cs.length)).padStart(3)}%  ${`${sum((c) => c.tokens.in)}/${sum((c) => c.tokens.out)}`.padStart(15)}  ${Math.round(sum((c) => c.latencyMs) / cs.length)} ms`);
+  }
   for (const cr of Object.values(s.crises)) console.log(`  crisi ${cr.id}: ${cr.escalation}/10 ${cr.status}`);
 }
 

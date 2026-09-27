@@ -16,6 +16,8 @@ export const Campaign = z.object({
     fogLevel: z.enum(['realistic', 'relaxed', 'none']), debugGodView: z.boolean(),
     cmoThreshold: z.object({ majorShips: z.number(), aircraftPerSide: z.number(), missileSalvo: z.number() }),
     llm: z.record(AgentRole, LlmRoleConfig), maxConcurrentAgents: z.number().int().min(1),
+    /** il giocatore chiede CMO per ogni ingaggio che lo coinvolge, anche minore */
+    cmoOnRequest: z.boolean().default(false),
   }),
 });
 

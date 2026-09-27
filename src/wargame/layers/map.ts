@@ -1,9 +1,10 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import countriesUrl from '../assets/countries.geojson?url';
 import ms from 'milsymbol';
 import type { UiState } from '../state/store';
-import { EU_ISO, FACTIONS, LNA_AREA, MAP_LABELS, NAMES } from './factions';
+import { EU_ISO, FACTIONS, MAP_LABELS, NAMES } from './factions';
 
 type Props = Record<string, any>;
 type FC = GeoJSON.FeatureCollection;
@@ -54,13 +55,14 @@ export class WarMap {
 
   private setup() {
     const m = this.map;
-    m.addSource('countries', { type: 'geojson', data: new URL('/data/countries.geojson', window.location.href).href });
-    m.addSource('lna', { type: 'geojson', data: LNA_AREA });
-    for (const id of ['zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'contactAreas', 'ranges', 'plans']) m.addSource(id, { type: 'geojson', data: EMPTY });
+    // confini 1:50m generati da `npm --prefix wargame-server run geo:build`
+    m.addSource('countries', { type: 'geojson', data: new URL(countriesUrl, window.location.href).href });
+    for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'contactAreas', 'ranges', 'plans']) m.addSource(id, { type: 'geojson', data: EMPTY });
     m.addLayer({ id: 'countries-fill', type: 'fill', source: 'countries', paint: { 'fill-color': '#4a4a42' } });
-    m.addLayer({ id: 'lna-fill', type: 'fill', source: 'lna', paint: { 'fill-color': FACTIONS.LBY_LNA!.color, 'fill-opacity': 0.85 } });
+    m.addLayer({ id: 'control-fill', type: 'fill', source: 'control', paint: { 'fill-color': '#8f6a3a', 'fill-opacity': 0.9 } });
+    m.addLayer({ id: 'control-line', type: 'line', source: 'control', paint: { 'line-color': '#101418', 'line-width': 0.7, 'line-dasharray': [3, 2] } });
     m.addLayer({ id: 'countries-line', type: 'line', source: 'countries', paint: { 'line-color': '#101418', 'line-width': 0.7 } });
-    m.addLayer({ id: 'countries-sel', type: 'line', source: 'countries', paint: { 'line-color': '#f5d77a', 'line-width': 2.2 }, filter: ['==', ['get', 'ISO3166-1-Alpha-3'], ''] });
+    m.addLayer({ id: 'countries-sel', type: 'line', source: 'countries', paint: { 'line-color': '#f5d77a', 'line-width': 2.2 }, filter: ['==', ['get', 'ISO3166-1-Alpha-3'], '__none__'] });
     m.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', paint: { 'fill-color': '#ffffff', 'fill-opacity': 0 } });
     m.addLayer({ id: 'zones-line', type: 'line', source: 'zones', filter: ['==', ['get', 'terrain'], 'sea'], paint: { 'line-color': '#9cc3e4', 'line-opacity': 0.25, 'line-dasharray': [2, 3] } });
     m.addLayer({ id: 'crises-fill', type: 'fill', source: 'crises', paint: { 'fill-color': ['interpolate', ['linear'], ['get', 'escalation'], 0, '#d8c24b', 5, '#ff8a3d', 10, '#ff2d2d'], 'fill-opacity': 0.18 } });
@@ -88,7 +90,8 @@ export class WarMap {
     tip('crises-fill', (p) => `${p.crises} — escalation ${p.escalation}/10`);
 
     m.on('click', (e) => {
-      if (m.queryRenderedFeatures(e.point, { layers: ['lna-fill'] }).length) return this.h.openCountry('LBY_LNA');
+      const area = m.queryRenderedFeatures(e.point, { layers: ['control-fill'] })[0]?.properties?.faction;
+      if (area) return this.h.openCountry(String(area));
       const iso = m.queryRenderedFeatures(e.point, { layers: ['countries-fill'] })[0]?.properties?.['ISO3166-1-Alpha-3'];
       const f = Object.entries(FACTIONS).find(([, v]) => v.iso === iso)?.[0] ?? null;
       this.h.openCountry(f);
@@ -108,7 +111,7 @@ export class WarMap {
     const m = this.map;
     m.setProjection({ type: s.globe ? 'globe' : 'mercator' });
     const src = (id: string, data: FC) => (m.getSource(id) as maplibregl.GeoJSONSource).setData(data);
-    for (const id of ['zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'ranges']) src(id, (s.layers[id] as FC) ?? EMPTY);
+    for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'ranges']) src(id, (s.layers[id] as FC) ?? EMPTY);
     src('contactAreas', { type: 'FeatureCollection', features: (s.layers.contacts?.features ?? []).map((f) => { const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number]; return { type: 'Feature', properties: f.properties, geometry: circle(lon, lat, Math.max(3, f.properties!.errorKm)) }; }) });
     this.renderPlans(s);
     this.renderMode(s);
@@ -129,9 +132,9 @@ export class WarMap {
     else value = factionColor;
     const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...pairs(value), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
     m.setPaintProperty('countries-fill', 'fill-color', expr as never);
-    m.setPaintProperty('lna-fill', 'fill-color', value('LBY_LNA'));
+    m.setPaintProperty('control-fill', 'fill-color', ['match', ['get', 'faction'], ...Object.keys(FACTIONS).flatMap((f) => [f, value(f)]), other] as never);
     m.setPaintProperty('crises-fill', 'fill-opacity', s.mapMode === 'crisi' ? 0.45 : 0.18);
-    m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && FACTIONS[s.country]?.iso) || '']);
+    m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && FACTIONS[s.country]?.iso) || '__none__']);
   }
 
   private renderPlans(s: UiState) {

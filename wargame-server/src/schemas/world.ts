@@ -98,6 +98,7 @@ export const Engagement = z.object({
   scale: z.enum(['minor', 'major']), resolution: z.enum(['auto', 'cmo']), status: z.enum(['pending_cmo', 'resolved']),
   cmoPackage: CmoPackage.optional(), aar: AfterActionReport.optional(),
   autoResult: z.object({ rollIds: z.array(z.string()), summary: z.string() }).optional(),
+  enemyLossesConfirmed: z.array(z.object({ classification: z.string(), status: z.enum(['destroyed', 'damaged', 'intact']) })).optional(),
 });
 
 export const WorldState = z.object({

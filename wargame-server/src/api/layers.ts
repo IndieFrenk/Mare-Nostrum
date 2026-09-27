@@ -31,6 +31,7 @@ export function layer(name: string, s: WorldState, k: FactionKnowledge, sc: Scen
     }
     case 'infrastructure': { const fc = geo(sc, 'infrastructure'); fc.features.forEach((f) => Object.assign(f.properties, { status: s.infrastructure[f.id as string]?.status })); return fc; }
     case 'lanes': return geo(sc, 'lanes');
+    case 'control': return geo(sc, 'control');
     case 'ranges': {
       const u = k.ownUnits.find((x) => x.id === unitId);
       if (!u) return { type: 'FeatureCollection', features: [] };

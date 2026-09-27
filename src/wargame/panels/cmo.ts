@@ -1,14 +1,8 @@
 import type { AfterActionReport, PendingCmo } from '../api-client';
 import { api } from '../api-client';
-import { endCampaign, forkFrom, resolveCmo } from '../actions';
+import { configure, endCampaign, forkFrom, resolveCmo } from '../actions';
 import { h, pct, select } from '../dom';
 import type { UiState } from '../state/store';
-
-function download(name: string, data: unknown) {
-  const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), download: name });
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
 
 function aarForm(s: UiState, e: PendingCmo) {
   const lossRows = h('div', {});
@@ -41,15 +35,18 @@ function aarForm(s: UiState, e: PendingCmo) {
 }
 
 export function cmoPanel(s: UiState) {
-  if (!s.cmo.length) return h('p', { class: 'wg-dim' }, 'Nessun ingaggio maggiore in attesa.');
-  return h('div', {}, s.cmo.map((e) => {
+  const toggle = h('label', { class: 'wg-row' }, h('input', { type: 'checkbox', checked: !!s.campaign?.config.cmoOnRequest, onchange: (e: Event) => configure({ cmoOnRequest: (e.target as HTMLInputElement).checked }) }), 'Risolvi su CMO anche gli ingaggi minori che coinvolgono l\'Italia');
+  const confirmed = (s.events ?? []).filter((e) => e.type === 'ENGAGEMENT_RESOLVED' && (e.payload as { patch?: { enemyLossesConfirmed?: unknown } }).patch?.enemyLossesConfirmed);
+  const header = [toggle, confirmed.length ? h('div', { class: 'wg-card' }, h('h4', {}, 'Conferme ISR sulle perdite nemiche'), h('ul', {}, confirmed.map((e) => h('li', {}, `${(e.payload as { engagementId: string }).engagementId}: ${((e.payload as { patch: { enemyLossesConfirmed: { classification: string; status: string }[] } }).patch.enemyLossesConfirmed).map((x) => `${x.classification} → ${x.status}`).join('; ') || 'nessuna conferma'}`)))) : null];
+  if (!s.cmo.length) return h('div', {}, header, h('p', { class: 'wg-dim' }, 'Nessun ingaggio in attesa di CMO.'));
+  return h('div', {}, header, s.cmo.map((e) => {
     const p = e.cmoPackage;
     return h('div', {},
       h('h3', { class: 'wg-warn' }, `${p.headline} — ${e.id}`),
       h('p', {}, `${e.zoneId} · ROE ${p.roe} · finestra ${p.environment.timeWindowUtc} UTC · mare ${p.environment.seaState} · vis. ${p.environment.visibilityKm} km · ${p.environment.clouds}`),
       h('h4', {}, 'Forze proprie'), h('ul', {}, p.playerForces.map((f) => h('li', {}, `${f.name} (${f.readiness}%): ${Object.entries(f.loadout).map(([k, v]) => `${k}×${v}`).join(', ')}`))),
       h('h4', {}, 'Stima OOB ostile'), h('ul', {}, p.enemyOobEstimate.map((x) => h('li', {}, `${x.classification}: ${x.estCount[0]}–${x.estCount[1]} (conf. ${pct(x.confidence)}) ${x.notes}`))),
-      h('div', { class: 'wg-row' }, h('a', { href: api.cmoTextUrl(s.campaignId!, e.id), target: '_blank', rel: 'noopener' }, 'Scarica .txt'), h('button', { onclick: () => download(`${e.id}.json`, p) }, 'Scarica .json')),
+      h('div', { class: 'wg-row' }, h('a', { href: api.cmoUrl(s.campaignId!, e.id, 'txt'), download: `${e.id}.txt` }, 'Scarica .txt'), h('a', { href: api.cmoUrl(s.campaignId!, e.id, 'json'), download: `${e.id}.json` }, 'Scarica .json')),
       aarForm(s, e));
   }));
 }

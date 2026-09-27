@@ -11,7 +11,9 @@
     "test": "vitest run",
     "sim": "tsx src/cli/sim.ts",
     "smoke-llm": "tsx src/cli/sim.ts --turns 1",
-    "schemas:export": "tsx src/cli/export-schemas.ts"
+    "schemas:export": "tsx src/cli/export-schemas.ts",
+    "geo:build": "tsx scripts/build-geo.ts",
+    "llm:check": "tsx src/cli/llm-check.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "polygon-clipping": "^0.15.7",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "vitest": "^4.1.0"

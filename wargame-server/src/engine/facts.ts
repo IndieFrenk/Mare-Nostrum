@@ -46,6 +46,7 @@ export function debriefFacts(turn: number, events: GameEvent[], ledger: LedgerEn
   for (const e of events) {
     const p = e.payload as Record<string, any>;
     if (e.type === 'ENGAGEMENT_OPENED') add('Operazioni', `Ingaggio ${p.engagement.id} in ${p.engagement.zoneId} (${p.engagement.scale}).`);
+    if (e.type === 'ENGAGEMENT_RESOLVED' && p.patch?.enemyLossesConfirmed) add('Operazioni', `ISR su ${p.engagementId}: ${p.patch.enemyLossesConfirmed.map((x: { classification: string; status: string }) => `${x.classification} ${x.status}`).join('; ') || 'nessuna perdita nemica confermata'}.`);
     if (e.type === 'ENGAGEMENT_RESOLVED' && p.patch?.autoResult) add('Operazioni', `Esito ${p.engagementId}: ${p.patch.autoResult.summary}.`);
     if (e.type === 'UNIT_DAMAGED' && e.visibility !== 'public' && e.visibility.includes(player)) add('Usura e perdite', `Unità ${p.unitId} danneggiata (${p.damage}%).`);
     if (e.type === 'CRISIS_CHANGED' && p.delta) add('Diplomazia e crisi', `Crisi ${p.crisisId}: ${p.delta > 0 ? '+' : ''}${p.delta} (${p.cause}).`);

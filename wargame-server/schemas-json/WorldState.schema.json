@@ -1334,6 +1334,29 @@
        "rollIds",
        "summary"
       ]
+     },
+     "enemyLossesConfirmed": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "classification": {
+         "type": "string"
+        },
+        "status": {
+         "type": "string",
+         "enum": [
+          "destroyed",
+          "damaged",
+          "intact"
+         ]
+        }
+       },
+       "required": [
+        "classification",
+        "status"
+       ]
+      }
      }
     },
     "required": [
