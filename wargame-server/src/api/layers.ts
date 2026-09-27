@@ -20,7 +20,7 @@ export function layer(name: string, s: WorldState, k: FactionKnowledge, sc: Scen
   switch (name) {
     case 'units': return { type: 'FeatureCollection', features: k.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => ({ type: 'Feature', id: u.id, properties: { id: u.id, name: u.name, type: u.type, domain: u.domain, status: u.status, readiness: u.readiness, count: u.count, classId: u.classId, task: (u.currentTask as { kind?: string } | null)?.kind ?? null }, geometry: pt(u.location) })) };
     case 'contacts': return { type: 'FeatureCollection', features: k.contacts.map((c) => ({ type: 'Feature', id: c.id, properties: { id: c.id, classification: c.classification, estFaction: c.estFaction, confidence: c.confidence, errorKm: c.errorKm, domain: c.domain, sources: c.sources }, geometry: pt(c.location) })) };
-    case 'zones': { const fc = geo(sc, 'zones'); fc.features.forEach((f) => Object.assign(f.properties, { tension: s.zones[f.id as string]?.tension ?? 0 })); return fc; }
+    case 'zones': { const fc = geo(sc, 'zones'); fc.features.forEach((f) => { const z = s.zones[f.id as string]; Object.assign(f.properties, { tension: z?.tension ?? 0, terrain: z?.terrain, center: z ? [z.center.lon, z.center.lat] : null }); }); return fc; }
     case 'crises': {
       const fc = geo(sc, 'zones');
       fc.features = fc.features.flatMap((f) => {

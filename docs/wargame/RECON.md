@@ -14,8 +14,8 @@ Base: `koala73/worldmonitor@67a1f75` importato come commit squash (AGPL-3.0, `LI
 | Test | `vitest.config.mts`, `tests/*.test.mjs`, `e2e/*.spec.ts`, `playwright.config.ts` | |
 
 ## Punti di aggancio scelti
-1. **Entry dedicata** `wargame.html` → `src/wargame/main.ts`, script `npm run dev:wargame` (`VITE_VARIANT=wargame`). Non passa per `src/main.ts`, quindi nessun servizio upstream viene importato: zero rete esterna per costruzione (solo tile della basemap `tiles.openfreemap.org`, già usata da upstream).
-2. **Riuso**: stesso stack mappa (`maplibre-gl` + `deck.gl`), stile basemap `FALLBACK_DARK_STYLE` di `src/config/basemap.ts`, convenzioni CSS dei pannelli (`.panel`, `.panel-header`, `.panel-content`).
+1. **Entry dedicata** `wargame.html` → `src/wargame/main.ts`, script `npm run dev:wargame` (`VITE_VARIANT=wargame`). Non passa per `src/main.ts`, quindi nessun servizio upstream viene importato: zero rete esterna per costruzione.
+2. **Riuso**: `maplibre-gl` (con il worker configurato come in `DeckGLMap.ts`), i confini in `public/data/countries.geojson`, convenzioni CSS dei pannelli (`.panel`, `.panel-header`, `.panel-content`).
 3. **Backend** in `wargame-server/` come package npm separato (proprie dipendenze), tipi condivisi importati dal frontend come `import type`.
 
 ## Servizi da disattivare
@@ -29,7 +29,7 @@ Tutti quelli caricati da `src/main.ts`/`App.ts` (news RSS, mercati, voli, AIS re
 ## Deviazioni dalla spec
 - Variante via entry HTML separata anziché `SITE_VARIANTS` (motivo sopra).
 - `zod-to-json-schema` non serve: Zod 4 ha `z.toJSONSchema`.
-- Mappa 2D maplibre+deck.gl (no globe) nella prima versione.
+- Mappa MapLibre con proiezione globo e confini da `public/data/countries.geojson`: nessuna tile esterna.
 - `world.json` usa unità compatte idratate dal catalogo classi (evita duplicare firme/sensori).
 
 ## Piano fasi 1–7

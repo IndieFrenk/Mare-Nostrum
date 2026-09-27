@@ -1,13 +1,13 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapboxOverlay } from '@deck.gl/mapbox';
-import { GeoJsonLayer, IconLayer, ScatterplotLayer } from '@deck.gl/layers';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import ms from 'milsymbol';
-import { FALLBACK_DARK_STYLE } from '@/config/basemap';
 import type { UiState } from '../state/store';
+import { EU_ISO, FACTIONS, LNA_AREA, MAP_LABELS, NAMES } from './factions';
 
-type Rgba = [number, number, number, number];
 type Props = Record<string, any>;
+type FC = GeoJSON.FeatureCollection;
+const EMPTY: FC = { type: 'FeatureCollection', features: [] };
 
 /** APP-6/MIL-STD-2525C (lettere) per le unità proprie. */
 const SIDC: Record<string, string> = {
@@ -15,61 +15,178 @@ const SIDC: Record<string, string> = {
   submarine: 'SFUPS----------', fighter_sqn: 'SFAPMFF--------', strike_sqn: 'SFAPMFA--------', aew: 'SFAPMFRW-------', mpa: 'SFAPMFP--------',
   drone_flight: 'SFAPMFQ--------', sam_battery: 'SFGPUCDM-------', ground_bn: 'SFGPUCI--------', sof_team: 'SFGPUCIS-------', tanker: 'SFSPNR---------', transport: 'SFSPNS---------',
 };
-const STATUS_COLOR: Record<string, string> = { ready: '#6fb6ff', deployed: '#4be08a', transit: '#f2d24b', maintenance: '#b0b0b0', damaged: '#ff8a3d', destroyed: '#555' };
-const icons = new Map<string, { url: string; width: number; height: number; anchorY: number }>();
+const STATUS_COLOR: Record<string, string> = { ready: '#8fc4ff', deployed: '#6fe39a', transit: '#f2d24b', maintenance: '#b0b0b0', damaged: '#ff8a3d', destroyed: '#555' };
+const icon = (type: string, status: string) => new ms.Symbol(SIDC[type] ?? 'SFGP-----------', { size: 20, fillColor: STATUS_COLOR[status] ?? '#8fc4ff' }).toDataURL();
 
-function icon(type: string, status: string) {
-  const key = `${type}:${status}`;
-  if (!icons.has(key)) {
-    const sym = new ms.Symbol(SIDC[type] ?? 'SFGP-----------', { size: 22, fillColor: STATUS_COLOR[status] ?? '#6fb6ff' });
-    const { width, height } = sym.getSize();
-    icons.set(key, { url: sym.toDataURL(), width, height, anchorY: height / 2 });
-  }
-  return icons.get(key)!;
+function circle(lon: number, lat: number, km: number, n = 40): GeoJSON.Polygon {
+  return { type: 'Polygon', coordinates: [Array.from({ length: n + 1 }, (_, i) => { const a = (i / n) * 2 * Math.PI; return [lon + (km / (111 * Math.cos((lat * Math.PI) / 180))) * Math.sin(a), lat + (km / 111) * Math.cos(a)]; })] };
+}
+const factionColor = (f: string) => FACTIONS[f]?.color ?? '#d0d0d0';
+
+export interface MapHandlers {
+  selectUnit: (id: string, add: boolean) => void;
+  openStack: (ids: string[]) => void;
+  openCountry: (factionId: string | null) => void;
+  orderToZone: (zoneId: string) => void;
 }
 
-const escalationColor = (e: number): Rgba => [Math.min(255, 60 + e * 20), Math.max(40, 200 - e * 18), 60, 40 + e * 10];
-const infraColor = (s: string): Rgba => (s === 'offline' ? [255, 60, 60, 230] : s === 'degraded' ? [255, 170, 40, 230] : [80, 200, 255, 200]);
-const factionColor = (f: string): Rgba => (f === 'unknown' ? [220, 220, 220, 255] : ['RUS', 'IRN'].includes(f) ? [255, 70, 70, 255] : ['USA', 'FRA', 'GBR', 'GRC'].includes(f) ? [120, 170, 255, 255] : [255, 200, 70, 255]);
-
+/** Mappa a tutto schermo in stile grand strategy: globo 3D, paesi colorati per fazione, pedine sulle posizioni. */
 export class WarMap {
   readonly map: maplibregl.Map;
-  private overlay = new MapboxOverlay({ interleaved: false, layers: [] });
+  private ready: Promise<void>;
+  private markers: maplibregl.Marker[] = [];
+  private labels: maplibregl.Marker[] = [];
+  private last: UiState | null = null;
 
-  constructor(container: HTMLElement, private onSelect: (unitId: string) => void) {
-    this.map = new maplibregl.Map({ container, style: FALLBACK_DARK_STYLE, center: [18, 36], zoom: 4.2, attributionControl: { compact: true } });
-    this.map.addControl(this.overlay as unknown as maplibregl.IControl);
-    this.map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+  constructor(container: HTMLElement, private h: MapHandlers) {
+    maplibregl.setWorkerUrl(maplibreWorkerUrl); // come DeckGLMap upstream: il worker non passa dall'optimizer di Vite
+    this.map = new maplibregl.Map({
+      container, center: [16, 36], zoom: 2.6, attributionControl: false, renderWorldCopies: false,
+      style: { version: 8, projection: { type: 'globe' }, sources: {}, layers: [{ id: 'sea', type: 'background', paint: { 'background-color': '#16324a' } }] },
+    });
+    this.map.dragRotate.disable();
+    if (import.meta.env.DEV) (window as unknown as { __wgMap: maplibregl.Map }).__wgMap = this.map;
+    this.map.on('error', (e) => console.error('mappa:', e.error?.message ?? e));
+    this.ready = new Promise((r) => this.map.on('load', () => { this.setup(); r(); }));
+    this.map.on('zoomend', () => this.last && this.renderUnits(this.last));
+    this.map.on('moveend', () => this.last && this.renderUnits(this.last));
   }
 
-  flyTo(lon: number, lat: number) { this.map.flyTo({ center: [lon, lat], zoom: Math.max(this.map.getZoom(), 6) }); }
+  private setup() {
+    const m = this.map;
+    m.addSource('countries', { type: 'geojson', data: new URL('/data/countries.geojson', window.location.href).href });
+    m.addSource('lna', { type: 'geojson', data: LNA_AREA });
+    for (const id of ['zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'contactAreas', 'ranges', 'plans']) m.addSource(id, { type: 'geojson', data: EMPTY });
+    m.addLayer({ id: 'countries-fill', type: 'fill', source: 'countries', paint: { 'fill-color': '#4a4a42' } });
+    m.addLayer({ id: 'lna-fill', type: 'fill', source: 'lna', paint: { 'fill-color': FACTIONS.LBY_LNA!.color, 'fill-opacity': 0.85 } });
+    m.addLayer({ id: 'countries-line', type: 'line', source: 'countries', paint: { 'line-color': '#101418', 'line-width': 0.7 } });
+    m.addLayer({ id: 'countries-sel', type: 'line', source: 'countries', paint: { 'line-color': '#f5d77a', 'line-width': 2.2 }, filter: ['==', ['get', 'ISO3166-1-Alpha-3'], ''] });
+    m.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', paint: { 'fill-color': '#ffffff', 'fill-opacity': 0 } });
+    m.addLayer({ id: 'zones-line', type: 'line', source: 'zones', filter: ['==', ['get', 'terrain'], 'sea'], paint: { 'line-color': '#9cc3e4', 'line-opacity': 0.25, 'line-dasharray': [2, 3] } });
+    m.addLayer({ id: 'crises-fill', type: 'fill', source: 'crises', paint: { 'fill-color': ['interpolate', ['linear'], ['get', 'escalation'], 0, '#d8c24b', 5, '#ff8a3d', 10, '#ff2d2d'], 'fill-opacity': 0.18 } });
+    m.addLayer({ id: 'crises-line', type: 'line', source: 'crises', paint: { 'line-color': ['interpolate', ['linear'], ['get', 'escalation'], 0, '#d8c24b', 10, '#ff2d2d'], 'line-width': 1.5 } });
+    m.addLayer({ id: 'lanes', type: 'line', source: 'lanes', paint: { 'line-color': '#d9e6f2', 'line-opacity': 0.35, 'line-width': 1, 'line-dasharray': [4, 3] } });
+    const infraColor = ['match', ['get', 'status'], 'offline', '#ff3b3b', 'degraded', '#ffaa2a', '#46d1ff'];
+    m.addLayer({ id: 'infra-line', type: 'line', source: 'infrastructure', filter: ['==', ['geometry-type'], 'LineString'], paint: { 'line-color': infraColor as never, 'line-width': 2.2 } });
+    m.addLayer({ id: 'infra-point', type: 'circle', source: 'infrastructure', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': infraColor as never, 'circle-radius': 4, 'circle-stroke-color': '#0b0f14', 'circle-stroke-width': 1 } });
+    const cColor = ['match', ['get', 'estFaction'], ...Object.entries(FACTIONS).flatMap(([f, v]) => [f, v.color]), '#e6e6e6'];
+    m.addLayer({ id: 'contact-area', type: 'fill', source: 'contactAreas', paint: { 'fill-color': cColor as never, 'fill-opacity': ['*', 0.35, ['get', 'confidence']] } });
+    m.addLayer({ id: 'contact-edge', type: 'line', source: 'contactAreas', paint: { 'line-color': '#ff5d5d', 'line-opacity': ['get', 'confidence'], 'line-width': 1 } });
+    m.addLayer({ id: 'contact-dot', type: 'circle', source: 'contacts', paint: { 'circle-color': '#ff5d5d', 'circle-radius': 3.5, 'circle-stroke-color': cColor as never, 'circle-stroke-width': 2, 'circle-opacity': ['get', 'confidence'] } });
+    m.addLayer({ id: 'ranges-fill', type: 'fill', source: 'ranges', paint: { 'fill-color': ['match', ['get', 'kind'], 'weapon', '#ff5a5a', '#5ac8ff'], 'fill-opacity': 0.08 } });
+    m.addLayer({ id: 'ranges-line', type: 'line', source: 'ranges', paint: { 'line-color': ['match', ['get', 'kind'], 'weapon', '#ff5a5a', '#5ac8ff'], 'line-width': 1 } });
+    m.addLayer({ id: 'plans', type: 'line', source: 'plans', paint: { 'line-color': '#f5d77a', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
 
-  render(s: UiState) {
-    const L = s.layers;
-    const fc = (n: string) => L[n] ?? { type: 'FeatureCollection' as const, features: [] };
-    this.overlay.setProps({
-      getTooltip: ({ object, layer }: { object?: { properties?: Props }; layer?: { id: string } | null }) => {
-        const p = object?.properties;
-        if (!p || !layer) return null;
-        if (layer.id === 'units') return `${p.name}\n${p.status} · prontezza ${p.readiness}%${p.count > 1 ? ` · ${p.count} velivoli` : ''}${p.task ? `\nordine: ${p.task}` : ''}`;
-        if (layer.id === 'contacts') return `${p.classification}\n${p.estFaction} · confidenza ${Math.round(p.confidence * 100)}% · ±${p.errorKm} km\nfonti: ${(p.sources as string[]).join(', ')}`;
-        if (layer.id === 'crises') return `${p.name}\n${p.crises}\nescalation ${p.escalation}/10`;
-        if (layer.id === 'infrastructure') return `${p.name}\n${p.status}`;
-        return null;
-      },
-      layers: [
-        new GeoJsonLayer({ id: 'crises', data: fc('crises'), filled: true, stroked: true, pickable: true, getFillColor: (f: { properties: Props }) => escalationColor(f.properties.escalation), getLineColor: [255, 120, 80, 160], lineWidthMinPixels: 1 }),
-        new GeoJsonLayer({ id: 'lanes', data: fc('lanes'), stroked: true, filled: false, getLineColor: [180, 180, 200, 90], lineWidthMinPixels: 1 }),
-        new GeoJsonLayer({ id: 'infrastructure', data: fc('infrastructure'), pickable: true, pointType: 'circle', getLineColor: (f: { properties: Props }) => infraColor(f.properties.status), getFillColor: (f: { properties: Props }) => infraColor(f.properties.status), lineWidthMinPixels: 2, pointRadiusMinPixels: 4 }),
-        new GeoJsonLayer({ id: 'ranges', data: fc('ranges'), filled: true, getFillColor: (f: { properties: Props }) => (f.properties.kind === 'weapon' ? [255, 90, 90, 25] : [90, 200, 255, 20]), getLineColor: (f: { properties: Props }) => (f.properties.kind === 'weapon' ? [255, 90, 90, 180] : [90, 200, 255, 160]), lineWidthMinPixels: 1 }),
-        new ScatterplotLayer({ id: 'contacts', data: fc('contacts').features, pickable: true, stroked: true, filled: true, radiusUnits: 'meters',
-          getPosition: (f: GeoJSON.Feature<GeoJSON.Point>) => f.geometry.coordinates as [number, number], getRadius: (f: { properties: Props }) => Math.max(2000, f.properties.errorKm * 1000),
-          getFillColor: (f: { properties: Props }) => { const c = factionColor(f.properties.estFaction); return [c[0], c[1], c[2], 25 + 60 * f.properties.confidence] as Rgba; },
-          getLineColor: (f: { properties: Props }) => { const c = factionColor(f.properties.estFaction); return [c[0], c[1], c[2], 80 + 175 * f.properties.confidence] as Rgba; }, lineWidthMinPixels: 1, radiusMinPixels: 3 }),
-        new IconLayer({ id: 'units', data: fc('units').features, pickable: true, sizeUnits: 'pixels', getSize: 26,
-          getPosition: (f: GeoJSON.Feature<GeoJSON.Point>) => f.geometry.coordinates as [number, number], getIcon: (f: { properties: Props }) => ({ id: `${f.properties.type}:${f.properties.status}`, ...icon(f.properties.type, f.properties.status) }),
-          onClick: ({ object }: { object?: { properties: Props } }) => { if (object) this.onSelect(object.properties.id); } }),
-      ],
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'wg-tip' });
+    const tip = (layer: string, text: (p: Props) => string) => {
+      m.on('mousemove', layer, (e) => { const p = e.features?.[0]?.properties; if (p) popup.setLngLat(e.lngLat).setText(text(p)).addTo(m); });
+      m.on('mouseleave', layer, () => popup.remove());
+    };
+    tip('contact-dot', (p) => `${p.classification} — ${p.estFaction}, confidenza ${Math.round(p.confidence * 100)}%, ±${p.errorKm} km`);
+    tip('infra-point', (p) => `${p.name}: ${p.status}`);
+    tip('infra-line', (p) => `${p.name}: ${p.status}`);
+    tip('crises-fill', (p) => `${p.crises} — escalation ${p.escalation}/10`);
+
+    m.on('click', (e) => {
+      if (m.queryRenderedFeatures(e.point, { layers: ['lna-fill'] }).length) return this.h.openCountry('LBY_LNA');
+      const iso = m.queryRenderedFeatures(e.point, { layers: ['countries-fill'] })[0]?.properties?.['ISO3166-1-Alpha-3'];
+      const f = Object.entries(FACTIONS).find(([, v]) => v.iso === iso)?.[0] ?? null;
+      this.h.openCountry(f);
+    });
+    m.on('contextmenu', (e) => {
+      e.preventDefault();
+      const zone = m.queryRenderedFeatures(e.point, { layers: ['zones-fill'] })[0]?.properties?.id;
+      if (zone) this.h.orderToZone(String(zone));
     });
   }
+
+  flyTo(lon: number, lat: number) { this.map.flyTo({ center: [lon, lat], zoom: Math.max(this.map.getZoom(), 5) }); }
+
+  async render(s: UiState) {
+    await this.ready;
+    this.last = s;
+    const m = this.map;
+    m.setProjection({ type: s.globe ? 'globe' : 'mercator' });
+    const src = (id: string, data: FC) => (m.getSource(id) as maplibregl.GeoJSONSource).setData(data);
+    for (const id of ['zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'ranges']) src(id, (s.layers[id] as FC) ?? EMPTY);
+    src('contactAreas', { type: 'FeatureCollection', features: (s.layers.contacts?.features ?? []).map((f) => { const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number]; return { type: 'Feature', properties: f.properties, geometry: circle(lon, lat, Math.max(3, f.properties!.errorKm)) }; }) });
+    this.renderPlans(s);
+    this.renderMode(s);
+    this.renderUnits(s);
+    this.renderLabels();
+  }
+
+  private renderMode(s: UiState) {
+    const m = this.map;
+    const rel = s.overview?.relations ?? {};
+    const pairs = (value: (f: string) => string) => Object.entries(FACTIONS).filter(([, v]) => v.iso).flatMap(([f, v]) => [v.iso!, value(f)]);
+    const heat = (v: number, lo: number, hi: number, c: [string, string, string]) => { const t = (v - lo) / (hi - lo); const i = t < 0.5 ? 0 : 1; const k = t < 0.5 ? t * 2 : (t - 0.5) * 2; return mix(c[i]!, c[i + 1]!, Math.max(0, Math.min(1, k))); };
+    let value: (f: string) => string;
+    let other = '#4a4a42';
+    if (s.mapMode === 'diplomazia') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.trust, -100, 100, ['#8c2323', '#6b6b5e', '#2f8f4f']) : other);
+    else if (s.mapMode === 'tensione') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.tension, 0, 100, ['#3a5a3a', '#b08a2a', '#b02020']) : other);
+    else if (s.mapMode === 'crisi') { value = () => '#3b3b36'; other = '#33332f'; }
+    else value = factionColor;
+    const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...pairs(value), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
+    m.setPaintProperty('countries-fill', 'fill-color', expr as never);
+    m.setPaintProperty('lna-fill', 'fill-color', value('LBY_LNA'));
+    m.setPaintProperty('crises-fill', 'fill-opacity', s.mapMode === 'crisi' ? 0.45 : 0.18);
+    m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && FACTIONS[s.country]?.iso) || '']);
+  }
+
+  private renderPlans(s: UiState) {
+    const units = new Map((s.knowledge?.ownUnits ?? []).map((u) => [u.id, u]));
+    const centers = new Map((s.layers.zones?.features ?? []).map((f) => [String(f.id), f.properties!.center as [number, number]]));
+    const features: GeoJSON.Feature[] = [];
+    for (const o of s.draft.military) {
+      const to = 'zoneId' in o ? centers.get(o.zoneId) : o.kind === 'MOVE' && typeof o.to === 'string' ? centers.get(o.to) : undefined;
+      if (!to) continue;
+      for (const id of 'unitIds' in o ? o.unitIds : []) { const u = units.get(id); if (u) features.push({ type: 'Feature', properties: { kind: o.kind }, geometry: { type: 'LineString', coordinates: [[u.location.lon, u.location.lat], to] } }); }
+    }
+    (this.map.getSource('plans') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features });
+  }
+
+  /** Pedine: le unità vicine sullo schermo si impilano in un'unica pedina con contatore (si separano zoomando). */
+  private renderUnits(s: UiState) {
+    this.markers.forEach((mk) => mk.remove());
+    this.markers = [];
+    const stacks: { x: number; y: number; units: NonNullable<UiState['knowledge']>['ownUnits'] }[] = [];
+    for (const u of s.knowledge?.ownUnits ?? []) {
+      if (u.status === 'destroyed') continue;
+      const p = this.map.project([u.location.lon, u.location.lat]);
+      const near = stacks.find((st) => Math.hypot(st.x - p.x, st.y - p.y) < 30);
+      if (near) near.units.push(u); else stacks.push({ x: p.x, y: p.y, units: [u] });
+    }
+    for (const { units } of stacks) {
+      const top = units.find((u) => u.status === 'deployed') ?? units[0]!;
+      const selected = units.some((u) => s.selection.includes(u.id));
+      const el = document.createElement('div');
+      el.className = `wg-counter${selected ? ' sel' : ''}`;
+      el.title = units.map((u) => `${u.name} — ${u.status}, ${u.readiness}%`).join('\n');
+      const img = document.createElement('img');
+      img.src = icon(top.type, top.status);
+      img.alt = top.name;
+      el.appendChild(img);
+      if (units.length > 1) { const b = document.createElement('span'); b.textContent = String(units.length); el.appendChild(b); }
+      el.addEventListener('click', (e) => { e.stopPropagation(); if (units.length > 1 && !e.shiftKey) this.h.openStack(units.map((u) => u.id)); else this.h.selectUnit(top.id, e.shiftKey); });
+      el.addEventListener('contextmenu', (e) => e.preventDefault());
+      this.markers.push(new maplibregl.Marker({ element: el }).setLngLat([top.location.lon, top.location.lat]).addTo(this.map));
+    }
+  }
+
+  private renderLabels() {
+    if (this.labels.length) return;
+    for (const [f, v] of Object.entries(FACTIONS)) {
+      const el = document.createElement('div');
+      el.className = 'wg-country-label';
+      el.textContent = (MAP_LABELS[f] ?? NAMES[f] ?? f).toUpperCase();
+      this.labels.push(new maplibregl.Marker({ element: el }).setLngLat(v.label).addTo(this.map));
+    }
+  }
+}
+
+function mix(a: string, b: string, t: number) {
+  const p = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
 }

@@ -17,6 +17,12 @@ WARGAME_MOCK=1 npm run wargame:all    # server :8787 + frontend su http://localh
 2. Leggi il **Briefing**, poi apri **Console Ordini**: scrivi una direttiva ("Pattugliare CANALE_SICILIA con ITA-F592") → *Interpreta* → *Valida*, oppure usa il costruttore.
 3. **Esegui turno**. Se un ingaggio supera la soglia CMO, apri **Coda CMO**: scarica il pacchetto, gioca su CMO e compila l'AAR (oppure *Risoluzione automatica*), poi **Prosegui**.
 
+## Comandi dell'interfaccia
+- **Clic su una pedina**: seleziona (pila: apre l'elenco). **Maiusc+clic**: selezione multipla.
+- **Tasto destro su una zona di mare** con unità selezionate: ordine di pattugliamento (tratteggio oro sulla mappa).
+- **Clic su un paese**: scheda con fiducia/tensione, stime e azioni diplomatiche rapide.
+- In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi) e globo/mappa piana. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
+
 ## Con modelli reali (OmniRoute)
 ```bash
 export LLM_BASE_URL=http://localhost:20128/v1   # default

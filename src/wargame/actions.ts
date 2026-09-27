@@ -40,6 +40,9 @@ export async function refresh() {
     api.events(id, Math.max(1, t - 1)), api.cmo(id), ...LAYERS.map((l) => api.layer(id, l)),
   ]);
   const layerMap = Object.fromEntries(LAYERS.map((l, i) => [l, layers[i]!]));
+  const alive = new Set(knowledge.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => u.id));
+  state.selection = state.selection.filter((x) => alive.has(x));
+  state.selectedUnitId = state.selection[0] ?? null;
   if (state.selectedUnitId) layerMap.ranges = await api.layer(id, 'ranges', state.selectedUnitId);
   set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, layers: layerMap });
 }
@@ -49,8 +52,11 @@ export const createCampaign = (name: string, seed: string, debugGodView: boolean
   await openCampaign(c.id);
 });
 
-export const selectUnit = (unitId: string | null) => guarded(async () => {
-  set({ selectedUnitId: unitId, layers: { ...state.layers, ranges: unitId && state.campaignId ? await api.layer(state.campaignId, 'ranges', unitId) : { type: 'FeatureCollection', features: [] } } });
+/** Seleziona un'unità; con `add` la aggiunge/toglie dalla selezione multipla. */
+export const selectUnit = (unitId: string | null, add = false) => guarded(async () => {
+  const selection = !unitId ? [] : add ? (state.selection.includes(unitId) ? state.selection.filter((x) => x !== unitId) : [...state.selection, unitId]) : [unitId];
+  unitId = selection[0] ?? null;
+  set({ selection, selectedUnitId: unitId, layers: { ...state.layers, ranges: unitId && state.campaignId ? await api.layer(state.campaignId, 'ranges', unitId) : { type: 'FeatureCollection', features: [] } } });
 });
 
 export const validateDraft = () => guarded(async () => { set({ validation: await api.validate(state.campaignId!, state.draft) }); });

@@ -6,6 +6,7 @@
 - **Fase 5** — `wargame.html` + `src/wargame/` (mappa maplibre+deck.gl, simboli `milsymbol`, 11 pannelli, SSE). Typecheck root pulito; biome e safe-html ok.
 - **Fase 6** — Coda CMO (pacchetto .txt/.json, form AAR, risoluzione automatica), fork dai turni chiusi, post-mortem con decisioni, tiri e rami.
 - **Fase 7** — `e2e-wargame/turn.spec.ts` (un turno con mock, verifica che non ci siano richieste esterne), `docs/wargame/README.md`, `npm run wargame:all`.
+- **Interfaccia grand strategy** (richiesta successiva): mappa a tutto schermo con globo 3D (MapLibre `globe`, commutabile in mappa piana), paesi colorati per fazione da `public/data/countries.geojson` (nessuna tile esterna), modalità mappa politica/diplomazia/tensione/crisi, barra risorse, menu a icone con pannelli sovrapposti, avvisi, scheda paese con azioni diplomatiche rapide, pedine NATO impilate per vicinanza, selezione multipla e ordine di pattugliamento col tasto destro (linea tratteggiata sul piano).
 
 ## Decisioni
 - Ogni mutazione dello stato è un `GameEvent` applicato da `engine/reducer.ts`: `state(N) = snapshot(N-1) + events(N)` (test dedicato).
@@ -17,6 +18,7 @@
 - Ordini del giocatore mancanti ad `advance` → ordini vuoti (source `human`).
 - Zone con `terrain` (sea/land): le unità navali non possono essere mandate in zone terrestri.
 - Eventi casuali: al massimo una variazione per crisi per turno.
+- Mappa solo MapLibre (niente deck.gl nella variante): i layer funzionano identici su globo e mappa piana.
 - Frontend: nessuna modifica a `src/main.ts`/`vite.config.ts`; la variante è solo in dev (`npm run dev:wargame`).
 - Rotta extra `POST /campaigns/:id/end` e `GET /campaigns/:id/overview` (indicatori, relazioni ITA, consegne).
 
@@ -26,5 +28,6 @@
 - Nessuna migrazione dello schema (`store/migrations/`): `schemaVersion` = 1 ovunque.
 - Nessun `build:wargame` di produzione (serve aggiungere `wargame.html` agli input di `vite.config.ts`).
 - Bilanciamento: con il mock le crisi tendono a salire; da tarare con partite reali.
-- Mappa 2D soltanto (niente globe.gl).
+- Poligoni delle zone marittime approssimati (rettangoli): le crisi sconfinano sulla terraferma.
+- La Libia è divisa con un poligono approssimato per l'area LNA.
 - Modello di combattimento volutamente semplice (salve 2d6); parametri in `engine/params.ts`.

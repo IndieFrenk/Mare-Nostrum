@@ -13,6 +13,14 @@ export interface UiState {
   cmo: PendingCmo[];
   layers: Record<string, FC>;
   selectedUnitId: string | null;
+  /** selezione multipla (stile grand strategy); selectedUnitId è la prima */
+  selection: string[];
+  mapMode: 'politica' | 'diplomazia' | 'tensione' | 'crisi';
+  globe: boolean;
+  drawer: string | null;
+  country: string | null;
+  /** pedina impilata aperta */
+  stack: string[] | null;
   draft: OrdersBody;
   validation: Validation | null;
   submitted: boolean;
@@ -28,7 +36,7 @@ const listeners = new Set<Listener>();
 
 export const state: UiState = {
   campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [],
-  layers: {}, selectedUnitId: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, error: null,
+  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, error: null,
 };
 
 export function set(patch: Partial<UiState>) {
