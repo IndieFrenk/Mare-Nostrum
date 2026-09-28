@@ -63,10 +63,75 @@
   "privateIntent": {
    "type": "string"
   },
+  "zoneStances": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "zoneId": {
+      "type": "string"
+     },
+     "stance": {
+      "type": "string",
+      "enum": [
+       "patrol",
+       "presence",
+       "show_of_force",
+       "escort_shipping",
+       "blockade",
+       "air_defense",
+       "withdraw"
+      ]
+     },
+     "intensity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+     }
+    },
+    "required": [
+     "zoneId",
+     "stance",
+     "intensity"
+    ]
+   }
+  },
   "confidence": {
    "type": "number",
    "minimum": 0,
    "maximum": 1
+  },
+  "letterIntents": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "gist": {
+      "type": "string"
+     },
+     "tone": {
+      "type": "string",
+      "enum": [
+       "cordial",
+       "formal",
+       "firm",
+       "threatening",
+       "conciliatory"
+      ]
+     }
+    },
+    "required": [
+     "to",
+     "gist",
+     "tone"
+    ]
+   }
   },
   "schemaVersion": {
    "type": "number",
@@ -96,7 +161,8 @@
     "intel_analyst",
     "order_parser",
     "reflection",
-    "repair"
+    "repair",
+    "diplomat"
    ]
   },
   "promptHash": {
@@ -831,6 +897,60 @@
          "amount",
          "type"
         ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "const": "LETTER"
+         },
+         "target": {
+          "type": "string",
+          "minLength": 2
+         },
+         "subject": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "tone": {
+          "type": "string",
+          "enum": [
+           "cordial",
+           "formal",
+           "firm",
+           "threatening",
+           "conciliatory"
+          ]
+         },
+         "visibility": {
+          "type": "string",
+          "enum": [
+           "private",
+           "public"
+          ]
+         },
+         "inReplyTo": {
+          "type": "string"
+         },
+         "model": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "target",
+         "subject",
+         "body",
+         "tone",
+         "visibility"
+        ]
        }
       ]
      }
@@ -952,6 +1072,42 @@
     "fallbackUsed"
    ]
   },
+  "stanceOrders": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "orderId": {
+      "type": "string"
+     },
+     "stance": {
+      "type": "string",
+      "enum": [
+       "patrol",
+       "presence",
+       "show_of_force",
+       "escort_shipping",
+       "blockade",
+       "air_defense",
+       "withdraw",
+       "worn"
+      ]
+     },
+     "zoneId": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    "required": [
+     "orderId",
+     "stance",
+     "zoneId"
+    ]
+   }
+  },
   "usage": {
    "type": "object",
    "properties": {
@@ -970,6 +1126,56 @@
     "completionTokens",
     "latencyMs"
    ]
+  },
+  "letters": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "actionId": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "reply",
+       "initiative"
+      ]
+     },
+     "inReplyTo": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "ai",
+       "template"
+      ]
+     },
+     "model": {
+      "type": "string"
+     },
+     "errors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "actionId",
+     "to",
+     "kind",
+     "source",
+     "model",
+     "errors"
+    ]
+   }
   }
  },
  "required": [

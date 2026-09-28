@@ -2,6 +2,7 @@ import type { DiploAction, Order } from '../api-client';
 import { selectUnit } from '../actions';
 import { h, pct } from '../dom';
 import { FACTIONS, NAMES } from '../layers/factions';
+import { composeTo } from './letters';
 import { newId, set, state, type UiState } from '../state/store';
 
 const POSTURE = ['', 'guerra aperta', 'confronto armato', 'coercizione', 'competizione', 'pace'];
@@ -36,7 +37,7 @@ export function countryCard(s: UiState, f: string) {
     agreements.length ? h('ul', { class: 'wg-dim' }, agreements.map((a) => h('li', {}, `${a.type}: ${a.terms} (${a.status})`))) : null,
     msg,
     h('div', { class: 'wg-actions' },
-      h('button', { onclick: act('REASSURANCE') }, 'Rassicurare'), h('button', { onclick: act('DEMARCHE') }, 'Démarche'), h('button', { onclick: act('THREAT') }, 'Minacciare'),
+      h('button', { onclick: act('REASSURANCE') }, 'Rassicurare'), h('button', { onclick: act('DEMARCHE') }, 'Démarche'), h('button', { onclick: act('THREAT') }, 'Minacciare'), h('button', { onclick: () => composeTo(f), title: 'Lettera formale al capo di Stato' }, '✉ Lettera'),
       h('button', { onclick: () => addDiplo({ id: newId('d'), kind: 'BACKCHANNEL', target: f, message: text() }) }, 'Canale riservato'),
       h('button', { onclick: () => addDiplo({ id: newId('d'), kind: 'SANCTION', target: f, scope: text() }) }, 'Sanzioni'),
       h('button', { onclick: () => addDiplo({ id: newId('d'), kind: 'AID', target: f, amount: 50, type: 'economic' }) }, 'Aiuto 50 M€')),

@@ -1,6 +1,7 @@
 import type { FactionOrders, OrdersBody, WorldState } from '../schemas/index.js';
 import type { Catalog } from './scenario.js';
 import { PARAMS } from './params.js';
+import { LETTER_LIMITS } from '../schemas/index.js';
 
 export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number }
 
@@ -11,9 +12,14 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
   if (!f) return { valid: false, errors: [`fazione sconosciuta ${factionId}`], risks, estCost: 0 };
   let cost = 0;
   const used = new Set<string>();
-  const zoneOk = (z: string) => !!s.zones[z] || (errors.push(`zona sconosciuta: ${z}`), false);
+  const usedAssets = new Set<string>();
+  let cyberOps = 0;
+  // l'errore porta l'id dell'ordine: così un ordine con una zona inventata si può scartare da solo
+  let current = '';
+  const zoneOk = (z: string) => !!s.zones[z] || (errors.push(`${current}: zona sconosciuta: ${z}`), false);
   const mult = PARAMS.opCostMultiplier[turnLength];
   for (const ord of o.military) {
+    current = ord.id;
     const unitIds = 'unitIds' in ord ? ord.unitIds : [];
     for (const id of unitIds) {
       const u = s.units[id];
@@ -45,10 +51,14 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
         break;
       }
       case 'ISR':
-        for (const a of ord.assetIds) if (!f.isrAssets.some((x) => x.id === a)) errors.push(`${ord.id}: asset ISR ${a} non disponibile`);
+        for (const a of ord.assetIds) {
+          if (!f.isrAssets.some((x) => x.id === a)) errors.push(`${ord.id}: asset ISR ${a} non disponibile`);
+          else if (usedAssets.has(a)) errors.push(`${ord.id}: asset ISR ${a} già impiegato in questo turno`);
+          usedAssets.add(a);
+        }
         zoneOk(ord.zoneId); cost += PARAMS.sortieCost.ISR * ord.assetIds.length; break;
       case 'SOF_OP': zoneOk(ord.zoneId); cost += PARAMS.sortieCost.SOF_OP; if (ord.unitIds.some((id) => s.units[id]?.type !== 'sof_team')) errors.push(`${ord.id}: SOF_OP richiede unità sof_team`); break;
-      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: fazione ${ord.target} sconosciuta`); cost += PARAMS.sortieCost.CYBER_OP; break;
+      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: fazione ${ord.target} sconosciuta`); if (++cyberOps > PARAMS.maxCyberOpsPerTurn) errors.push(`${ord.id}: al massimo ${PARAMS.maxCyberOpsPerTurn} operazioni cyber per turno`); cost += PARAMS.sortieCost.CYBER_OP; break;
       case 'ESCORT': if (!s.units[ord.protect] && !s.infrastructure[ord.protect] && !/^convoglio/i.test(ord.protect)) errors.push(`${ord.id}: oggetto da scortare sconosciuto`); break;
       default: break;
     }
@@ -64,12 +74,23 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
     if ((ordersOfItem.get(item.id) ?? 0) > 1) risks.push(`${p.id}: ordini ripetuti su ${item.name} riducono la disponibilità industriale`);
     cost += item.cost * p.qty;
   }
+  let letters = 0;
   for (const d of o.diplomacy) {
     if ('target' in d && typeof d.target === 'string' && !s.factions[d.target]) errors.push(`${d.id}: destinatario ${d.target} sconosciuto`);
+    if (d.kind === 'LETTER') {
+      letters++;
+      if (d.target === factionId) errors.push(`${d.id}: una lettera non può essere indirizzata a sé stessi`);
+      else if (s.factions[d.target]?.kind === 'bloc') errors.push(`${d.id}: ${d.target} non ha un capo di Stato a cui scrivere`);
+      if (!d.subject.trim()) errors.push(`${d.id}: oggetto della lettera vuoto`);
+      if (d.subject.length > LETTER_LIMITS.subject) errors.push(`${d.id}: oggetto oltre ${LETTER_LIMITS.subject} caratteri (${d.subject.length})`);
+      if (!d.body.trim()) errors.push(`${d.id}: testo della lettera vuoto`);
+      if (d.body.length > LETTER_LIMITS.body) errors.push(`${d.id}: testo oltre ${LETTER_LIMITS.body} caratteri (${d.body.length})`);
+    }
     if (d.kind === 'AID') cost += d.amount;
     if (d.kind === 'RESPOND_AGREEMENT' && !s.agreements[d.agreementId]?.parties.includes(factionId)) errors.push(`${d.id}: accordo ${d.agreementId} non pertinente`);
     if (d.kind === 'ENERGY_DEAL' && !s.infrastructure[d.infrastructureId]) errors.push(`${d.id}: infrastruttura ${d.infrastructureId} sconosciuta`);
   }
+  if (f.controller === 'human' && letters > LETTER_LIMITS.perTurnHuman) errors.push(`al massimo ${LETTER_LIMITS.perTurnHuman} lettere per turno (${letters} in bozza)`);
   cost = Math.round(cost * 10) / 10;
   if (cost > f.budget.discretionary) errors.push(`costo stimato ${cost} M€ oltre il budget disponibile ${f.budget.discretionary} M€`);
   return { valid: errors.length === 0, errors, risks, estCost: cost };

@@ -2209,7 +2209,9 @@
    "alliances": [
     "NATO",
     "EU"
-   ]
+   ],
+   "leaderTitle": "Il Presidente del Consiglio dei Ministri della Repubblica Italiana",
+   "capital": "Roma"
   },
   {
    "id": "USA",
@@ -2295,7 +2297,9 @@
    },
    "alliances": [
     "NATO"
-   ]
+   ],
+   "leaderTitle": "Il Presidente degli Stati Uniti d'America",
+   "capital": "Washington"
   },
   {
    "id": "FRA",
@@ -2360,7 +2364,9 @@
    "alliances": [
     "NATO",
     "EU"
-   ]
+   ],
+   "leaderTitle": "Il Presidente della Repubblica francese",
+   "capital": "Parigi"
   },
   {
    "id": "TUR",
@@ -2421,7 +2427,9 @@
    },
    "alliances": [
     "NATO"
-   ]
+   ],
+   "leaderTitle": "Il Presidente della Repubblica di Turchia",
+   "capital": "Ankara"
   },
   {
    "id": "RUS",
@@ -2502,7 +2510,9 @@
     "offense": 9,
     "defense": 7
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Federazione Russa",
+   "capital": "Mosca"
   },
   {
    "id": "CHN",
@@ -2557,7 +2567,9 @@
     "offense": 9,
     "defense": 8
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Popolare Cinese",
+   "capital": "Pechino"
   },
   {
    "id": "GBR",
@@ -2591,7 +2603,9 @@
    },
    "alliances": [
     "NATO"
-   ]
+   ],
+   "leaderTitle": "Il Primo Ministro del Regno Unito",
+   "capital": "Londra"
   },
   {
    "id": "GRC",
@@ -2626,7 +2640,9 @@
    "alliances": [
     "NATO",
     "EU"
-   ]
+   ],
+   "leaderTitle": "Il Primo Ministro della Repubblica Ellenica",
+   "capital": "Atene"
   },
   {
    "id": "EGY",
@@ -2658,7 +2674,9 @@
     "offense": 4,
     "defense": 4
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Araba d'Egitto",
+   "capital": "Il Cairo"
   },
   {
    "id": "ISR",
@@ -2710,7 +2728,9 @@
     "offense": 9,
     "defense": 9
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Primo Ministro dello Stato di Israele",
+   "capital": "Gerusalemme"
   },
   {
    "id": "ALG",
@@ -2742,7 +2762,9 @@
     "offense": 5,
     "defense": 5
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Algerina Democratica e Popolare",
+   "capital": "Algeri"
   },
   {
    "id": "TUN",
@@ -2774,7 +2796,9 @@
     "offense": 2,
     "defense": 3
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Tunisina",
+   "capital": "Tunisi"
   },
   {
    "id": "LBY_GNU",
@@ -2806,7 +2830,9 @@
     "offense": 2,
     "defense": 2
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Primo Ministro del Governo di Unità Nazionale di Libia",
+   "capital": "Tripoli"
   },
   {
    "id": "LBY_LNA",
@@ -2838,7 +2864,9 @@
     "offense": 2,
     "defense": 2
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Comandante generale dell'Esercito Nazionale Libico",
+   "capital": "Bengasi"
   },
   {
    "id": "IRN",
@@ -2877,7 +2905,9 @@
     "offense": 8,
     "defense": 6
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Islamica dell'Iran",
+   "capital": "Teheran"
   },
   {
    "id": "NATO",
@@ -2901,7 +2931,9 @@
     "offense": 0,
     "defense": 8
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Segretario generale della NATO",
+   "capital": "Bruxelles"
   },
   {
    "id": "EU",
@@ -2925,7 +2957,9 @@
     "offense": 0,
     "defense": 7
    },
-   "alliances": []
+   "alliances": [],
+   "leaderTitle": "Il Presidente del Consiglio europeo",
+   "capital": "Bruxelles"
   }
  ]
 }

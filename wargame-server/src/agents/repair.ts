@@ -35,6 +35,8 @@ export async function callStructured<T>(provider: LlmProvider, log: LlmCall[], c
 /** Il narratore non inventa numeri: ogni cifra del testo deve comparire nei fatti. */
 export function numbersNotInFacts(text: string, facts: string[]): string[] {
   const norm = (n: string) => n.replace(',', '.').replace(/\.0+$/, '');
+  // i riferimenti ai fatti (F3-2, F3-E1, D3-4) non sono cifre inventate: il modello li cita spesso nel testo
+  text = text.replace(/\b[FD]\d+-[A-Z0-9_-]+\b/g, ' ');
   const allowed = new Set(facts.join(' ').match(/\d+(?:[.,]\d+)?/g)?.map(norm) ?? []);
   return [...new Set((text.match(/\d+(?:[.,]\d+)?/g) ?? []).map(norm).filter((n) => !allowed.has(n)))];
 }

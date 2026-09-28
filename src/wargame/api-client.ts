@@ -1,4 +1,4 @@
-import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, FactionKnowledge, GameEvent, LedgerEntry, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
+import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
 
 export type * from '../../wargame-server/src/schemas/index';
 
@@ -19,6 +19,7 @@ export interface CatalogView { budget: number; items: (CatalogItem & { available
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
 export interface Postmortem { turn: number; decisions: AgentDecision[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
 export type FC = GeoJSON.FeatureCollection;
+export interface LetterDraft { target: string; inReplyTo?: string; subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
 
 const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
 export const api = {
@@ -36,7 +37,10 @@ export const api = {
   parse: (id: string, text: string) => req<{ orders: OrdersBody; ambiguities: string[]; validation: Validation }>('POST', `${c(id)}/orders/parse`, { text }),
   validate: (id: string, o: OrdersBody) => req<Validation>('POST', `${c(id)}/orders/validate`, o),
   submit: (id: string, o: OrdersBody) => req<{ validation: Validation }>('POST', `${c(id)}/orders`, o),
+  letters: (id: string, turn?: number) => req<DiploLetter[]>('GET', `${c(id)}/letters${turn === undefined ? '' : `?turn=${turn}`}`),
+  draftLetter: (id: string, b: { target: string; gist: string; tone: LetterTone; inReplyTo?: string }) => req<LetterDraft>('POST', `${c(id)}/letters/draft`, b),
   advance: (id: string) => req<Campaign>('POST', `${c(id)}/advance`),
+  status: (id: string) => req<{ running: boolean; op: string | null; since: number | null; turn: number; phase: string }>('GET', `${c(id)}/status`),
   cmo: (id: string) => req<PendingCmo[]>('GET', `${c(id)}/cmo`),
   cmoUrl: (id: string, engagementId: string, format: 'txt' | 'json') => `${BASE}${c(id)}/cmo?format=${format}&engagementId=${encodeURIComponent(engagementId)}`,
   aar: (id: string, engagementId: string, body: AfterActionReport | { autoResolve: true }) => req<unknown>('POST', `${c(id)}/cmo/${encodeURIComponent(engagementId)}/aar`, body),

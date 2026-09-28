@@ -2,6 +2,7 @@ import type { UiState } from './state/store';
 import { briefingPanel, crisesPanel, intelPanel, newsPanel } from './panels/intel';
 import { foedPanel, oobPanel, procurementPanel } from './panels/forces';
 import { diplomacyPanel } from './panels/diplomacy';
+import { lettersPanel } from './panels/letters';
 import { ordersPanel } from './panels/orders';
 import { cmoPanel, postmortemPanel } from './panels/cmo';
 
@@ -19,6 +20,7 @@ export const WARGAME_VARIANT = {
     { id: 'news', title: 'Notizie', render: (s) => newsPanel(s) },
     { id: 'crises', title: 'Crisi', render: (s) => crisesPanel(s) },
     { id: 'diplomacy', title: 'Diplomazia', render: (s) => diplomacyPanel(s) },
+    { id: 'letters', title: 'Lettere', render: (s) => lettersPanel(s) },
     { id: 'foed', title: 'FOED', render: (s) => foedPanel(s) },
     { id: 'procurement', title: 'Procurement', render: (s) => procurementPanel(s) },
     { id: 'cmo', title: 'Coda CMO', render: (s) => cmoPanel(s) },

@@ -1,5 +1,6 @@
 import type { AgentMemory, FactionKnowledge } from '../schemas/index.js';
 import type { Scenario } from '../engine/scenario.js';
+import { stanceForces } from '../engine/stances.js';
 
 /** Azioni lecite per una fazione, derivate SOLO dalla sua Knowledge e dal catalogo pubblico. */
 export function legalActions(k: FactionKnowledge, sc: Scenario) {
@@ -9,13 +10,17 @@ export function legalActions(k: FactionKnowledge, sc: Scenario) {
     units: k.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => ({ id: u.id, name: u.name, type: u.type, zoneId: u.zoneId, status: u.status, readiness: u.readiness, count: u.count, loadout: u.loadout })),
     isrAssets: f.isrAssets.map((a) => ({ id: a.id, type: a.type, coverage: a.coverage })),
     seaZones: Object.values(sc.world.zones).filter((z) => z.terrain === 'sea').map((z) => z.id),
+    // per zoneStances: quante unità il motore può mandare in ogni zona di mare (conteggi, non id: li sceglie il motore)
+    unitsPerSeaZone: stanceForces(k.ownUnits, sc.world.zones),
     landZones: Object.values(sc.world.zones).filter((z) => z.terrain === 'land').map((z) => z.id),
     ownBases: Object.values(sc.world.bases).filter((b) => b.factionId === f.id).map((b) => b.id),
     strikeTargets: { contacts: k.contacts.map((c) => c.id), infrastructure: Object.keys(sc.world.infrastructure) },
     procurement: sc.catalog.items.filter((i) => i.leadTimeTurns !== null && i.cost <= f.budget.discretionary).map((i) => ({ id: i.id, name: i.name, cost: i.cost })),
     pendingAgreements: k.knownAgreements.filter((a) => a.status === 'proposed' && a.parties.includes(f.id)).map((a) => a.id),
     factions: Object.keys(k.beliefs),
-    orderKinds: ['MOVE', 'PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'AIR_DEFENSE', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN', 'EVACUATION'],
+    // solo i tipi di ordine che la fazione può davvero eseguire: i modelli piccoli altrimenti inventano asset ISR o squadre SOF
+    orderKinds: ['MOVE', 'PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'AIR_DEFENSE', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN', 'EVACUATION']
+      .filter((kind) => (kind !== 'ISR' || f.isrAssets.length > 0) && (kind !== 'SOF_OP' || k.ownUnits.some((u) => u.type === 'sof_team' && u.status !== 'destroyed'))),
     diploKinds: ['DEMARCHE', 'THREAT', 'REASSURANCE', 'PROPOSE_AGREEMENT', 'RESPOND_AGREEMENT', 'SANCTION', 'LIFT_SANCTION', 'BACKCHANNEL', 'NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT', 'ENERGY_DEAL', 'AID'],
   };
 }
@@ -29,6 +34,8 @@ export function situation(k: FactionKnowledge) {
     accordi: k.knownAgreements.map((a) => ({ id: a.id, type: a.type, parties: a.parties, status: a.status })),
     stimeAltrui: k.beliefs, inbox: k.inbox.map((m) => ({ from: m.from, text: m.text, channel: m.channel })),
     notizie: k.publicNews.slice(0, 6).map((n) => `${n.outlet}: ${n.headline}`),
+    // lettere ricevute nell'ultimo turno (il testo intero lo vede il consigliere che risponde)
+    lettere: k.letters.filter((l) => l.to === k.factionId && l.turn >= k.turn - 1).map((l) => ({ da: l.from, oggetto: l.subject, tono: l.tone })),
   };
 }
 

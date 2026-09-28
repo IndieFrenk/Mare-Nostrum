@@ -1,0 +1,13 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "string",
+ "enum": [
+  "patrol",
+  "presence",
+  "show_of_force",
+  "escort_shipping",
+  "blockade",
+  "air_defense",
+  "withdraw"
+ ]
+}

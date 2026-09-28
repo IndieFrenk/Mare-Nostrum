@@ -1,5 +1,6 @@
-import type { DiploAction, PublicStatement } from '../schemas/index.js';
+import type { DiploAction, DiploLetter, LetterAction, LetterTone, PublicStatement, WorldState } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
+import { deescalateByAgreement } from './crises.js';
 
 const PERMANENT = ['USA', 'GBR', 'FRA', 'RUS', 'CHN'];
 
@@ -8,10 +9,51 @@ function message(ctx: TurnCtx, from: string, to: string, text: string, channel: 
     { targets: [to], visibility: channel === 'backchannel' ? [from, to] : 'public' });
 }
 
+/**
+ * Effetti deterministici del tono di una lettera (trust, tension), più lievi delle azioni formali corrispondenti:
+ * conciliante ≈ REASSURANCE, ferma ≈ DEMARCHE, minacciosa ≈ THREAT (e come THREAT registra una minaccia da verificare).
+ */
+export const LETTER_TONE_EFFECTS: Record<LetterTone, { trust: number; tension: number }> = {
+  cordial: { trust: 2, tension: -2 },
+  conciliatory: { trust: 3, tension: -4 },
+  formal: { trust: 1, tension: -1 },
+  firm: { trust: -1, tension: 2 },
+  threatening: { trust: -5, tension: 8 },
+};
+
+/** Carica e città di una fazione per intestazione e firma (mai nomi di persona). */
+export function leaderOf(s: WorldState, f: string) {
+  const x = s.factions[f];
+  return { title: x?.leaderTitle || `Il Capo di Stato (${x?.name ?? f})`, capital: x?.capital || x?.name || f };
+}
+
+/** La lettera come viene archiviata: intestazioni dal mondo, fonte dall'ordine. */
+export function letterRecord(ctx: TurnCtx, actor: string, a: LetterAction): DiploLetter {
+  const from = leaderOf(ctx.state, actor); const to = leaderOf(ctx.state, a.target);
+  const source = actor === ctx.campaign.playerFaction ? 'human' : a.model === 'template' ? 'template' : 'ai';
+  return {
+    id: `LT${ctx.turn}-${actor}-${a.id.replace(`${actor}-${ctx.turn}-`, '')}`, turn: ctx.turn, date: ctx.state.date, from: actor, to: a.target,
+    fromTitle: from.title, toTitle: to.title, place: from.capital, subject: a.subject.trim(), body: a.body.trim(), tone: a.tone, visibility: a.visibility,
+    ...(a.inReplyTo ? { inReplyTo: a.inReplyTo } : {}), source, ...(source !== 'human' && a.model ? { model: a.model } : {}),
+  };
+}
+
+function resolveLetter(ctx: TurnCtx, actor: string, a: LetterAction) {
+  const letter = letterRecord(ctx, actor, a);
+  const visibility = a.visibility === 'public' ? 'public' as const : [actor, a.target];
+  const cause = { causedBy: { orderId: a.id } };
+  ctx.emit('LETTER_SENT', actor, { letter }, { targets: [a.target], visibility, ...cause });
+  const fx = LETTER_TONE_EFFECTS[a.tone];
+  ctx.relate(actor, a.target, fx.trust, fx.tension, `lettera (${a.tone}): ${letter.subject}`, { propagate: a.tone === 'threatening', visibility });
+  if (a.tone === 'threatening') ctx.emit('FACTION_CHANGED', actor, { factionId: actor, delta: { credibility: 1 }, pendingThreat: { target: a.target, turn: ctx.turn } }, { visibility, ...cause });
+  if (a.visibility === 'public') ctx.emit('STATEMENT', actor, { text: letter.subject, tone: a.tone, audience: a.target, letterId: letter.id }, cause);
+}
+
 export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
   const s = ctx.state;
   const cause = { causedBy: { orderId: a.id } };
   switch (a.kind) {
+    case 'LETTER': resolveLetter(ctx, actor, a); break;
     case 'DEMARCHE': ctx.relate(actor, a.target, -2, 3, `démarche: ${a.message}`, { propagate: false }); message(ctx, actor, a.target, a.message, 'official', a.id); break;
     case 'THREAT':
       ctx.relate(actor, a.target, -6, 10, `minaccia: ${a.message}`);
@@ -31,6 +73,7 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       const status = a.response === 'accept' ? 'active' : a.response === 'reject' ? 'expired' : 'proposed';
       ctx.emit('AGREEMENT_CHANGED', actor, { agreement: { ...ag, status, terms: a.counterTerms ?? ag.terms } }, { targets: ag.parties, visibility: ag.visibility, ...cause });
       for (const p of ag.parties) if (p !== actor) ctx.relate(actor, p, a.response === 'accept' ? 8 : a.response === 'reject' ? -4 : 0, a.response === 'accept' ? -5 : 2, `risposta ad accordo ${ag.id}: ${a.response}`, { propagate: false });
+      if (status === 'active') deescalateByAgreement(ctx, ag);
       break;
     }
     case 'SANCTION':

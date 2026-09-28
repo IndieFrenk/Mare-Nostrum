@@ -19,7 +19,8 @@
     "intel_analyst",
     "order_parser",
     "reflection",
-    "repair"
+    "repair",
+    "diplomat"
    ]
   },
   "factionId": {

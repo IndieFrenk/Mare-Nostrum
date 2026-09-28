@@ -33,10 +33,11 @@ describe('API', () => {
     const adv = await j('POST', `/campaigns/${c.id}/advance`);
     expect(adv.body.phase).toBe('CMO_PENDING');
     const cmo = (await j('GET', `/campaigns/${c.id}/cmo`)).body;
-    expect(cmo).toHaveLength(1);
+    // lo strike del giocatore, più eventuali ingaggi nati dalle posture delle fazioni IA
+    expect(cmo.length).toBeGreaterThanOrEqual(1);
     const txt = await app.inject({ method: 'GET', url: `/api/wg/campaigns/${c.id}/cmo?format=txt` });
     expect(txt.body).toContain('RISOLUZIONE SU CMO RICHIESTA');
-    expect((await j('POST', `/campaigns/${c.id}/cmo/${cmo[0].id}/aar`, { autoResolve: true })).body.status).toBe('resolved');
+    for (const e of cmo) expect((await j('POST', `/campaigns/${c.id}/cmo/${e.id}/aar`, { autoResolve: true })).body.status).toBe('resolved');
     const next = await j('POST', `/campaigns/${c.id}/advance`);
     expect(next.body).toMatchObject({ currentTurn: 2, phase: 'PLAYER_ORDERS' });
     expect((await j('GET', `/campaigns/${c.id}/ledger?turn=1`)).body.every((l: { factionId: string }) => l.factionId === 'ITA')).toBe(true);
@@ -56,5 +57,34 @@ describe('API', () => {
     expect(pm2.body.branches.length).toBe(2);
     expect((await j('GET', '/campaigns/nope')).status).toBe(404);
     await app.close();
+  }, 30_000);
+});
+
+describe('API lettere', () => {
+  it('bozza dall\'LLM → ordine LETTER → risposta nel turno dopo, visibile solo se pertinente', async () => {
+    const { app } = await buildServer({ dataDir: tmp(), provider: new MockLLMProvider() });
+    const j = async (method: 'GET' | 'POST', url: string, payload?: unknown) => {
+      const r = await app.inject({ method, url: `/api/wg${url}`, payload: payload as object });
+      return { status: r.statusCode, body: r.json() };
+    };
+    const { body: c } = await j('POST', '/campaigns', { scenarioId: 'med-2026', name: 'lettere', seed: 'api-lettere' });
+    expect((await j('POST', `/campaigns/${c.id}/letters/draft`, { target: 'ITA', gist: 'x', tone: 'formal' })).status).toBe(400);
+    expect((await j('POST', `/campaigns/${c.id}/letters/draft`, { target: 'TUR', gist: 'x', tone: 'rude' })).status).toBe(400);
+    const before = (await j('GET', `/campaigns/${c.id}`)).body;
+    const { body: draft } = await j('POST', `/campaigns/${c.id}/letters/draft`, { target: 'TUR', gist: 'Proporre un tavolo sulla sicurezza della navigazione nell\'Egeo.', tone: 'conciliatory' });
+    expect(draft).toMatchObject({ target: 'TUR', tone: 'conciliatory', source: 'ai' });
+    expect(draft.body.length).toBeLessThanOrEqual(1800);
+    expect((await j('GET', `/campaigns/${c.id}`)).body.updatedAt).toBe(before.updatedAt); // la bozza non cambia lo stato
+    const l = { id: 'l1', kind: 'LETTER', target: 'TUR', subject: draft.subject, body: `${draft.body}\nAggiunta del giocatore.`, tone: draft.tone, visibility: 'private' };
+    const three = { diplomacy: [l, { ...l, id: 'l2' }, { ...l, id: 'l3' }] };
+    expect((await j('POST', `/campaigns/${c.id}/orders/validate`, three)).body.errors.join()).toContain('al massimo 2 lettere');
+    expect((await j('POST', `/campaigns/${c.id}/orders`, { diplomacy: [l] })).status).toBe(200);
+    await j('POST', `/campaigns/${c.id}/advance`);
+    await j('POST', `/campaigns/${c.id}/advance`);
+    const all = (await j('GET', `/campaigns/${c.id}/letters`)).body as { from: string; to: string; turn: number; inReplyTo?: string; visibility: string; body: string }[];
+    expect(all.find((x) => x.from === 'ITA')!.body).toContain('Aggiunta del giocatore.');
+    expect(all.find((x) => x.from === 'TUR' && x.inReplyTo === 'LT1-ITA-l1')).toBeTruthy();
+    expect(all.every((x) => x.from === 'ITA' || x.to === 'ITA' || x.visibility === 'public')).toBe(true);
+    expect((await j('GET', `/campaigns/${c.id}/letters?turn=2`)).body.every((x: { turn: number }) => x.turn === 2)).toBe(true);
   }, 30_000);
 });

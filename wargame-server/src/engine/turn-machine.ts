@@ -1,5 +1,6 @@
-import type { AfterActionReport, AgentDecision, AgentMemory, Campaign, Contact, DiploMessage, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
-import { FactionOrders as FactionOrdersSchema } from '../schemas/index.js';
+import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
+import { FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
+import { leaderOf } from './diplomacy.js';
 import type { JsonStore } from '../store/json-store.js';
 import { adjudicate } from './adjudication.js';
 import { applyAttrition } from './attrition.js';
@@ -15,9 +16,21 @@ import { deliver } from './procurement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
-import { llmDefaults } from '../config.js';
+import { AGENT_ROLES, cadenceDefaults, llmDefaults } from '../config.js';
+import { doctrineDecision } from '../agents/faction-agent.js';
+import { quickMemory } from '../agents/reflection.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
+/** Una lettera da scrivere (una chiamata al ruolo diplomat): il motore sceglie chi scrive a chi, l'LLM solo testo e tono. */
+export interface LetterJob {
+  campaign: Campaign; factionId: string; to: string; kind: 'reply' | 'initiative' | 'draft';
+  knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string;
+  fromTitle: string; toTitle: string; date: string;
+  /** fiducia/tensione del mittente verso il destinatario (la sua riga della matrice) */
+  relation: { trust: number; tension: number } | null;
+  intent?: string; replyTo?: DiploLetter; gist?: string; tone?: LetterTone;
+}
+export interface LetterResult { subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
 export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario }
 /** Porta verso gli agenti: il motore non conosce LLM, solo questo contratto. */
 export interface AgentsPort {
@@ -26,12 +39,23 @@ export interface AgentsPort {
   debrief(i: { campaign: Campaign; facts: Fact[]; publicEvents: GameEvent[] }): Promise<{ debriefing: NonNullable<TurnNarrative['debriefing']>; news: NewsItem[] }>;
   reflect(i: { campaign: Campaign; factionId: string; decision: AgentDecision | null; visibleEvents: GameEvent[]; memory: AgentMemory }): Promise<AgentMemory>;
   parseOrders(i: { campaign: Campaign; text: string; knowledge: FactionKnowledge }): Promise<{ orders: OrdersBody; ambiguities: string[] }>;
+  /** Scrive le lettere IA del turno, nello stesso ordine dei job (in replay: le rilegge dalle decisioni salvate). */
+  writeLetters(jobs: LetterJob[], onProgress: (factionId: string, status: string) => void): Promise<LetterResult[]>;
+  /** Bozza di lettera per il giocatore (non cambia lo stato). */
+  draftLetter(job: LetterJob): Promise<LetterResult>;
   drainLlmCalls(): LlmCall[];
 }
 
+type LlmRoleConfig = NonNullable<Campaign['config']['llm']['diplomat']>;
+/** Configurazione LLM di un ruolo (diplomat assente nelle campagne vecchie → quella di faction_major). */
+export const roleConfig = (c: Campaign, role: AgentRole): LlmRoleConfig => c.config.llm[role] ?? c.config.llm.faction_major;
+
 export class GameError extends Error { constructor(public code: string, message: string, public details?: unknown) { super(message); } }
 
-export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Partial<Campaign['config']> }
+type Cadence = Campaign['config']['agentCadence'];
+export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Omit<Partial<Campaign['config']>, 'agentCadence'> & { agentCadence?: Partial<Cadence> } }
+/** Cadenza della campagna con i default per i campi aggiunti dopo (campagne vecchie). */
+export const cadenceOf = (c: Campaign): Cadence => Object.assign({ minorEvery: 1, reflectEvery: 1, lettersPerTurn: 3 }, c.config.agentCadence);
 
 
 export class Engine {
@@ -48,7 +72,7 @@ export class Engine {
       config: {
         fogLevel: 'realistic', debugGodView: false, cmoThreshold: { majorShips: 1, aircraftPerSide: 4, missileSalvo: 8 },
         llm: llmDefaults(),
-        maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config,
+        maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config, agentCadence: { ...cadenceDefaults(), ...o.config?.agentCadence },
       },
     };
     const s = sc.world;
@@ -85,6 +109,12 @@ export class Engine {
   /** Esegue le fasi fino a PLAYER_ORDERS del turno successivo o a CMO_PENDING. */
   advance(id: string): Promise<Campaign> {
     return this.store.withLock(id, async () => {
+      try { return await this.runPhases(id); } finally { this.onProgress(id, { done: true }); }
+    }, 'turno');
+  }
+
+  private async runPhases(id: string): Promise<Campaign> {
+    {
       const c = await this.store.getCampaign(id);
       if (c.status === 'ended') throw new GameError('CAMPAIGN_ENDED', 'campagna conclusa');
       const ctx = await this.ctxFor(c);
@@ -110,6 +140,7 @@ export class Engine {
             const orders = (await Promise.all(Object.keys(ctx.state.factions).sort().map((f) => this.store.getOrders(id, ctx.turn, f)))).filter((o): o is FactionOrders => !!o);
             const rejected = adjudicate(ctx, orders);
             if (rejected.length) progress({ rejected });
+            await this.store.appendLetters(id, ctx.turn, ctx.events.filter((e) => e.type === 'LETTER_SENT' && e.turn === ctx.turn).map((e) => (e.payload as { letter: DiploLetter }).letter));
             for (const e of Object.values(ctx.state.engagements).filter((e) => e.turn === ctx.turn && e.cmoPackage)) await this.store.saveCmo(id, ctx.turn, e.id, { package: e.cmoPackage });
             ctx.phase = this.pendingCmo(ctx.state).length ? 'CMO_PENDING' : 'DEBRIEF';
             break;
@@ -124,7 +155,7 @@ export class Engine {
           await this.flush(ctx, c, true);
         }
       }
-    });
+    }
   }
 
   private pendingCmo(s: WorldState) { return Object.values(s.engagements).filter((e) => e.status === 'pending_cmo'); }
@@ -133,7 +164,8 @@ export class Engine {
     const prevEvents = ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : [];
     const inbox = prevEvents.filter((e) => e.type === 'DIPLO_MESSAGE').map((e) => (e.payload as { message: DiploMessage }).message);
     const news = (await this.store.getNarrative(c.id, ctx.turn - 1))?.news ?? [];
-    return { inbox, news };
+    const letters = (await Promise.all([3, 2, 1].filter((d) => ctx.turn - d >= 1).map((d) => this.store.getLetters(c.id, ctx.turn - d)))).flat();
+    return { inbox, news, letters };
   }
 
   private async intel(ctx: TurnCtx, c: Campaign) {
@@ -174,11 +206,70 @@ export class Engine {
       const memory = (await this.store.getMemory(c.id, f))!;
       inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc });
     }
-    const decisions = await this.agents.decideAll(inputs, (factionId, status) => progress({ agent: factionId, status }));
+    // cadenza: le fazioni minori saltano l'IA a turni alterni (sfalsate), con ordini di dottrina deterministici
+    const cad = cadenceOf(c);
+    const minors = ai.filter((f) => ctx.state.factions[f]!.agentRole === 'faction_minor');
+    const withLlm = (f: string) => { const i = minors.indexOf(f); return i < 0 || (cad.minorEvery > 0 && (ctx.turn + i) % cad.minorEvery === 0); };
+    const skipped = inputs.filter((i) => !withLlm(i.factionId)).map((i) => {
+      progress({ agent: i.factionId, status: 'dottrina (turno senza IA)' });
+      return doctrineDecision(i, `Turno senza IA (cadenza 1 ogni ${cad.minorEvery || '∞'}): ordini di dottrina.`);
+    });
+    const decisions = [...skipped, ...await this.agents.decideAll(inputs.filter((i) => withLlm(i.factionId)), (factionId, status) => progress({ agent: factionId, status }))];
+    await this.letters(ctx, c, decisions, inputs, progress);
     for (const d of decisions.sort((a, b) => a.factionId.localeCompare(b.factionId))) {
       await this.store.saveDecision(c.id, d);
       await this.store.saveOrders(c.id, d.orders);
     }
+  }
+
+  private letterJob(c: Campaign, s: WorldState, i: { factionId: string; knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string }, to: string, kind: LetterJob['kind'], extra: Partial<LetterJob> = {}): LetterJob {
+    const rel = s.relations[i.factionId]?.[to];
+    return {
+      campaign: c, factionId: i.factionId, to, kind, knowledge: i.knowledge, memory: i.memory, profile: i.profile,
+      fromTitle: leaderOf(s, i.factionId).title, toTitle: leaderOf(s, to).title, date: s.date,
+      relation: rel ? { trust: rel.trust, tension: rel.tension } : null, ...extra,
+    };
+  }
+
+  /**
+   * Lettere IA del turno, scelte in modo deterministico e poi scritte dal ruolo diplomat:
+   * 1) risposte alle lettere del giocatore del turno precedente (sempre, al massimo una per fazione, anche nei turni «senza IA»);
+   * 2) iniziative dai letterIntents delle decisioni IA (max 1 per le minori, 2 per le maggiori), al massimo lettersPerTurn,
+   *    prima le maggiori e poi per id. Diventano azioni LETTER negli ordini: stesso validatore ed effetti del giocatore.
+   */
+  private async letters(ctx: TurnCtx, c: Campaign, decisions: AgentDecision[], inputs: DecideInput[], progress: (m: Record<string, unknown>) => void) {
+    const s = ctx.state; const player = c.playerFaction;
+    const byF = new Map(decisions.map((d) => [d.factionId, d]));
+    for (const d of decisions) { d.orders.diplomacy = d.orders.diplomacy.filter((x) => x.kind !== 'LETTER'); d.letters = []; }
+    type Choice = { factionId: string; to: string; kind: 'reply' | 'initiative'; replyTo?: DiploLetter; gist?: string; tone?: LetterTone };
+    const picks: Choice[] = [];
+    const replying = new Set<string>();
+    for (const l of ctx.turn > 1 ? await this.store.getLetters(c.id, ctx.turn - 1) : []) {
+      if (l.from !== player || !byF.has(l.to) || replying.has(l.to)) continue;
+      replying.add(l.to);
+      picks.push({ factionId: l.to, to: player, kind: 'reply', replyTo: l });
+    }
+    const major = (f: string) => s.factions[f]?.agentRole === 'faction_major';
+    const initiatives = decisions.filter((d) => d.model !== 'dottrina').flatMap((d) => {
+      const seen = new Set<string>();
+      return d.letterIntents.slice(0, major(d.factionId) ? 2 : 1).filter((li) => li.to !== d.factionId && s.factions[li.to] && s.factions[li.to]!.kind !== 'bloc'
+        && !(li.to === player && replying.has(d.factionId)) && !seen.has(li.to) && !!seen.add(li.to))
+        .map((li): Choice => ({ factionId: d.factionId, to: li.to, kind: 'initiative', gist: li.gist.slice(0, LETTER_LIMITS.gist), tone: li.tone }));
+    }).sort((a, b) => Number(major(b.factionId)) - Number(major(a.factionId)) || a.factionId.localeCompare(b.factionId));
+    picks.push(...initiatives.slice(0, cadenceOf(c).lettersPerTurn));
+    if (!picks.length) return;
+    const input = new Map(inputs.map((i) => [i.factionId, i]));
+    const jobs = picks.map((p) => {
+      const d = byF.get(p.factionId)!;
+      return this.letterJob(c, s, input.get(p.factionId)!, p.to, p.kind, { replyTo: p.replyTo, gist: p.gist, tone: p.tone, intent: d.privateIntent });
+    });
+    const results = await this.agents.writeLetters(jobs, (factionId, status) => progress({ agent: factionId, status }));
+    picks.forEach((p, i) => {
+      const d = byF.get(p.factionId)!; const r = results[i]!;
+      const action: LetterAction = { id: `${p.factionId}-${ctx.turn}-L${d.letters.length + 1}`, kind: 'LETTER', target: p.to, subject: r.subject, body: r.body, tone: r.tone, visibility: 'private', ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), model: r.model };
+      d.orders.diplomacy.push(action);
+      d.letters.push({ actionId: action.id, to: p.to, kind: p.kind, ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), source: r.source, model: r.model, errors: r.errors });
+    });
   }
 
   private async debrief(ctx: TurnCtx, c: Campaign) {
@@ -193,10 +284,14 @@ export class Engine {
     const { debriefing, news } = await this.agents.debrief({ campaign: c, facts, publicEvents: events.filter((e) => e.visibility === 'public') });
     const narrative = (await this.store.getNarrative(c.id, ctx.turn))!;
     await this.store.saveNarrative(c.id, ctx.turn, { ...narrative, debriefing, news });
+    const cad = cadenceOf(c);
+    const ai = Object.values(ctx.state.factions).filter((f) => f.controller === 'ai').map((f) => f.id).sort();
     for (const f of Object.values(ctx.state.factions).filter((f) => f.controller === 'ai')) {
       const memory = (await this.store.getMemory(c.id, f.id))!;
       const decision = await this.store.getDecision(c.id, ctx.turn, f.id);
-      const m = await this.agents.reflect({ campaign: c, factionId: f.id, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f.id)), memory });
+      const m = (ctx.turn + ai.indexOf(f.id)) % cad.reflectEvery === 0
+        ? await this.agents.reflect({ campaign: c, factionId: f.id, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f.id)), memory })
+        : quickMemory(memory, decision, ctx.turn);
       await this.store.saveMemory(c.id, { ...m, updatedTurn: ctx.turn });
     }
   }
@@ -233,6 +328,21 @@ export class Engine {
     return { ...r, validation: await this.validate(id, r.orders) };
   }
 
+  /** Bozza di lettera del giocatore scritta dal ruolo diplomat a nome dell'Italia: il giocatore la rivede e la invia come ordine LETTER. */
+  async draftLetter(id: string, b: { target: string; gist: string; tone: LetterTone; inReplyTo?: string }) {
+    const c = await this.store.getCampaign(id);
+    const s = await this.store.getState(id);
+    const t = s.factions[b.target];
+    if (!t || b.target === c.playerFaction || t.kind === 'bloc') throw new GameError('VALIDATION', `destinatario non valido: ${b.target}`);
+    const k = await this.knowledge(id);
+    const replyTo = b.inReplyTo ? k.letters.find((l) => l.id === b.inReplyTo && l.to === c.playerFaction) : undefined;
+    const job = this.letterJob(c, s, { factionId: c.playerFaction, knowledge: k, memory: null, profile: loadScenario(c.scenarioId).profiles[c.playerFaction] ?? '' }, b.target, 'draft',
+      { gist: b.gist.slice(0, LETTER_LIMITS.gist), tone: b.tone, replyTo });
+    const r = await this.agents.draftLetter(job);
+    await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
+    return { target: b.target, ...(replyTo ? { inReplyTo: replyTo.id } : {}), ...r };
+  }
+
   submitAar(id: string, engagementId: string, body: { autoResolve: true } | AfterActionReport) {
     return this.store.withLock(id, async () => {
       const c = await this.store.getCampaign(id);
@@ -244,7 +354,7 @@ export class Engine {
       await this.store.saveCmo(id, ctx.turn, engagementId, { package: eng.cmoPackage, aar: 'autoResolve' in body ? null : body, result: ctx.state.engagements[engagementId] });
       await this.flush(ctx, c);
       return ctx.state.engagements[engagementId];
-    });
+    }, 'cmo');
   }
 
   async fork(id: string, fromTurn: number) {
@@ -254,20 +364,22 @@ export class Engine {
   }
 
   /** Cambi di configurazione in corsa (es. turno mensile→settimanale in crisi acuta, CMO su richiesta, modelli per ruolo). */
-  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; llm?: Record<string, Partial<Campaign['config']['llm'][keyof Campaign['config']['llm']]>> }) {
+  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; agentCadence?: Partial<Cadence>; llm?: Record<string, Partial<LlmRoleConfig>> }) {
     return this.store.withLock(id, async () => {
       const c = await this.store.getCampaign(id);
       if (patch.turnLength) c.turnLength = patch.turnLength;
-      const { llm, turnLength: _t, ...rest } = patch;
+      const { llm, turnLength: _t, agentCadence, ...rest } = patch;
       Object.assign(c.config, rest);
+      if (agentCadence) c.config.agentCadence = { ...cadenceOf(c), ...agentCadence };
       for (const [role, cfg] of Object.entries(llm ?? {})) {
-        if (!(role in c.config.llm)) throw new GameError('VALIDATION', `ruolo sconosciuto ${role}`);
-        Object.assign(c.config.llm[role as keyof typeof c.config.llm], cfg);
+        if (!(AGENT_ROLES as readonly string[]).includes(role)) throw new GameError('VALIDATION', `ruolo sconosciuto ${role}`);
+        const r = role as AgentRole;
+        c.config.llm[r] = { ...roleConfig(c, r), ...cfg };
       }
       c.updatedAt = new Date().toISOString();
       await this.store.saveCampaign(c);
       return c;
-    });
+    }, 'config');
   }
 
   async end(id: string) {

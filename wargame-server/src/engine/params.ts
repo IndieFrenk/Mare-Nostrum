@@ -14,8 +14,17 @@ export const PARAMS = {
   engagement: { tensionForHostile: 70, incidentChance: 0.25 },
   randomEventChance: 0.35,
   crisisDriftUp: 11, crisisDriftDown: 3,
+  /** operazioni cyber per fazione e per turno (i modelli piccoli ne ordinavano decine: nessuna unità da impegnare) */
+  maxCyberOpsPerTurn: 2,
+  /** SPEC «accordi e de-escalation la riducono»: probabilità base di −1 per una crisi senza incidenti nel turno
+   *  precedente, moltiplicata per (1 + calma), calma = 1 − tensione media tra le fazioni coinvolte / 100 */
+  crisisCoolChance: 0.25,
+  /** riduzione dell'escalation quando entra in vigore un accordo pertinente */
+  agreementDeescalation: { ceasefire: 2, migration: 1, energy: 1 },
   diplo: { propagation: 0.3 },
   energy: { ttfPerLostShare: 120, stabilityPerLostShare: 25, penaltyPerLostShare: 60 },
   aarPlausibility: { victory: 0.75, draw: 0.55, defeat: 0.35 },
   autoResolveUncertainty: 0.3,
+  /** posture per zona (engine/stances.ts): unità per livello di intensità (indice 1–3), prontezza minima, soglia di logoramento */
+  stances: { unitsByIntensity: [0, 1, 3, 5], minReadiness: 50, wornReadiness: 35 },
 } as const;
