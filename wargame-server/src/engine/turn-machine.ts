@@ -15,7 +15,9 @@ import { deliver } from './procurement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
-import { llmDefaults } from '../config.js';
+import { cadenceDefaults, llmDefaults } from '../config.js';
+import { doctrineDecision } from '../agents/faction-agent.js';
+import { quickMemory } from '../agents/reflection.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
 export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario }
@@ -48,7 +50,7 @@ export class Engine {
       config: {
         fogLevel: 'realistic', debugGodView: false, cmoThreshold: { majorShips: 1, aircraftPerSide: 4, missileSalvo: 8 },
         llm: llmDefaults(),
-        maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config,
+        maxConcurrentAgents: 2, cmoOnRequest: false, agentCadence: cadenceDefaults(), ...o.config,
       },
     };
     const s = sc.world;
@@ -180,7 +182,15 @@ export class Engine {
       const memory = (await this.store.getMemory(c.id, f))!;
       inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc });
     }
-    const decisions = await this.agents.decideAll(inputs, (factionId, status) => progress({ agent: factionId, status }));
+    // cadenza: le fazioni minori saltano l'IA a turni alterni (sfalsate), con ordini di dottrina deterministici
+    const cad = c.config.agentCadence ?? { minorEvery: 1, reflectEvery: 1 };
+    const minors = ai.filter((f) => ctx.state.factions[f]!.agentRole === 'faction_minor');
+    const withLlm = (f: string) => { const i = minors.indexOf(f); return i < 0 || (cad.minorEvery > 0 && (ctx.turn + i) % cad.minorEvery === 0); };
+    const skipped = inputs.filter((i) => !withLlm(i.factionId)).map((i) => {
+      progress({ agent: i.factionId, status: 'dottrina (turno senza IA)' });
+      return doctrineDecision(i, `Turno senza IA (cadenza 1 ogni ${cad.minorEvery || '∞'}): ordini di dottrina.`);
+    });
+    const decisions = [...skipped, ...await this.agents.decideAll(inputs.filter((i) => withLlm(i.factionId)), (factionId, status) => progress({ agent: factionId, status }))];
     for (const d of decisions.sort((a, b) => a.factionId.localeCompare(b.factionId))) {
       await this.store.saveDecision(c.id, d);
       await this.store.saveOrders(c.id, d.orders);
@@ -199,10 +209,14 @@ export class Engine {
     const { debriefing, news } = await this.agents.debrief({ campaign: c, facts, publicEvents: events.filter((e) => e.visibility === 'public') });
     const narrative = (await this.store.getNarrative(c.id, ctx.turn))!;
     await this.store.saveNarrative(c.id, ctx.turn, { ...narrative, debriefing, news });
+    const cad = c.config.agentCadence ?? { minorEvery: 1, reflectEvery: 1 };
+    const ai = Object.values(ctx.state.factions).filter((f) => f.controller === 'ai').map((f) => f.id).sort();
     for (const f of Object.values(ctx.state.factions).filter((f) => f.controller === 'ai')) {
       const memory = (await this.store.getMemory(c.id, f.id))!;
       const decision = await this.store.getDecision(c.id, ctx.turn, f.id);
-      const m = await this.agents.reflect({ campaign: c, factionId: f.id, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f.id)), memory });
+      const m = (ctx.turn + ai.indexOf(f.id)) % cad.reflectEvery === 0
+        ? await this.agents.reflect({ campaign: c, factionId: f.id, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f.id)), memory })
+        : quickMemory(memory, decision, ctx.turn);
       await this.store.saveMemory(c.id, { ...m, updatedTurn: ctx.turn });
     }
   }
@@ -260,7 +274,7 @@ export class Engine {
   }
 
   /** Cambi di configurazione in corsa (es. turno mensile→settimanale in crisi acuta, CMO su richiesta, modelli per ruolo). */
-  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; llm?: Record<string, Partial<Campaign['config']['llm'][keyof Campaign['config']['llm']]>> }) {
+  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; agentCadence?: Campaign['config']['agentCadence']; llm?: Record<string, Partial<Campaign['config']['llm'][keyof Campaign['config']['llm']]>> }) {
     return this.store.withLock(id, async () => {
       const c = await this.store.getCampaign(id);
       if (patch.turnLength) c.turnLength = patch.turnLength;

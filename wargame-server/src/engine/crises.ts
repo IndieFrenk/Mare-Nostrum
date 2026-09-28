@@ -3,12 +3,35 @@ import { evaluate } from './conditions.js';
 import { PARAMS } from './params.js';
 
 /** OPEN: deriva delle crisi con 2d6 ed eventi casuali pesati per zona/tensione. */
+/** 1 = le fazioni coinvolte non hanno tensioni tra loro, 0 = tensione massima. */
+function calm(ctx: TurnCtx, involved: string[]) {
+  const t: number[] = [];
+  for (const a of involved) for (const b of involved) if (a < b) { const r = ctx.state.relations[a]?.[b]; if (r) t.push(r.tension); }
+  return t.length ? 1 - t.reduce((x, y) => x + y, 0) / t.length / 100 : 0.5;
+}
+
+/** Un accordo entrato in vigore raffredda le crisi pertinenti (tregua tra ≥2 coinvolti; migrazione/energia per le crisi di quel tipo). */
+export function deescalateByAgreement(ctx: TurnCtx, ag: { id: string; type: string; parties: string[] }) {
+  const d = (PARAMS.agreementDeescalation as Record<string, number>)[ag.type];
+  if (!d) return;
+  for (const c of Object.values(ctx.state.crises)) {
+    if (c.status === 'resolved') continue;
+    const inv = ag.parties.filter((p) => c.involved.includes(p)).length;
+    if (ag.type === 'ceasefire' ? inv >= 2 : c.type === ag.type && inv >= 1) ctx.escalate(c.id, -d, `accordo ${ag.type} ${ag.id} in vigore`);
+  }
+}
+
 export function evolveCrises(ctx: TurnCtx) {
   for (const c of Object.values(ctx.state.crises)) {
     if (c.status === 'resolved' || c.status === 'frozen') continue;
     const r = ctx.rng.roll(`deriva crisi ${c.id}`, '2d6');
     if (r.total >= PARAMS.crisisDriftUp) ctx.escalate(c.id, 1, 'deriva: deterioramento spontaneo');
     else if (r.total <= PARAMS.crisisDriftDown) ctx.escalate(c.id, -1, 'deriva: raffreddamento');
+    // senza nuovi incidenti nel turno precedente la crisi tende a calmarsi, tanto più se le parti non sono in tensione
+    const quiet = !c.history.some((h) => h.turn === ctx.turn - 1 && h.delta > 0);
+    if (quiet && c.escalation > 0 && ctx.rng.chance(`raffreddamento ${c.id}`, Math.min(0.9, PARAMS.crisisCoolChance * (1 + calm(ctx, c.involved)))).ok) {
+      ctx.escalate(c.id, -1, 'nessun nuovo incidente: raffreddamento');
+    }
   }
   const table = ctx.scenario.events;
   const touched = new Set<string>();

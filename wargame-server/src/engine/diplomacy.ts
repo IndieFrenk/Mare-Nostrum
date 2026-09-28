@@ -1,5 +1,6 @@
 import type { DiploAction, PublicStatement } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
+import { deescalateByAgreement } from './crises.js';
 
 const PERMANENT = ['USA', 'GBR', 'FRA', 'RUS', 'CHN'];
 
@@ -31,6 +32,7 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       const status = a.response === 'accept' ? 'active' : a.response === 'reject' ? 'expired' : 'proposed';
       ctx.emit('AGREEMENT_CHANGED', actor, { agreement: { ...ag, status, terms: a.counterTerms ?? ag.terms } }, { targets: ag.parties, visibility: ag.visibility, ...cause });
       for (const p of ag.parties) if (p !== actor) ctx.relate(actor, p, a.response === 'accept' ? 8 : a.response === 'reject' ? -4 : 0, a.response === 'accept' ? -5 : 2, `risposta ad accordo ${ag.id}: ${a.response}`, { propagate: false });
+      if (status === 'active') deescalateByAgreement(ctx, ag);
       break;
     }
     case 'SANCTION':

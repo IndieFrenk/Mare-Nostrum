@@ -14,6 +14,11 @@ export const PARAMS = {
   engagement: { tensionForHostile: 70, incidentChance: 0.25 },
   randomEventChance: 0.35,
   crisisDriftUp: 11, crisisDriftDown: 3,
+  /** SPEC «accordi e de-escalation la riducono»: probabilità base di −1 per una crisi senza incidenti nel turno
+   *  precedente, moltiplicata per (1 + calma), calma = 1 − tensione media tra le fazioni coinvolte / 100 */
+  crisisCoolChance: 0.25,
+  /** riduzione dell'escalation quando entra in vigore un accordo pertinente */
+  agreementDeescalation: { ceasefire: 2, migration: 1, energy: 1 },
   diplo: { propagation: 0.3 },
   energy: { ttfPerLostShare: 120, stabilityPerLostShare: 25, penaltyPerLostShare: 60 },
   aarPlausibility: { victory: 0.75, draw: 0.55, defeat: 0.35 },

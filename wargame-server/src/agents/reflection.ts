@@ -26,6 +26,12 @@ export function clampMemory(m: AgentMemory): AgentMemory {
   };
 }
 
+/** Aggiornamento della memoria senza IA (turni a cadenza ridotta): una riga nel riassunto, il resto invariato. */
+export function quickMemory(memory: AgentMemory, decision: AgentDecision | null, turn: number): AgentMemory {
+  const line = `T${turn}: ${decision?.privateIntent ?? 'nessuna decisione'}.`;
+  return clampMemory({ ...memory, rollingSummary: `${memory.rollingSummary} ${line}`.trim(), updatedTurn: turn });
+}
+
 export async function reflect(provider: LlmProvider, log: LlmCall[], c: Campaign, i: { factionId: string; decision: AgentDecision | null; visibleEvents: GameEvent[]; memory: AgentMemory }): Promise<AgentMemory> {
   const turn = c.currentTurn;
   const events = i.visibleEvents.filter((e) => e.type !== 'UNIT_STATUS' && e.type !== 'BUDGET_CHANGED').slice(-40).map((e) => `${e.type} ${e.actor}→${e.targets.join(',')} ${JSON.stringify(e.payload).slice(0, 160)}`);

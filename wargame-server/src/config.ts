@@ -14,6 +14,12 @@ export const config = {
   mock: process.env.WARGAME_MOCK === '1',
 };
 
+/** Cadenza predefinita degli agenti per le campagne nuove (WARGAME_MINOR_EVERY, WARGAME_REFLECT_EVERY; 1 = sempre). */
+export const cadenceDefaults = () => ({
+  minorEvery: Math.max(0, Number(process.env.WARGAME_MINOR_EVERY ?? 1) || 0),
+  reflectEvery: Math.max(1, Number(process.env.WARGAME_REFLECT_EVERY ?? 1) || 1),
+});
+
 export const AGENT_ROLES = ['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair'] as const;
 type RoleCfg = { model: string; temperature: number; maxTokens: number; timeoutMs: number };
 

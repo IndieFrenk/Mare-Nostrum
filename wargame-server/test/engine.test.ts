@@ -21,7 +21,7 @@ describe('motore: 5 turni headless con mock', () => {
       expect(validation.valid).toBe(true);
     });
     c = r.campaign;
-    deliveryTurn = (await e.store.getState(c.id, 1)).pendingDeliveries.find((d) => d.itemId === 'LOT_METEOR')!.deliveryTurn;
+    deliveryTurn = (await e.store.getState(c.id, 1)).pendingDeliveries.find((d) => d.itemId === 'LOT_METEOR' && d.factionId === 'ITA')!.deliveryTurn;
   }, 60_000);
 
   it('arriva al turno 6 in attesa del giocatore', () => {
@@ -105,4 +105,28 @@ describe('CMO', () => {
     expect(c.currentTurn).toBe(2);
     expect(c.phase).toBe('PLAYER_ORDERS');
   }, 30_000);
+});
+
+describe('de-escalation delle crisi (SPEC: «accordi e de-escalation la riducono»)', () => {
+  it('senza incidenti le crisi si raffreddano e un cessate il fuoco accettato riduce l\'escalation', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cool', seed: 'raffreddamento' });
+    await runSim(e, c, 8);
+    const s = await e.store.getState(c.id);
+    const causes = Object.values(s.crises).flatMap((k) => k.history.map((h) => h.cause));
+    expect(causes.some((x) => x.includes('raffreddamento'))).toBe(true);
+    const { deescalateByAgreement } = await import('../src/engine/crises.js');
+    const deltas: [string, number, string][] = [];
+    const fake = { state: s, escalate: (id: string, d: number, cause: string) => deltas.push([id, d, cause]) };
+    // tregua tra due fazioni coinvolte in una crisi non risolta → −2 su quella crisi
+    const open = Object.values(s.crises).find((k) => k.status !== 'resolved')!;
+    deescalateByAgreement(fake as never, { id: 'AG-X', type: 'ceasefire', parties: open.involved.slice(0, 2) });
+    expect(deltas.filter(([, d]) => d === -2).map(([id]) => id)).toContain(open.id);
+    deltas.length = 0;
+    deescalateByAgreement(fake as never, { id: 'AG-Z', type: 'defense', parties: open.involved.slice(0, 2) });
+    expect(deltas).toEqual([]); // un accordo di difesa non raffredda
+    deltas.length = 0;
+    deescalateByAgreement(fake as never, { id: 'AG-Y', type: 'migration', parties: ['ITA', 'TUN'] });
+    expect(deltas.map(([id]) => id)).toEqual(s.crises.SAHEL_MIG!.status === 'resolved' ? [] : ['SAHEL_MIG']);
+  }, 60_000);
 });

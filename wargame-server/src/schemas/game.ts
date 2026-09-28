@@ -18,6 +18,12 @@ export const Campaign = z.object({
     llm: z.record(AgentRole, LlmRoleConfig), maxConcurrentAgents: z.number().int().min(1),
     /** il giocatore chiede CMO per ogni ingaggio che lo coinvolge, anche minore */
     cmoOnRequest: z.boolean().default(false),
+    /**
+     * Risparmio di chiamate LLM: le fazioni minori decidono con l'IA un turno ogni `minorEvery` (0 = mai, solo dottrina;
+     * sfalsate tra loro) e ogni fazione aggiorna la memoria con l'IA un turno ogni `reflectEvery` (negli altri turni
+     * un riassunto senza IA). 1/1 = tutto con l'IA a ogni turno.
+     */
+    agentCadence: z.object({ minorEvery: z.number().int().min(0), reflectEvery: z.number().int().min(1) }).default({ minorEvery: 1, reflectEvery: 1 }),
   }),
 });
 

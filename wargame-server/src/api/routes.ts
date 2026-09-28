@@ -80,6 +80,7 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/config`, async (req) => engine.configure(req.params.id, z.object({
     turnLength: z.enum(['week', 'month']).optional(), cmoOnRequest: z.boolean().optional(), debugGodView: z.boolean().optional(),
     maxConcurrentAgents: z.number().int().min(1).max(16).optional(),
+    agentCadence: z.object({ minorEvery: z.number().int().min(0).max(10), reflectEvery: z.number().int().min(1).max(10) }).optional(),
     llm: z.record(z.string(), z.object({ model: z.string().optional(), temperature: z.number().optional(), maxTokens: z.number().optional(), timeoutMs: z.number().optional() })).optional(),
   }).parse(req.body)));
   app.get<Id & { Querystring: { format?: string; engagementId?: string } }>(`${P}/campaigns/:id/cmo`, async (req, reply) => {

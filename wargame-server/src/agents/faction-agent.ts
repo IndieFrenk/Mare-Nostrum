@@ -32,6 +32,20 @@ export function doctrineOrders(i: DecideInput): OrdersBody {
   return normalize({ military, diplomacy: [], procurement: [], statements: [] }, i.factionId, k.turn);
 }
 
+/** Decisione senza IA (cadenza ridotta): ordini di dottrina, marcata come tale nel post-mortem. */
+export function doctrineDecision(i: DecideInput, reason: string): AgentDecision {
+  const k = i.knowledge;
+  const role = k.ownFaction.agentRole === 'faction_major' ? 'faction_major' : 'faction_minor';
+  return {
+    schemaVersion: 1, id: `DEC-${k.turn}-${i.factionId}`, factionId: i.factionId, turn: k.turn, model: 'dottrina', role, promptHash: '',
+    knowledgeRef: `knowledge/${i.factionId}/turn-${String(k.turn).padStart(4, '0')}.json`, memoryRef: `memory/${i.factionId}.json@${i.memory.updatedTurn}`,
+    situationAssessment: reason, threats: [], optionsConsidered: [], privateIntent: 'mantenere la postura',
+    orders: { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: 'fallback_doctrine', ...doctrineOrders(i) }, confidence: 0.3,
+    validation: { valid: true, errors: [], repairAttempts: 0, fallbackUsed: false },
+    usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 },
+  };
+}
+
 export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInput): Promise<AgentDecision> {
   const k = i.knowledge;
   const f = k.ownFaction;

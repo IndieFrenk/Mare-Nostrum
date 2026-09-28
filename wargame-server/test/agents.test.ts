@@ -80,3 +80,27 @@ describe('riflessione: note sulle relazioni scritte come oggetti', () => {
     expect(noteText({ EGY: { note: 'x' } })).toBe('{"EGY":{"note":"x"}}');
   });
 });
+
+describe('cadenza degli agenti (risparmio di chiamate LLM)', () => {
+  it('fazioni minori a turni alterni e memoria IA ogni 3 turni: meno chiamate, decisioni per tutti, replay identico', async () => {
+    const calls: string[] = [];
+    const mock = new MockLLMProvider();
+    const spy = { name: 'spy', complete: (r: Parameters<MockLLMProvider['complete']>[0]) => { calls.push(r.role); return mock.complete(r); } };
+    const e = makeEngine(spy as never);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cad', seed: 'cadenza', config: { agentCadence: { minorEvery: 2, reflectEvery: 3 } } });
+    const src = (await runSim(e, c, 4)).campaign;
+    const count = (role: string) => calls.filter((x) => x === role).length;
+    // 9 minori × 4 turni = 36 → circa la metà; 14 riflessioni × 4 turni = 56 → circa un terzo
+    expect(count('faction_minor')).toBeLessThanOrEqual(20);
+    expect(count('faction_major')).toBe(5 * 4);
+    expect(count('reflection')).toBeLessThanOrEqual(22);
+    for (let t = 1; t <= 4; t++) for (const f of AI) expect(await e.store.getDecision(src.id, t, f)).not.toBeNull();
+    const skipped = (await Promise.all(AI.map((f) => e.store.getDecision(src.id, 2, f)))).filter((d) => d!.model === 'dottrina');
+    expect(skipped.length).toBeGreaterThan(0);
+    expect((await e.store.getMemory(src.id, 'TUR'))!.updatedTurn).toBe(4);
+    const replay = new Engine(e.store, new ReplayAgents(e.store, src.id));
+    const rc = await replay.createCampaign({ scenarioId: 'med-2026', name: 'rep', seed: src.seed, config: src.config });
+    const r = await runSim(replay, rc, 4, async (t) => { const o = await e.store.getOrders(src.id, t, 'ITA'); if (o) await e.store.saveOrders(rc.id, o); });
+    for (let t = 1; t <= 4; t++) expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(src.id, t));
+  }, 60_000);
+});
