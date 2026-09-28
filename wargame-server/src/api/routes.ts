@@ -1,7 +1,8 @@
 import { EventEmitter } from 'node:events';
 import type { FastifyInstance } from 'fastify';
 import { ZodError, z } from 'zod';
-import { AfterActionReport, OrdersBody } from '../schemas/index.js';
+import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody } from '../schemas/index.js';
+import { letterVisibleTo } from '../engine/knowledge.js';
 import { cmoText } from '../engine/cmo.js';
 import { listScenarios, loadScenario } from '../engine/scenario.js';
 import { GameError, type Engine } from '../engine/turn-machine.js';
@@ -72,6 +73,16 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
     return { budget, items: loadScenario(c.scenarioId).catalog.items.map((i) => ({ ...i, available: i.leadTimeTurns !== null && i.cost <= budget })), bases: Object.values(s.bases).filter((b) => b.factionId === c.playerFaction).map((b) => ({ id: b.id, name: b.name })), deliveries: s.pendingDeliveries.filter((d) => d.factionId === c.playerFaction) };
   });
   app.post<Id & { Body: { text: string } }>(`${P}/campaigns/:id/orders/parse`, async (req) => engine.parseOrders(req.params.id, z.object({ text: z.string().min(1) }).parse(req.body).text));
+  /** Lettere visibili al giocatore (sue, a lui, pubbliche): tutti i turni, o solo `turn`. */
+  app.get<Id & { Querystring: { turn?: string } }>(`${P}/campaigns/:id/letters`, async (req) => {
+    const c = await store.getCampaign(req.params.id);
+    const turns = req.query.turn === undefined ? Array.from({ length: c.currentTurn }, (_, i) => i + 1) : [Number(req.query.turn)].filter((t) => t >= 1 && t <= c.currentTurn);
+    return (await Promise.all(turns.map((t) => store.getLetters(c.id, t)))).flat().filter((l) => letterVisibleTo(l, c.playerFaction));
+  });
+  /** Bozza scritta dall'LLM a nome dell'Italia: il giocatore la rivede e la manda come ordine LETTER. Non cambia lo stato. */
+  app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/letters/draft`, async (req) => engine.draftLetter(req.params.id, z.object({
+    target: z.string(), gist: z.string().min(1).max(LETTER_LIMITS.gist), tone: LetterTone, inReplyTo: z.string().optional(),
+  }).parse(req.body)));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders/validate`, async (req) => engine.validate(req.params.id, OrdersBody.parse(req.body)));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders`, async (req) => engine.submitOrders(req.params.id, OrdersBody.parse(req.body)));
   app.post<Id>(`${P}/campaigns/:id/advance`, async (req) => {
