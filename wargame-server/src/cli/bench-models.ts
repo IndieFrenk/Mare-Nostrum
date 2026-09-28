@@ -45,7 +45,7 @@ const major = pick('faction_major');
 const refl = pick('reflection');
 const narr = pick('gm_narrator', false);
 const refsOf = async (f: string) => new Set(((await store.getKnowledge(campaignId, f, 1))?.contacts ?? []).map((c) => c.id));
-const newFormat = readFileSync(new URL('../agents/prompts/faction.md', import.meta.url), 'utf8').split('FORMATO')[1];
+const newFormat = template('faction', { maxLetters: '2' }).split('FORMATO')[1];
 const ReflOut = AgentMemory.omit({ schemaVersion: true, factionId: true, updatedTurn: true }).extend({ lessons: z.array(z.string()) });
 const NarrOut = z.object({ title: z.string(), sections: z.array(z.object({ heading: z.string(), body: z.string() })), factsRef: z.array(z.string()).default([]) });
 const facts = narr.user.split('\n').filter((l) => l.startsWith('['));

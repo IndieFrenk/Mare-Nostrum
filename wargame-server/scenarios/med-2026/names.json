@@ -1,0 +1,37 @@
+{
+  "_nota": "Alias italiani di zone e fazioni per la Console Ordini (riconoscimento deterministico dei nomi prima dell'LLM). Gli alias di più id non si sostituiscono nel testo.",
+  "zones": {
+    "TIRRENO": ["Mar Tirreno", "Tirreno"],
+    "ADRIATICO": ["Mar Adriatico", "Adriatico"],
+    "IONIO": ["Mar Ionio", "Ionio"],
+    "CANALE_SICILIA": ["Canale di Sicilia", "Stretto di Sicilia", "Canale siciliano"],
+    "MAR_LIBICO": ["Mar Libico", "acque libiche", "Golfo della Sirte", "Golfo di Sirte"],
+    "LIBIA_TERRA": ["entroterra libico", "Libia (entroterra)"],
+    "MED_OCCIDENTALE": ["Mediterraneo occidentale", "Mar di Sardegna", "Baleari"],
+    "EGEO": ["Mar Egeo", "Egeo"],
+    "MEDITERRANEO_ORIENTALE": ["Mediterraneo orientale", "Levante", "acque di Cipro"],
+    "MAR_ROSSO": ["Mar Rosso", "Bab el-Mandeb", "Bab el Mandeb"],
+    "MAR_NERO": ["Mar Nero"],
+    "GOLFO": ["Golfo Persico", "Hormuz", "Stretto di Hormuz"],
+    "SAHEL": ["Sahel"]
+  },
+  "factions": {
+    "ITA": ["Italia"],
+    "USA": ["Stati Uniti", "USA", "America", "Washington", "americani"],
+    "FRA": ["Francia", "Parigi", "francesi"],
+    "TUR": ["Turchia", "Ankara", "turchi"],
+    "RUS": ["Russia", "Mosca", "russi"],
+    "CHN": ["Cina", "Pechino", "cinesi"],
+    "GBR": ["Regno Unito", "Gran Bretagna", "Londra", "britannici", "inglesi"],
+    "GRC": ["Grecia", "Atene", "greci"],
+    "EGY": ["Egitto", "Cairo", "egiziani"],
+    "ISR": ["Israele", "israeliani"],
+    "ALG": ["Algeria", "Algeri", "algerini"],
+    "TUN": ["Tunisia", "Tunisi", "tunisini"],
+    "LBY_GNU": ["Libia", "libici", "Tripoli", "GNU", "governo di Tripoli"],
+    "LBY_LNA": ["Libia", "libici", "Haftar", "LNA", "Bengasi", "Cirenaica"],
+    "IRN": ["Iran", "Teheran", "iraniani"],
+    "NATO": ["NATO", "Alleanza Atlantica"],
+    "EU": ["UE", "Unione Europea", "Bruxelles"]
+  }
+}

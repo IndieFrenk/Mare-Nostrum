@@ -18,7 +18,10 @@ export interface EventRow { id: string; weight: number; minTension: number; text
 export interface Scenario {
   id: string; name: string; startDate: string; turnLength: 'week' | 'month';
   catalog: Catalog; world: WorldState; events: EventRow[]; profiles: Record<string, string>; geo: Record<string, unknown>;
+  /** alias italiani di zone e fazioni (names.json, facoltativo) per riconoscere i nomi nelle direttive del giocatore */
+  names: ScenarioNames;
 }
+export interface ScenarioNames { zones: Record<string, string[]>; factions: Record<string, string[]> }
 
 const cache = new Map<string, Scenario>();
 const readJson = (f: string) => JSON.parse(readFileSync(f, 'utf8'));
@@ -77,7 +80,9 @@ export function loadScenario(id: string): Scenario {
   for (const c of Object.values(world.crises)) for (const z of c.zoneIds) world.zones[z].tension = Math.max(world.zones[z].tension, c.escalation * 10);
   const profiles = Object.fromEntries(readdirSync(path.join(dir, 'factions')).map((f) => [f.replace(/\.md$/, ''), readFileSync(path.join(dir, 'factions', f), 'utf8')]));
   const geo = Object.fromEntries(readdirSync(path.join(dir, 'geo')).map((f) => [f.replace(/\.geojson$/, ''), readJson(path.join(dir, 'geo', f))]));
-  const sc: Scenario = { id, name: meta.name, startDate: meta.startDate, turnLength: meta.turnLength, catalog, world, events: readJson(path.join(dir, 'event-tables.json')).default, profiles, geo };
+  const namesFile = path.join(dir, 'names.json');
+  const names: ScenarioNames = existsSync(namesFile) ? (({ zones = {}, factions = {} }) => ({ zones, factions }))(readJson(namesFile)) : { zones: {}, factions: {} };
+  const sc: Scenario = { id, name: meta.name, startDate: meta.startDate, turnLength: meta.turnLength, catalog, world, events: readJson(path.join(dir, 'event-tables.json')).default, profiles, geo, names };
   cache.set(id, sc);
   return structuredClone(sc);
 }
