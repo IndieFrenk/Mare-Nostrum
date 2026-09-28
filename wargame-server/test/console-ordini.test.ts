@@ -4,6 +4,9 @@ import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import { buildLexicon, recognize } from '../src/engine/names.js';
 import { loadScenario } from '../src/engine/scenario.js';
 import { PARSER_CASES, scoreParsed } from '../src/cli/parser-cases.js';
+import { LENGTH_KEYS, portableSchema } from '../src/agents/llm-client.js';
+import { maxJsonChars, PARSER_CAPS, PARSER_LENGTHS } from '../src/agents/order-parser.js';
+import { llmDefaults } from '../src/config.js';
 import { makeEngine } from './helpers.js';
 
 /** Provider finto: il parser restituisce la risposta scritta nel test (gli errori visti con i modelli locali), il resto è il mock. */
@@ -276,6 +279,102 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(v.errors).toEqual(expect.arrayContaining([
       'c1: un\'operazione cyber non può colpire la propria fazione', 'a1: destinatario EGEO sconosciuto (non è una fazione)', 'a1: destinatario IONIO sconosciuto (non è una fazione)', 'a2: DEMARCHE non può essere rivolto alla propria fazione',
     ]));
+  });
+});
+
+describe('console ordini: schema del parser senza JSON troncati', () => {
+  /** tutti i nodi dello schema JSON (anche dentro oneOf/anyOf/items) */
+  const nodes = (n: unknown, out: Record<string, unknown>[] = []): Record<string, unknown>[] => {
+    if (Array.isArray(n)) n.forEach((x) => nodes(x, out));
+    else if (n && typeof n === 'object') { out.push(n as Record<string, unknown>); Object.values(n).forEach((x) => nodes(x, out)); }
+    return out;
+  };
+
+  it('lo schema inviato ha maxLength su tutti i testi liberi, maxItems su tutte le liste e il caso peggiore sta sotto maxTokens', async () => {
+    const p = new ScriptedParser({ orders: empty, ambiguities: [] });
+    const e = makeEngine(p);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'schema', seed: 'schema' });
+    await e.parseOrders(c.id, FRASE_1);
+    const req = p.requests[0]!;
+    expect(req.keepLengths).toBe(true);
+    const sent = portableSchema(req.jsonSchema, false, LENGTH_KEYS) as Record<string, unknown>;
+    const all = nodes(sent).filter((x) => typeof x.type === 'string');
+    const strings = all.filter((x) => x.type === 'string' && x.enum === undefined && x.const === undefined);
+    expect(strings.length).toBeGreaterThan(20);
+    for (const x of strings) expect(x.maxLength, JSON.stringify(x)).toBeGreaterThan(0);
+    for (const x of all.filter((y) => y.type === 'array')) expect(x.maxItems, JSON.stringify(x).slice(0, 80)).toBeGreaterThan(0);
+    for (const x of all.filter((y) => y.type === 'object' && typeof y.additionalProperties === 'object')) expect(x.maxProperties).toBeGreaterThan(0);
+    // i testi del giocatore: messaggi e ambiguità
+    const props = (sent.properties as Record<string, { maxItems?: number; items?: { maxLength?: number } }>);
+    expect(props.ambiguities).toMatchObject({ maxItems: PARSER_CAPS.ambiguities, items: { maxLength: PARSER_LENGTHS.ambiguities } });
+    expect(JSON.stringify(sent)).toContain(`"message":{"type":"string","maxLength":${PARSER_LENGTHS.message}}`);
+    // niente lettere dal parser (hanno il loro pannello e un testo fino a 1.800 caratteri)
+    expect(JSON.stringify(sent)).not.toContain('"LETTER"');
+    // caso peggiore (liste piene, testi al massimo), con 2,5 caratteri per token: sotto il tetto del ruolo order_parser
+    const worst = maxJsonChars(sent);
+    expect(Number.isFinite(worst)).toBe(true);
+    expect(worst / 2.5).toBeLessThanOrEqual(llmDefaults().order_parser.maxTokens);
+    expect(c.config.llm.order_parser.maxTokens).toBe(llmDefaults().order_parser.maxTokens);
+  });
+
+  it('gli id dello scenario entrano nel limite degli identificatori', () => {
+    const sc = loadScenario('med-2026');
+    const w = sc.world;
+    const ids = [...Object.keys(w.units), ...Object.keys(w.zones), ...Object.keys(w.bases), ...Object.keys(w.infrastructure), ...Object.keys(w.agreements), ...Object.keys(w.factions),
+      ...sc.catalog.items.map((i) => i.id), ...Object.values(w.factions).flatMap((f) => f.isrAssets.map((a) => a.id))];
+    expect(Math.max(...ids.map((x) => x.length))).toBeLessThanOrEqual(PARSER_LENGTHS.ids);
+    expect('convoglio MEDITERRANEO_ORIENTALE'.length).toBeLessThanOrEqual(PARSER_LENGTHS.protect);
+  });
+
+  it('in lettura le liste troppo lunghe si tagliano e le lettere si tolgono (provider senza grammatica)', async () => {
+    const patrol = (u: string) => ({ id: u, kind: 'PATROL', unitIds: [u], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' });
+    const e = makeEngine(new ScriptedParser({ orders: { ...empty,
+      military: ['ITA-F591', 'ITA-F592', 'ITA-F593', 'ITA-F594', 'ITA-F596', 'ITA-F597'].map(patrol),
+      diplomacy: [{ id: 'l1', kind: 'LETTER', target: 'FRA', subject: 'x', body: 'y', tone: 'formal', visibility: 'private' }, { id: 'd1', kind: 'REASSURANCE', target: 'FRA', message: 'x', visibility: 'public' }] },
+      ambiguities: ['a', 'b', 'c', 'd', 'e'] }));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cap', seed: 'cap' });
+    const r = await e.parseOrders(c.id, 'Pattuglia lo Ionio con sei fregate e rassicura la Francia');
+    expect(r.orders.military).toHaveLength(PARSER_CAPS.military);
+    expect(r.orders.diplomacy.map((d) => d.kind)).toEqual(['REASSURANCE']);
+    expect(r.ambiguities.slice(0, 3)).toEqual(['a', 'b', 'c']);
+    expect(r.ambiguities).not.toContain('d');
+  });
+});
+
+describe('console ordini: operazioni cyber chieste nel testo', () => {
+  const FRASE_11 = 'Avvia un\'operazione cyber di spionaggio contro l\'Iran';
+  const run = async (reply: unknown, text: string, seed: string) => {
+    const p = new ScriptedParser(reply);
+    const e = makeEngine(p);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
+    return { r: await e.parseOrders(c.id, text), p };
+  };
+  const cyberOf = (r: { orders: { military: { kind: string }[] } }) => r.orders.military.filter((o) => o.kind === 'CYBER_OP');
+
+  it('il prompt dice come si scrive: effect dal testo (spionaggio → espionage), CYBER_OP e non ISR', async () => {
+    const { p } = await run({ orders: empty, ambiguities: [] }, FRASE_11, 'cyp');
+    expect(p.requests[0]!.system).toContain('CYBER_OP (non ISR, senza unità) con "target" la fazione ed "effect": spionaggio → "espionage", attacco/sabotaggio → "disruption"');
+    expect(p.requests[0]!.user).toContain('contro l\'Iran [IRN]');
+  });
+
+  it('nessuna CYBER_OP dal modello (anche con un ISR al suo posto) → la completa il motore, con l\'effetto dal testo', async () => {
+    const isr = { orders: { ...empty, military: [{ id: 'i1', kind: 'ISR', assetIds: ['ITA-AISE-GOLFO'], zoneId: 'GOLFO' }] }, ambiguities: [] };
+    const { r } = await run(isr, FRASE_11, 'cy1');
+    expect(cyberOf(r)).toEqual([{ id: expect.any(String), kind: 'CYBER_OP', target: 'IRN', targetRef: 'reti governative', effect: 'espionage' }]);
+    expect(r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: CYBER_OP (espionage) contro Iran (IRN)'))).toBe(true);
+    expect(r.validation.valid).toBe(true);
+    expect(r.validation.risks.filter((x) => x.startsWith('⚠'))).toEqual([]);
+    const { r: attack } = await run({ orders: empty, ambiguities: [] }, 'Lancia un attacco informatico contro la Russia', 'cy2');
+    expect(cyberOf(attack)).toMatchObject([{ target: 'RUS', effect: 'disruption' }]);
+    const { r: shield } = await run({ orders: empty, ambiguities: [] }, 'Rafforza la difesa informatica contro gli attacchi della Russia', 'cy3');
+    expect(cyberOf(shield)).toMatchObject([{ target: 'RUS', effect: 'defense_hardening' }]);
+  });
+
+  it('non completa: CYBER_OP già data, negazione, due fazioni, un blocco, testo senza cyber', async () => {
+    const given = { orders: { ...empty, military: [{ id: 'c1', kind: 'CYBER_OP', target: 'IRN', targetRef: 'x', effect: 'disruption' }] }, ambiguities: [] };
+    expect(cyberOf((await run(given, FRASE_11, 'cn1')).r)).toMatchObject([{ effect: 'disruption' }]);
+    for (const [text, seed] of [['Non avviare operazioni cyber contro l\'Iran', 'cn2'], ['Operazione cyber contro Iran e Russia', 'cn3'], ['Operazione cyber contro la NATO', 'cn4'], ['Chiedi all\'Iran più controlli', 'cn5']] as const)
+      expect(cyberOf((await run({ orders: empty, ambiguities: [] }, text, seed)).r), text).toEqual([]);
   });
 });
 

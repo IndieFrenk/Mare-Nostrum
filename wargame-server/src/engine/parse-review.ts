@@ -49,6 +49,8 @@ export function finishParsed(i: FinishInput): ParsedDraft {
   // il modello non ha dato né un ordine né una postura per le unità nominate: il motore completa la bozza (poi validata come le altre)
   const done = completeNamed({ text: i.text, recognized, orders, units: k.ownUnits, zones: i.scenario.world.zones, noted: t.notes });
   for (const o of done.orders) orders.military.push({ ...o, id: id() });
+  const cyber = completeCyber({ text: i.text, recognized, orders, state: s, factionId });
+  for (const o of cyber.orders) orders.military.push({ ...o, id: id() });
   const v = validateOrders(s, i.scenario.catalog, factionId, orders, refs, i.turnLength);
   // rientri dei logorati e riparazioni dei danneggiati: il motore li aggiunge comunque, non impiegano le unità nominate
   const auto = new Set(stanceOrders.filter((x) => x.stance === 'worn').map((x) => x.orderId));
@@ -57,7 +59,7 @@ export function finishParsed(i: FinishInput): ParsedDraft {
     orders, zoneStances: i.parsed.zoneStances, recognized, stanceOrders,
     // avvisi, non errori: la bozza resta modificabile; gli errori veri (es. destinatario che non è una fazione) li dà il validatore
     validation: { ...v, risks: [...review.risks, ...v.risks] },
-    ambiguities: [...i.parsed.ambiguities, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...review.ambiguities],
+    ambiguities: [...i.parsed.ambiguities, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...cyber.notes, ...review.ambiguities],
   };
 }
 
@@ -103,6 +105,10 @@ export function completeNamed(i: CompleteInput): { orders: Order[]; notes: strin
 /** parole che dicono che si parla di forze militari, anche senza un nome riconosciuto */
 const FORCE_WORDS = /\b(nav[ei]|fregat[ae]|unita|sottomarin[oi]|portaerei|cacciatorpedinier[ei]|pattugliator[ei]|aere[oi]|caccia|stormo|droni?|squadra navale|flotta)\b/;
 const CYBER_WORDS = /(cyber|ciber|hack|informatic|malware|intrusion[ei] (nei|nelle) (reti|sistemi)|attacco (alle|alla) ret[ei])/;
+/** effetto di un'operazione cyber dal testo (il primo che corrisponde; altrimenti spionaggio, il meno ostile) */
+const CYBER_EFFECT: [RegExp, 'defense_hardening' | 'disruption'][] = [
+  [/\b(difes\w*|difend\w*|protegg\w*|protezion\w*)/, 'defense_hardening'], [/\b(attacc\w*|sabot\w*|colpi\w*|paralizz\w*|disabilit\w*|blocc\w*)/, 'disruption'],
+];
 /** verbo diplomatico → tipi di azione che lo soddisfano */
 const DIPLO_VERBS: [RegExp, string[], string][] = [
   [/\brassicur\w*/, ['REASSURANCE', 'BACKCHANNEL', 'LETTER'], 'rassicurare'],
@@ -110,6 +116,23 @@ const DIPLO_VERBS: [RegExp, string[], string][] = [
   [/\bsanzion\w*/, ['SANCTION', 'THREAT'], 'sanzionare'],
   [/\b(chied\w*|chiedi|sollecit\w*|protest\w*)/, ['DEMARCHE', 'BACKCHANNEL', 'PROPOSE_AGREEMENT', 'LETTER', 'THREAT'], 'chiedere o protestare'],
 ];
+
+/**
+ * Completamento deterministico di un'operazione cyber: il testo parla di cyber o di operazioni informatiche, nomina una sola
+ * fazione straniera (non un blocco) e la bozza non ha nessuna CYBER_OP → CYBER_OP contro quella fazione, con l'effetto dal
+ * testo (difesa → defense_hardening, attacco/sabotaggio → disruption, altrimenti espionage). I modelli locali rispondevano a
+ * «Avvia un'operazione cyber di spionaggio contro l'Iran» senza nessuna CYBER_OP. Validata e controllata come le altre.
+ */
+export function completeCyber(i: { text: string; recognized: NameHit[]; orders: OrdersBody; state: WorldState; factionId: string }): { orders: Order[]; notes: string[] } {
+  const text = plain(i.text);
+  if (!CYBER_WORDS.test(text) || NEGATION.test(text) || i.orders.military.some((o) => o.kind === 'CYBER_OP')) return { orders: [], notes: [] };
+  const targets = [...new Set(i.recognized.filter((h) => h.kind === 'faction' && h.id !== i.factionId && i.state.factions[h.id]?.kind !== 'bloc').map((h) => h.id))];
+  if (targets.length !== 1) return { orders: [], notes: [] };
+  const target = targets[0]!;
+  const effect = CYBER_EFFECT.find(([re]) => re.test(text))?.[1] ?? 'espionage';
+  const order: Order = { id: '', kind: 'CYBER_OP', target, targetRef: effect === 'defense_hardening' ? 'reti nazionali' : 'reti governative', effect };
+  return { orders: [order], notes: [`Ordine completato dal motore: CYBER_OP (${effect}) contro ${i.state.factions[target]?.name ?? target} (${target}) (il modello non ha dato l'operazione cyber chiesta): controlla che sia quello che volevi.`] };
+}
 
 export interface ReviewInput {
   text: string; orders: OrdersBody; state: WorldState; factionId: string; knowledge: FactionKnowledge; recognized: NameHit[];

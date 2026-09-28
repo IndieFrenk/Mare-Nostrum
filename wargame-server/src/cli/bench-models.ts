@@ -166,7 +166,7 @@ if (wants('parser')) {
         const pr = parserPrompt(k, scenario, c.text);
         let verdict: Verdict = 'sbagliato'; let why: string[] = [];
         try {
-          const r = await p.complete({ role: 'order_parser', model, temperature: cfg.temperature, maxTokens: cfg.maxTokens, timeoutMs: 300_000, system: pr.system, user: pr.user, schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA,
+          const r = await p.complete({ role: 'order_parser', model, temperature: cfg.temperature, maxTokens: cfg.maxTokens, timeoutMs: 300_000, system: pr.system, user: pr.user, schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA, keepLengths: true,
             meta: { text: pr.recognition.text, original: c.text, legal: pr.legal, recognized: pr.recognition.hits } });
           const v = ParsedLenient.safeParse(extractJson(r.text));
           if (!v.success) why = [`schema: ${v.error.issues.slice(0, 2).map((i) => `${i.path.join('.')} ${i.message}`).join(' | ')}`];

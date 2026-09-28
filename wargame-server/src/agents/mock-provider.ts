@@ -111,6 +111,9 @@ function parser(m: M) {
   if (zone && stance !== 'withdraw' && (units.length || /presenza|pattugl|dimostr|scort/.test(text))) zoneStances.push({ zoneId: zone, stance, intensity: !units.length && /più|rafforz/.test(text) ? 2 : 1 });
   const dkind = /rassicur/.test(text) ? 'REASSURANCE' : /minacc/.test(text) ? 'THREAT' : /chied|sollecit|protest/.test(text) ? 'DEMARCHE' : null;
   if (dkind) for (const f of factions) diplomacy.push({ id: `d-${f}`, kind: dkind, target: f, message: 'Richiesta formale del Governo italiano.', visibility: 'public' });
+  // aiuti: le frasi diplomatiche i modelli locali le sbagliano di rado; per il cyber nessuna CYBER_OP (la completa il motore)
+  const amount = Number(/(\d+)\s*milion/.exec(text)?.[1] ?? 0);
+  if (/aiut/.test(text) && amount) for (const f of factions) diplomacy.push({ id: `a-${f}`, kind: 'AID', target: f, amount, type: /militar/.test(text) ? 'military' : 'economic' });
   if (!military.length && !zoneStances.length && !diplomacy.length) {
     if (!units.length) ambiguities.push('Nessuna unità riconosciuta nella direttiva.');
     if (!zone) ambiguities.push('Nessuna zona riconosciuta nella direttiva.');
