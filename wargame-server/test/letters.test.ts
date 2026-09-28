@@ -91,7 +91,7 @@ describe('lettere: agenti', () => {
   it('la fazione risponde nel turno dopo alla lettera del giocatore, anche in un turno «senza IA»', async () => {
     const e = makeEngine();
     // LBY_GNU è minore: con minorEvery 2 in uno dei due turni decide per dottrina, ma alle lettere del giocatore risponde sempre
-    let c = await e.createCampaign({ scenarioId: 'med-2026', name: 'risposta', seed: 'risposta', config: { agentCadence: { minorEvery: 2, lettersPerTurn: 0 } } });
+    let c = await e.createCampaign({ scenarioId: 'med-2026', name: 'risposta', seed: 'risposta', config: { factionMode: 'llm',  agentCadence: { minorEvery: 2, lettersPerTurn: 0 } } });
     await e.submitOrders(c.id, body(letter({ id: 'a', target: 'LBY_GNU', subject: 'Cooperazione sulla migrazione' }), letter({ id: 'b', target: 'TUR', tone: 'firm' })));
     c = (await runSim(e, c, 1)).campaign;
     await e.submitOrders(c.id, body(letter({ id: 'a', target: 'LBY_GNU', subject: 'Cooperazione sulla migrazione' }), letter({ id: 'b', target: 'TUR', tone: 'firm' })));
@@ -166,7 +166,7 @@ describe('lettere: agenti', () => {
       return { ...res, text: JSON.stringify(d) };
     } };
     const e = makeEngine(provider as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'tetto', seed: 'tetto', config: { agentCadence: { lettersPerTurn: 3 } } });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'tetto', seed: 'tetto', config: { factionMode: 'llm',  agentCadence: { lettersPerTurn: 3 } } });
     await e.advance(c.id);
     const letters = await e.store.getLetters(c.id, 1);
     expect(letters.map((l) => `${l.from}>${l.to}`)).toEqual(['CHN>GRC', 'CHN>ITA', 'FRA>GRC']);

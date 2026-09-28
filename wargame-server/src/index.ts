@@ -1,6 +1,6 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
-import { config } from './config.js';
+import { config, factionModeDefault } from './config.js';
 import { OpenAiCompatProvider, type LlmProvider } from './agents/llm-client.js';
 import { LlmStatusProbe, mockStatus, type LlmStatusSource } from './agents/llm-status.js';
 import { MockLLMProvider } from './agents/mock-provider.js';
@@ -28,5 +28,5 @@ export async function buildServer(opts: { dataDir?: string; provider?: LlmProvid
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { app } = await buildServer({ logger: true });
   await app.listen({ port: config.port, host: config.host });
-  console.log(`wargame-server su http://${config.host}:${config.port} (LLM: ${config.mock ? 'mock' : process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1'}${config.allowOffline ? ', turni anche senza modelli (WARGAME_ALLOW_OFFLINE)' : ''})`);
+  console.log(`wargame-server su http://${config.host}:${config.port} (LLM: ${config.mock ? 'mock' : process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1'}, fazioni: ${factionModeDefault()}${config.allowOffline ? ', turni anche senza modelli (WARGAME_ALLOW_OFFLINE)' : ''})`);
 }

@@ -22,7 +22,7 @@ describe('agenti', () => {
 
   it('JSON invalido → repair → decisione valida', async () => {
     const e = makeEngine(new MockLLMProvider({ corrupt: { faction_major: 1 } }));
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'r', seed: 'repair' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'r', seed: 'repair', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const ds = await Promise.all(['CHN', 'FRA', 'RUS', 'TUR', 'USA'].map((f) => e.store.getDecision(c.id, 1, f)));
     const repaired = ds.filter((d) => d!.validation.repairAttempts === 1);
@@ -32,7 +32,7 @@ describe('agenti', () => {
 
   it('repair fallito → fallback dottrinale', async () => {
     const e = makeEngine(new MockLLMProvider({ corrupt: { faction_minor: 99 }, corruptRepair: true }));
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'f', seed: 'fallback' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'f', seed: 'fallback', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const d = (await e.store.getDecision(c.id, 1, 'GRC'))!;
     expect(d.validation).toMatchObject({ fallbackUsed: true, repairAttempts: 2, valid: false });
@@ -53,7 +53,7 @@ describe('agenti', () => {
   it('il mock produce posture per zona deterministiche, tradotte in ordini con unità', async () => {
     const run = async () => {
       const e = makeEngine();
-      const c = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'm', seed: 'mock-stances' }), 2)).campaign;
+      const c = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'm', seed: 'mock-stances', config: { factionMode: 'llm' } }), 2)).campaign;
       return Promise.all(AI.map((f) => e.store.getDecision(c.id, 1, f)));
     };
     const [a, b] = [await run(), await run()];
@@ -68,11 +68,11 @@ describe('agenti', () => {
 
   it('replay identico anche con le posture (ordini già tradotti nelle decisioni salvate)', async () => {
     const e = makeEngine();
-    const src = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'src', seed: 'replay-stances' }), 3)).campaign;
+    const src = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'src', seed: 'replay-stances', config: { factionMode: 'llm' } }), 3)).campaign;
     const stanceOrders = (await Promise.all(AI.map((f) => e.store.getDecision(src.id, 2, f)))).flatMap((d) => d!.stanceOrders);
     expect(stanceOrders.length).toBeGreaterThan(AI.length / 2);
     const replay = new Engine(e.store, new ReplayAgents(e.store, src.id));
-    const c = await replay.createCampaign({ scenarioId: 'med-2026', name: 'rep', seed: src.seed });
+    const c = await replay.createCampaign({ scenarioId: 'med-2026', name: 'rep', seed: src.seed, config: src.config });
     const r = await runSim(replay, c, 3, async (t) => { const o = await e.store.getOrders(src.id, t, 'ITA'); if (o) await e.store.saveOrders(c.id, o); });
     for (let t = 1; t <= 3; t++) expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(src.id, t));
     const again = await e.store.getDecision(r.campaign.id, 2, 'TUR');
@@ -116,7 +116,7 @@ describe('cadenza degli agenti (risparmio di chiamate LLM)', () => {
     const mock = new MockLLMProvider();
     const spy = { name: 'spy', complete: (r: Parameters<MockLLMProvider['complete']>[0]) => { calls.push(r.role); return mock.complete(r); } };
     const e = makeEngine(spy as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cad', seed: 'cadenza', config: { agentCadence: { minorEvery: 2, reflectEvery: 3 } } });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cad', seed: 'cadenza', config: { factionMode: 'llm',  agentCadence: { minorEvery: 2, reflectEvery: 3 } } });
     const src = (await runSim(e, c, 4)).campaign;
     const count = (role: string) => calls.filter((x) => x === role).length;
     // 9 minori × 4 turni = 36 → circa la metà; 14 riflessioni × 4 turni = 56 → circa un terzo
@@ -145,7 +145,7 @@ describe('ordini impossibili scartati invece di buttare la decisione', () => {
       return { ...res, text: JSON.stringify(d) };
     } };
     const e = makeEngine(provider as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'drop', seed: 'drop' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'drop', seed: 'drop', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
     expect(d.validation).toMatchObject({ valid: true, fallbackUsed: false, repairAttempts: 0 });
@@ -173,7 +173,7 @@ describe('tetti agli ordini per turno', () => {
       return { ...res, text: JSON.stringify(d) };
     } };
     const e = makeEngine(provider as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cap', seed: 'cap' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cap', seed: 'cap', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
     expect(d.validation.fallbackUsed).toBe(false);
@@ -197,7 +197,7 @@ describe('limiti realistici agli ordini IA', () => {
       return { ...res, text: JSON.stringify(d) };
     } };
     const e = makeEngine(provider as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'limiti', seed: 'limiti' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'limiti', seed: 'limiti', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const tur = (await e.store.getDecision(c.id, 1, 'TUR'))!;
     expect(tur.validation.fallbackUsed).toBe(false);

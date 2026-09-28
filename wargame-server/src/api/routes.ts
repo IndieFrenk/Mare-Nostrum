@@ -5,11 +5,11 @@ import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody } from '../sch
 import { letterVisibleTo } from '../engine/knowledge.js';
 import { cmoText } from '../engine/cmo.js';
 import { listScenarios, loadScenario } from '../engine/scenario.js';
-import { GameError, type Engine } from '../engine/turn-machine.js';
+import { factionModeOf, GameError, type Engine } from '../engine/turn-machine.js';
 import { LockError } from '../store/json-store.js';
 import { layer } from './layers.js';
 import { mockStatus, type LlmStatusSource } from '../agents/llm-status.js';
-import { llmDefaults } from '../config.js';
+import { factionModeDefault, llmDefaults, RULES_FREE_ROLES } from '../config.js';
 
 const STATUS: Record<string, number> = { NOT_FOUND: 404, WRONG_PHASE: 409, INVALID_ORDERS: 422, CAMPAIGN_LOCKED: 423, FORBIDDEN: 403, BAD_TURN: 400, CAMPAIGN_ENDED: 409, VALIDATION: 400, LLM_UNREACHABLE: 503 };
 
@@ -34,10 +34,15 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
   };
   type Id = { Params: { id: string } };
 
-  /** modello per ruolo: quelli della campagna (cambiano in corsa con /config) o i predefiniti del server */
+  /**
+   * Modello per ruolo: quelli della campagna (cambiano in corsa con /config) o i predefiniti del server. In modalità `rules` solo
+   * i ruoli che usano ancora l'LLM (lettere, notizie, briefing, intel, Console Ordini, repair): decisioni e memoria delle fazioni
+   * le fa il motore.
+   */
   const modelsFor = async (campaignId?: string) => {
-    const cfg = campaignId ? (await store.getCampaign(campaignId)).config.llm : llmDefaults();
-    return Object.fromEntries(Object.entries(cfg).filter(([, v]) => v).map(([r, v]) => [r, v!.model]));
+    const c = campaignId ? await store.getCampaign(campaignId) : null;
+    const rules = (c ? factionModeOf(c) : factionModeDefault()) === 'rules';
+    return Object.fromEntries(Object.entries(c?.config.llm ?? llmDefaults()).filter(([r, v]) => v && !(rules && (RULES_FREE_ROLES as readonly string[]).includes(r))).map(([r, v]) => [r, v!.model]));
   };
   /**
    * Prima di un'operazione che chiama i modelli: se non rispondono, 503 subito invece di un turno tutto in dottrina.
@@ -52,7 +57,10 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
   };
 
   /** Stato dei modelli (cache 30 s; ?fresh=1 riprova subito): raggiungibili, modello per ruolo, modelli mancanti, latenza. */
-  app.get<{ Querystring: { campaignId?: string; fresh?: string } }>(`${P}/llm/status`, async (req) => llm.status(await modelsFor(req.query.campaignId), req.query.fresh === '1'));
+  app.get<{ Querystring: { campaignId?: string; fresh?: string } }>(`${P}/llm/status`, async (req) => {
+    const c = req.query.campaignId ? await store.getCampaign(req.query.campaignId) : null;
+    return { ...(await llm.status(await modelsFor(req.query.campaignId), req.query.fresh === '1')), factionMode: c ? factionModeOf(c) : factionModeDefault() };
+  });
 
   app.get(`${P}/scenarios`, async () => listScenarios());
   app.get(`${P}/campaigns`, async () => store.listCampaigns());

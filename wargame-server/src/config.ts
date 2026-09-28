@@ -27,6 +27,17 @@ export const cadenceDefaults = () => ({
   lettersPerTurn: Math.max(0, Math.floor(Number(process.env.WARGAME_LETTERS_PER_TURN ?? 3) || 0)),
 });
 
+/**
+ * Chi decide le mosse delle fazioni non giocate dall'umano nelle campagne nuove (WARGAME_FACTION_MODE, copiata in
+ * `campaign.config.factionMode`): `rules` (predefinito) = decisore a regole del motore (engine/policy.ts), l'LLM scrive solo
+ * lettere, notizie, briefing e interpreta la Console Ordini; `llm` = come prima, una chiamata faction_major/minor per fazione
+ * con controller «ai» (le fazioni «scripted» decidono comunque a regole) più la riflessione.
+ */
+export type FactionMode = 'rules' | 'llm';
+export const factionModeDefault = (): FactionMode => (process.env.WARGAME_FACTION_MODE?.trim().toLowerCase() === 'llm' ? 'llm' : 'rules');
+/** Ruoli che in modalità `rules` non chiamano più l'LLM (le decisioni e la memoria delle fazioni le fa il motore). */
+export const RULES_FREE_ROLES = ['faction_major', 'faction_minor', 'reflection'] as const;
+
 export const AGENT_ROLES = ['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat'] as const;
 type RoleCfg = { model: string; temperature: number; maxTokens: number; timeoutMs: number };
 

@@ -35,7 +35,7 @@ describe('client OpenAI-compatible (OmniRoute)', () => {
     const http = new OpenAiCompatProvider(base);
     const spy = { name: 'spy', complete: (r: LlmRequest) => { pending.push(r); return http.complete(r); } };
     const e = makeEngine(spy as never);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'http', seed: 'http' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'http', seed: 'http', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     expect(seen[0]!.response_format.type).toBe('json_schema');
     // le chiamate già in volo possono tentare json_schema una volta; poi il client resta su json_object

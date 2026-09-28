@@ -21,6 +21,12 @@ export const Campaign = z.object({
       /** facoltativo: le campagne create prima delle lettere usano il modello di faction_major */
       diplomat: LlmRoleConfig.optional(),
     }), maxConcurrentAgents: z.number().int().min(1),
+    /**
+     * chi decide le mosse delle fazioni non umane: `rules` = decisore a regole del motore (engine/policy.ts), `llm` = agenti LLM
+     * per le fazioni con controller «ai». Si sceglie alla creazione (WARGAME_FACTION_MODE); assente nelle campagne vecchie
+     * (vale WARGAME_FACTION_MODE del server).
+     */
+    factionMode: z.enum(['rules', 'llm']).optional(),
     /** il giocatore chiede CMO per ogni ingaggio che lo coinvolge, anche minore */
     cmoOnRequest: z.boolean().default(false),
     /**
