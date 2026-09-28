@@ -2,7 +2,7 @@ import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
-import { fillLeaders, migrate } from './migrations/index.js';
+import { fillFromScenario, migrate } from './migrations/index.js';
 import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
@@ -104,8 +104,8 @@ export class JsonStore implements Store {
   async getState(id: string, turn?: number) {
     const f = turn === undefined ? this.dir(id, 'state', 'current.json') : this.dir(id, 'state', `turn-${pad(turn)}.json`);
     const s = this.must(await this.read(f, S.WorldState), `stato ${id}/${turn ?? 'current'}`);
-    // campagne precedenti alle lettere: cariche e capitali dei leader dallo scenario (solo in memoria)
-    return Object.values(s.factions).some((x) => !x.leaderTitle || !x.capital) ? fillLeaders(s, (await this.getCampaign(id)).scenarioId) : s;
+    // campagne vecchie: cariche dei leader, profilo del decisore a regole e nomi dallo scenario (solo in memoria)
+    return fillFromScenario(s, (await this.getCampaign(id)).scenarioId);
   }
 
   async saveState(id: string, s: WorldState, snapshotTurn?: number) {

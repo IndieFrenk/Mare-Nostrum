@@ -17,26 +17,29 @@ export function migrate<T>(data: T): T {
   return d as T;
 }
 
-const leaders = new Map<string, Record<string, { leaderTitle: string; capital: string }>>();
+type Ref = Pick<WorldState['factions'][string], 'name' | 'leaderTitle' | 'capital' | 'policy'>;
+const refs = new Map<string, Record<string, Ref>>();
 /**
- * Campagne create prima delle lettere: le fazioni non hanno `leaderTitle` e `capital` (lo schema li legge come '') e le lettere
- * dicevano «Il Capo di Stato (Turchia)». In lettura si riempiono i campi mancanti dallo scenario (`world.json`), solo in memoria:
- * i file salvati non si riscrivono (lo stato corrente si salva comunque a fine fase, già completo).
+ * Campagne create prima di alcuni campi delle fazioni, riempiti in lettura dallo scenario (`world.json`), solo in memoria: i file
+ * salvati non si riscrivono (lo stato corrente si salva comunque a fine fase, già completo).
+ * - `leaderTitle` e `capital` (prima delle lettere: dicevano «Il Capo di Stato (Turchia)»);
+ * - `policy`, il profilo del decisore a regole (prima di WARGAME_FACTION_MODE): senza, la fazione userebbe il profilo di ripiego;
+ * - `name`: il nome non cambia mai in partita, vale quello dello scenario (es. «Libia (LNA, Bengasi)» invece del nome di una persona).
  */
-export function fillLeaders(s: WorldState, scenarioId: string): WorldState {
-  const missing = Object.values(s.factions).filter((f) => !f.leaderTitle || !f.capital);
-  if (!missing.length) return s;
-  let ref = leaders.get(scenarioId);
+export function fillFromScenario(s: WorldState, scenarioId: string): WorldState {
+  let ref = refs.get(scenarioId);
   if (!ref) {
-    try { ref = Object.fromEntries(Object.values(loadScenario(scenarioId).world.factions).map((f) => [f.id, { leaderTitle: f.leaderTitle, capital: f.capital }])); }
+    try { ref = Object.fromEntries(Object.values(loadScenario(scenarioId).world.factions).map((f) => [f.id, { name: f.name, leaderTitle: f.leaderTitle, capital: f.capital, policy: f.policy }])); }
     catch { ref = {}; }
-    leaders.set(scenarioId, ref);
+    refs.set(scenarioId, ref);
   }
-  for (const f of missing) {
+  for (const f of Object.values(s.factions)) {
     const d = ref[f.id];
     if (!d) continue;
     if (!f.leaderTitle) f.leaderTitle = d.leaderTitle;
     if (!f.capital) f.capital = d.capital;
+    if (!f.policy && d.policy) f.policy = structuredClone(d.policy);
+    if (d.name && f.name !== d.name) f.name = d.name;
   }
   return s;
 }
