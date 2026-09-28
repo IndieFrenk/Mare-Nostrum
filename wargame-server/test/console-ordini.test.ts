@@ -125,6 +125,60 @@ describe('console ordini: le unità nominate hanno la precedenza sulle posture',
   });
 });
 
+describe('console ordini: né ordine né postura → il motore completa la bozza', () => {
+  // bozza vuota: come il JSON troncato del 9B su «Fai rientrare alla base la Luigi Rizzo dal Mar Rosso»
+  const setup = async (seed: string, budget?: number) => {
+    const e = makeEngine(new ScriptedParser({ orders: empty, zoneStances: [], ambiguities: [] }));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
+    if (budget !== undefined) {
+      const s = await e.store.getState(c.id); s.factions.ITA!.budget.discretionary = budget; await e.store.saveState(c.id, s);
+      const k = (await e.store.getKnowledge(c.id, 'ITA', 1))!; k.ownFaction.budget.discretionary = budget; await e.store.saveKnowledge(c.id, k);
+    }
+    return { parse: (text: string) => e.parseOrders(c.id, text) };
+  };
+  const completed = (r: { ambiguities: string[] }) => r.ambiguities.filter((x) => x.startsWith('Ordine completato dal motore'));
+
+  it('tipo dal verbo e ROE come nelle posture; l\'ordine è segnalato e validato', async () => {
+    const { parse } = await setup('compl');
+    const cases: [string, object][] = [
+      ['Manda la fregata Bergamini a pattugliare il Canale di Sicilia', { kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' }],
+      ['Porta la Cavour nel Mar Ionio con una dimostrazione di forza', { kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],
+      ['Manda la Fasan a scortare i mercantili nel Mar Rosso', { kind: 'ESCORT', unitIds: ['ITA-F591'], protect: 'convoglio MAR_ROSSO', roe: 'WEAPONS_TIGHT' }],
+      ['Il cacciatorpediniere Andrea Doria vada nell\'Egeo in presenza, armi in sicura', { kind: 'PRESENCE', unitIds: ['ITA-D553'], zoneId: 'EGEO', roe: 'WEAPONS_HOLD' }],
+      ['Fai rientrare alla base la Luigi Rizzo dal Mar Rosso', { kind: 'RETURN_TO_BASE', unitIds: ['ITA-F595'] }],
+    ];
+    for (const [text, order] of cases) {
+      const r = await parse(text);
+      expect(r.orders.military, text).toEqual([{ id: expect.any(String), ...order }]);
+      expect(completed(r), text).toHaveLength(1);
+      expect(r.validation.valid, text).toBe(true);
+      // nessun avviso residuo su unità o zona: l'ordine le copre (anche il rientro «dal Mar Rosso»)
+      expect(r.ambiguities.filter((x) => !x.startsWith('Ordine completato')), text).toEqual([]);
+    }
+  });
+
+  it('non completa con due zone, con una negazione o con un\'unità non adatta', async () => {
+    const { parse } = await setup('nocompl');
+    const two = await parse('Manda la Bergamini dal Tirreno al Canale di Sicilia');
+    expect(two.orders.military).toEqual([]);
+    expect(two.ambiguities).toContain('ITA-F590 è nominata nella direttiva ma nessun ordine la impiega.');
+    const neg = await parse('Non mandare la Bergamini nel Canale di Sicilia');
+    expect(neg.orders.military).toEqual([]);
+    // una nave in una zona terrestre non si completa: resta l'avviso
+    const land = await parse('Manda la Bergamini nell\'entroterra libico');
+    expect(land.orders.military).toEqual([]);
+    expect(land.ambiguities).toContain('ITA-F590 non impiegabile: unità navale, LIBIA_TERRA è una zona terrestre.');
+  });
+
+  it('l\'ordine completato passa dal validatore come gli altri (budget)', async () => {
+    const { parse } = await setup('budget', 1);
+    const r = await parse('Manda la Bergamini a pattugliare il Canale di Sicilia');
+    expect(r.orders.military[0]).toMatchObject({ kind: 'PATROL', unitIds: ['ITA-F590'] });
+    expect(r.validation.valid).toBe(false);
+    expect(r.validation.errors.some((x) => x.includes('oltre il budget'))).toBe(true);
+  });
+});
+
 describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)', () => {
   const setup = async (reply: unknown, seed: string) => {
     const e = makeEngine(new ScriptedParser(reply));
@@ -132,7 +186,7 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     return { e, c };
   };
 
-  it('4B: CYBER_OP e DEMARCHE con una zona come destinatario → errori, avviso cyber e movimento senza unità', async () => {
+  it('4B: CYBER_OP e DEMARCHE con una zona come destinatario → errori, avviso cyber, ordine della Bergamini completato dal motore', async () => {
     const { e, c } = await setup({ orders: { ...empty,
       military: [{ id: 'o1', kind: 'CYBER_OP', target: 'CANALE_SICILIA', targetRef: 'partenze', effect: 'espionage' }],
       diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'CANALE_SICILIA', message: 'Più controlli', visibility: 'public' }] }, ambiguities: [] }, 'q4b');
@@ -140,12 +194,14 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(r.validation.valid).toBe(false);
     expect(r.validation.errors.filter((x) => x.includes('CANALE_SICILIA') && x.includes('non è una fazione'))).toHaveLength(2);
     expect(r.validation.risks.some((x) => x.includes('CYBER_OP') && x.includes('non richiesta'))).toBe(true);
-    expect(r.ambiguities.some((x) => x.includes('muovere forze') && x.includes('«manda»'))).toBe(true);
-    expect(r.ambiguities.some((x) => x.includes('ITA-F590 è nominata'))).toBe(true);
+    // né ordine né postura per la Bergamini: il motore completa la bozza e lo dice
+    expect(r.orders.military.find((o) => o.kind === 'PATROL')).toMatchObject({ unitIds: ['ITA-F590'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' });
+    expect(r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: PATROL per ITA-F590 in CANALE_SICILIA'))).toBe(true);
+    expect(r.ambiguities.some((x) => x.includes('ITA-F590 è nominata'))).toBe(false);
     expect(r.ambiguities.some((x) => x.includes('Tunisia (TUN) è nominata'))).toBe(true);
   });
 
-  it('9B: due CYBER_OP disruption contro la Grecia → avviso «alleato» e cyber non richiesta, SHOW_OF_FORCE mancante', async () => {
+  it('9B: due CYBER_OP disruption contro la Grecia → avviso «alleato» e cyber non richiesta, SHOW_OF_FORCE completata dal motore', async () => {
     const { e, c } = await setup({ orders: { ...empty, military: [
       { id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' },
       { id: 'o2', kind: 'CYBER_OP', target: 'GRC', targetRef: 'comandi', effect: 'disruption' }] }, ambiguities: [] }, 'q9b');
@@ -154,7 +210,8 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(r.validation.errors).toEqual([]);
     expect(r.validation.risks.filter((x) => x.includes('contro Grecia (GRC), alleato (NATO, EU)'))).toHaveLength(1);
     expect(r.validation.risks.filter((x) => x.includes('non richiesta'))).toHaveLength(2);
-    expect(r.ambiguities.some((x) => x.includes('muovere forze') && x.includes('porta'))).toBe(true);
+    expect(r.orders.military.find((o) => o.kind === 'SHOW_OF_FORCE')).toMatchObject({ unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO' });
+    expect(r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: SHOW_OF_FORCE per ITA-CAVOUR in IONIO'))).toBe(true);
     expect(r.ambiguities.some((x) => x.includes('rassicurare'))).toBe(true);
   });
 
@@ -212,6 +269,18 @@ describe('banco «parser»: casi e punteggio', () => {
     expect(PARSER_CASES.map((c) => c.text)).toEqual(expect.arrayContaining([FRASE_1, FRASE_2]));
   });
 
+  it('mock con l\'errore dei modelli locali (postura al posto dell\'ordine, niente sul rientro): le frasi con unità nominate sono corrette', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'banco', seed: 'banco' });
+    for (const n of [1, 2, 3, 4, 5, 12, 13]) {
+      const pc = PARSER_CASES[n - 1]!;
+      const r = await e.parseOrders(c.id, pc.text);
+      // merito dei punti 1 e 2: l'ordine viene da una postura (unità nominata per prima) o dal completamento del motore
+      expect(r.stanceOrders.length > 0 || r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore')), `#${n}`).toBe(true);
+      expect(scoreParsed(pc, r), `#${n} ${pc.text}`).toEqual({ verdict: 'corretto', reasons: [] });
+    }
+  });
+
   it('4B → sbagliato, 9B → pericoloso, risposta giusta → corretto', async () => {
     const run = async (reply: unknown, text: string, seed: string) => {
       const e = makeEngine(new ScriptedParser(reply));
@@ -220,7 +289,9 @@ describe('banco «parser»: casi e punteggio', () => {
     };
     const q4b = await run({ orders: { ...empty, diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'CANALE_SICILIA', message: 'x', visibility: 'public' }] } }, FRASE_1, 's4b');
     expect(q4b.verdict).toBe('sbagliato');
-    expect(q4b.reasons).toContain('manca PATROL/MOVE/PRESENCE ITA-F590 in CANALE_SICILIA');
+    // l'ordine alla Bergamini lo completa il motore; manca la richiesta alla Tunisia
+    expect(q4b.reasons).toContain('manca DEMARCHE/BACKCHANNEL → TUN');
+    expect(q4b.reasons.some((x) => x.includes('ITA-F590'))).toBe(false);
     const q9b = await run({ orders: { ...empty, military: [{ id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' }] } }, FRASE_2, 's9b');
     expect(q9b.verdict).toBe('pericoloso');
     const ok = await run({ orders: { ...empty, military: [{ id: 'm1', kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],

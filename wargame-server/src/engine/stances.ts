@@ -55,14 +55,21 @@ const inZone = (u: Unit, zone: Zone, zones: Record<string, Zone>) => u.zoneId ==
  * in manutenzione, prontezza sotto `minReadiness`, nave in una zona terrestre (come nel validatore); per `withdraw` deve
  * essere fuori base. Niente scaglioni di tipo (`POOLS`) né `busyElsewhere`: se il giocatore la nomina, ci va.
  */
-export function unfitReason(u: Unit, zone: Zone, stance: Stance): string | null {
+export function unfitReason(u: Unit, zone: Zone | null, stance: Stance): string | null {
   if (u.status === 'destroyed') return 'distrutta';
   if (u.status === 'damaged') return 'danneggiata';
   if (stance === 'withdraw') return out(u) ? null : 'già in base';
   if (u.status !== 'ready' && !out(u)) return `non disponibile (${u.status})`;
   if (u.readiness < PARAMS.stances.minReadiness) return `prontezza ${u.readiness} sotto ${PARAMS.stances.minReadiness}`;
-  if (zone.terrain === 'land' && (u.domain === 'sea' || u.domain === 'subsurface')) return `unità navale, ${zone.id} è una zona terrestre`;
+  if (zone?.terrain === 'land' && (u.domain === 'sea' || u.domain === 'subsurface')) return `unità navale, ${zone.id} è una zona terrestre`;
   return null;
+}
+
+/** L'ordine di una postura (tipo e ROE) per le unità scelte: lo usano il traduttore e il completamento della Console Ordini. */
+export function stanceOrder(stance: Exclude<Stance, 'withdraw'>, unitIds: string[], zoneId: string): Order {
+  if (stance === 'escort_shipping') return { id: '', kind: 'ESCORT', unitIds, protect: `convoglio ${zoneId}`, roe: 'WEAPONS_TIGHT' };
+  if (stance === 'air_defense') return { id: '', kind: 'AIR_DEFENSE', unitIds, zoneId, alert: 'high' };
+  return { id: '', kind: ORDER[stance].kind, unitIds, zoneId, roe: ORDER[stance].roe };
 }
 
 /** Unità candidate per una postura in una zona, nell'ordine in cui il motore le sceglie. */
@@ -150,10 +157,7 @@ export function translateStances(i: StanceInput): StanceResult {
     if (!picked.length) { notes.push(`${label}: ${tooExpensive || mine.length ? 'budget insufficiente' : 'nessuna unità adatta disponibile'}`); continue; }
     const unitIds = picked.map((u) => u.id);
     picked.forEach((u) => used.add(u.id));
-    const origin = { stance: st.stance, zoneId: zone.id };
-    if (st.stance === 'escort_shipping') push({ id: '', kind: 'ESCORT', unitIds, protect: `convoglio ${zone.id}`, roe: 'WEAPONS_TIGHT' }, origin);
-    else if (st.stance === 'air_defense') push({ id: '', kind: 'AIR_DEFENSE', unitIds, zoneId: zone.id, alert: 'high' }, origin);
-    else push({ id: '', kind: ORDER[st.stance].kind, unitIds, zoneId: zone.id, roe: ORDER[st.stance].roe }, origin);
+    push(stanceOrder(st.stance, unitIds, zone.id), { stance: st.stance, zoneId: zone.id });
     if (picked.length < want) notes.push(`${label}: ${picked.length} unità su ${want} richieste`);
   }
   return { orders, origins, notes };

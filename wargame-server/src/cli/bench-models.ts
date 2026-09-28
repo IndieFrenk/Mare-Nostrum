@@ -174,6 +174,8 @@ if (wants('parser')) {
             const d = finishParsed({ state, scenario, factionId: player, knowledge: k, turnLength: campaign.turnLength, text: c.text,
               parsed: { ...v.data, ambiguities: [...v.data.ambiguities, ...nameAmbiguities(pr.recognition)], recognized: pr.recognition.hits } });
             ({ verdict, reasons: why } = scoreParsed(c, d));
+            // da dove vengono gli ordini con unità: postura del modello (unità nominate per prime) o completamento del motore
+            if (verdict === 'corretto') why = [[d.stanceOrders.some((x) => x.stance !== 'worn') ? 'via postura' : '', d.ambiguities.some((x) => x.startsWith('Ordine completato dal motore')) ? 'completato dal motore' : ''].filter(Boolean).join(' + ')].filter(Boolean);
           }
         } catch (e) { why = [`errore: ${(e as Error).message}`]; }
         st[verdict]++; st.secs += (Date.now() - t0) / 1000;
