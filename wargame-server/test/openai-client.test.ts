@@ -75,6 +75,9 @@ describe('client OpenAI-compatible: errori 400 che non riguardano lo schema', ()
     expect(seen.filter((b) => b.model === 'combo').map((b) => b.response_format.type)).toEqual(['json_schema', 'json_object']);
     await http.complete(req('ok'));
     expect(seen.at(-1)!.response_format.type).toBe('json_schema');
+    // LLM_RESPONSE_FORMAT=json_object: mai json_schema
+    await new OpenAiCompatProvider(http.baseUrl, undefined, 'json_object').complete(req('ok'));
+    expect(seen.at(-1)!.response_format.type).toBe('json_object');
     server.close();
   });
 });

@@ -16,6 +16,15 @@ async function call(method: string, p: string, body?: unknown): Promise<J> {
   if (!r.ok) throw Object.assign(new Error(`${method} ${p} → ${r.status}: ${JSON.stringify(d).slice(0, 300)}`), { status: r.status, body: d });
   return d as J;
 }
+/** ▶ che sopravvive ai limiti del client HTTP (fetch chiude dopo 5 min senza header): se la risposta si perde,
+ *  segue il turno con /status finché il server ha finito, come fa la UI. */
+async function advance(id: string): Promise<J> {
+  try { return await call('POST', `/campaigns/${id}/advance`); } catch (e) {
+    if ((e as { status?: number }).status) throw e;
+    console.log(`  (risposta del ▶ persa: ${(e as Error).message}; seguo il turno con /status)`);
+    for (;;) { await new Promise((r) => setTimeout(r, 10_000)); if (!(await call('GET', `/campaigns/${id}/status`)).running) return call('GET', `/campaigns/${id}`); }
+  }
+}
 const problems: string[] = [];
 const problem = (t: number, s: string) => { problems.push(`T${t}: ${s}`); console.log(`  ! ${s}`); };
 const t0 = Date.now();
@@ -67,7 +76,7 @@ while (c.currentTurn <= target && c.status === 'active') {
   await call('POST', `/campaigns/${c.id}/orders`, orders);
   // ▶ come la UI; nel frattempo lo stato deve dire «in corso» e un secondo ▶ deve essere rifiutato
   let finished = false;
-  const adv = call('POST', `/campaigns/${c.id}/advance`).finally(() => { finished = true; });
+  const adv = advance(c.id).finally(() => { finished = true; });
   await new Promise((r) => setTimeout(r, 1500));
   const st = await call('GET', `/campaigns/${c.id}/status`);
   if (!finished) { // turno ancora in corso (con LLM veri): status e secondo ▶ vanno controllati
@@ -79,7 +88,7 @@ while (c.currentTurn <= target && c.status === 'active') {
   let cmo = 0;
   while (c.phase === 'CMO_PENDING') {
     for (const e of await call('GET', `/campaigns/${c.id}/cmo`) as unknown as J[]) { await call('POST', `/campaigns/${c.id}/cmo/${encodeURIComponent(e.id)}/aar`, { autoResolve: true }); cmo++; }
-    c = await call('POST', `/campaigns/${c.id}/advance`);
+    c = await advance(c.id);
   }
   if (c.currentTurn !== t + 1 || c.phase !== 'PLAYER_ORDERS') problem(t, `dopo il turno: T${c.currentTurn} ${c.phase}`);
   const pm = await call('GET', `/campaigns/${c.id}/postmortem?turn=${t}`);

@@ -48,7 +48,10 @@ class FatalHttpError extends Error {}
 export class OpenAiCompatProvider implements LlmProvider {
   name = 'openai-compat';
   private jsonSchemaUnsupported = new Set<string>();
-  constructor(readonly baseUrl = process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1', readonly apiKey = process.env.LLM_API_KEY) {}
+  /** LLM_EXTRA_BODY: campi aggiunti a ogni richiesta, in JSON (es. {"reasoning_effort":"none"} per spegnere il ragionamento). */
+  private extra: Record<string, unknown> = (() => { try { return JSON.parse(process.env.LLM_EXTRA_BODY || '{}'); } catch { return {}; } })();
+  /** LLM_RESPONSE_FORMAT=json_object salta del tutto json_schema (utile se i provider principali non lo accettano). */
+  constructor(readonly baseUrl = process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1', readonly apiKey = process.env.LLM_API_KEY, readonly responseFormat = process.env.LLM_RESPONSE_FORMAT ?? 'json_schema') {}
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     let lastErr: unknown;
@@ -57,13 +60,13 @@ export class OpenAiCompatProvider implements LlmProvider {
       const t0 = Date.now();
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), req.timeoutMs);
-      const plainJson = this.jsonSchemaUnsupported.has(req.model);
+      const plainJson = this.responseFormat === 'json_object' || this.jsonSchemaUnsupported.has(req.model);
       try {
         const res = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST', signal: ctl.signal,
           headers: { 'content-type': 'application/json', ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}) },
           body: JSON.stringify({
-            model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
+            ...this.extra, model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
             messages: [{ role: 'system', content: req.system }, { role: 'user', content: req.user }],
             response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema), strict: false } },
           }),
