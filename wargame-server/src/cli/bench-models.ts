@@ -3,6 +3,7 @@
 // - fazione: schema + validatore degli ordini (unità, zone, basi, bersagli inesistenti = allucinazione)
 // - narratore: schema + numeri non presenti nei fatti
 // - riflessione: schema della memoria
+// - lettera: risposta di una fazione a una lettera di esempio del giocatore (stesso prompt del gioco): schema, lunghezze e numeri
 // Uso: npm run bench:models -- <cartella-campagna> <modello|combo>... [--runs N]   (config da wargame-server/.env)
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -14,6 +15,9 @@ import { extractJson, OpenAiCompatProvider } from '../agents/llm-client.js';
 import { template } from '../agents/prompts.js';
 import { legalActions, memoryText, situation } from '../agents/context-builder.js';
 import { trimFormat } from '../agents/faction-agent.js';
+import { LETTER_SCHEMA, letterErrors, letterPrompt } from '../agents/letter-writer.js';
+import { leaderOf } from '../engine/diplomacy.js';
+import { LETTER_LIMITS, LetterTone } from '../schemas/index.js';
 import { numbersNotInFacts } from '../agents/repair.js';
 import { loadScenario } from '../engine/scenario.js';
 import { validateOrders } from '../engine/validators.js';
@@ -43,7 +47,7 @@ const ReflOut = AgentMemory.omit({ schemaVersion: true, factionId: true, updated
 const NarrOut = z.object({ title: z.string(), sections: z.array(z.object({ heading: z.string(), body: z.string() })), factsRef: z.array(z.string()).default([]) });
 const facts = narr.user.split('\n').filter((l) => l.startsWith('['));
 
-type Test = { nome: string; system: string; user: string; schema: ZodType; maxTokens: number; check: (v: never) => string[] };
+type Test = { nome: string; system: string; user: string; schema: ZodType; maxTokens: number; check: (v: never) => string[]; keepLengths?: boolean; jsonSchema?: Record<string, unknown> };
 const factionTest = async (c: { factionId: string; system: string; user: string }): Promise<Test> => {
   const refs = await refsOf(c.factionId);
   // il messaggio utente si ricostruisce col codice attuale (azioni lecite, situazione), il resto viene dal log
@@ -64,11 +68,34 @@ const factionTest = async (c: { factionId: string; system: string; user: string 
 const factionCalls = opt['all-factions']
   ? [...new Map(calls.filter((x) => (x.role === 'faction_major' || x.role === 'faction_minor') && x.factionId).map((x) => [x.factionId, { factionId: x.factionId!, ...(x.request as { system: string; user: string }) }])).values()]
   : [major];
+// lettera di esempio del giocatore a una potenza maggiore: la fazione risponde col suo profilo e la sua knowledge del turno 1
+const letterTest = async (): Promise<Test | null> => {
+  const from = major.factionId; const k = await store.getKnowledge(campaignId, from, 1);
+  if (!k) return null;
+  const rel = state.relations[from]?.ITA;
+  const replyTo = { id: 'LT1-ITA-bench', turn: 1, date: campaign.date, from: 'ITA', to: from, fromTitle: leaderOf(state, 'ITA').title, toTitle: leaderOf(state, from).title, place: leaderOf(state, 'ITA').capital,
+    subject: 'Sicurezza della navigazione e dialogo diretto', tone: 'firm' as const, visibility: 'private' as const, source: 'human' as const,
+    body: 'Signor Presidente,\nil Governo italiano segue con preoccupazione le attività navali nelle aree di crisi del Mediterraneo. Le propongo un canale di dialogo diretto per evitare incidenti e chiedo che le Sue unità mantengano una condotta prudente.\nConfido nella Sua risposta.' };
+  const p = letterPrompt({ campaign, factionId: from, to: 'ITA', kind: 'reply', knowledge: k, memory: await store.getMemory(campaignId, from), profile: scenario.profiles[from] ?? '',
+    fromTitle: leaderOf(state, from).title, toTitle: leaderOf(state, 'ITA').title, date: campaign.date, relation: rel ? { trust: rel.trust, tension: rel.tension } : null, replyTo, intent: 'mantenere la postura' });
+  return {
+    nome: 'lettera', system: p.system, user: p.user, maxTokens: 1200, keepLengths: true, jsonSchema: LETTER_SCHEMA,
+    // lunghezze controllate a parte (non come errore di schema) per distinguerle nel riepilogo
+    schema: z.object({ subject: z.string().min(1), body: z.string().min(1), tone: LetterTone }),
+    check: (v: { subject: string; body: string }) => [
+      ...(v.subject.length > LETTER_LIMITS.subject ? [`oggetto ${v.subject.length} > ${LETTER_LIMITS.subject} caratteri`] : []),
+      ...(v.body.length > LETTER_LIMITS.body ? [`testo ${v.body.length} > ${LETTER_LIMITS.body} caratteri`] : []),
+      ...letterErrors(v, p.facts),
+    ],
+  };
+};
+const letter = await letterTest();
 const tests: Test[] = [
   ...await Promise.all(factionCalls.map(factionTest)),
   { nome: 'narratore', system: template('narrator', { doc: 'il briefing di situazione', headings: 'Quadro strategico, Minacce, Energia e rotte, Forze proprie, Raccomandazioni' }), user: narr.user, schema: NarrOut, maxTokens: 2000,
     check: (v: { title: string; sections: unknown }) => { const bad = numbersNotInFacts(JSON.stringify([v.title, v.sections]), facts); return bad.length ? [`numeri inventati: ${bad.join(', ')}`] : []; } },
   { nome: 'riflessione', system: template('reflection', { factionId: refl.factionId }), user: refl.user, schema: ReflOut, maxTokens: 2000, check: () => [] },
+  ...(letter ? [letter] : []),
 ];
 const p = new OpenAiCompatProvider();
 const summary: Record<string, { ok: number; schema: number; halluc: number; err: number; secs: number; n: number }> = {};
@@ -80,7 +107,7 @@ for (const model of models) {
       const s = (summary[`${model} · ${t.nome.startsWith('fazione') ? 'fazioni' : t.nome}`] ??= { ok: 0, schema: 0, halluc: 0, err: 0, secs: 0, n: 0 });
       s.n++;
       try {
-        const r = await p.complete({ role: 'faction_major', model, temperature: 0.3, maxTokens: t.maxTokens, timeoutMs: 300_000, system: t.system, user: t.user, schemaName: 'Bench', jsonSchema: z.toJSONSchema(t.schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>, meta: {} });
+        const r = await p.complete({ role: 'faction_major', model, temperature: 0.3, maxTokens: t.maxTokens, timeoutMs: 300_000, system: t.system, user: t.user, schemaName: 'Bench', jsonSchema: t.jsonSchema ?? z.toJSONSchema(t.schema, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>, keepLengths: t.keepLengths, meta: {} });
         s.secs += secs();
         let esito = 'OK';
         try {

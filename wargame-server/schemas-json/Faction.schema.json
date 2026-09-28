@@ -36,7 +36,8 @@
       "intel_analyst",
       "order_parser",
       "reflection",
-      "repair"
+      "repair",
+      "diplomat"
      ]
     },
     {
@@ -232,6 +233,14 @@
    "items": {
     "type": "string"
    }
+  },
+  "leaderTitle": {
+   "default": "",
+   "type": "string"
+  },
+  "capital": {
+   "default": "",
+   "type": "string"
   }
  },
  "required": [

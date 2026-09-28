@@ -12,7 +12,7 @@ export const LetterOut = z.object({
   tone: LetterTone,
 });
 // maxLength resta nello schema inviato al modello (keepLengths): con Ollama/llama.cpp la grammatica ferma i testi troppo lunghi
-const LETTER_SCHEMA = z.toJSONSchema(LetterOut, { io: 'input' }) as Record<string, unknown>;
+export const LETTER_SCHEMA = z.toJSONSchema(LetterOut, { io: 'input' }) as Record<string, unknown>;
 
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 /** «2026-03-09» → «9 marzo 2026» */
@@ -54,27 +54,38 @@ export function templateLetter(job: Pick<LetterJob, 'toTitle' | 'replyTo'>): { s
   return { subject, body, tone: 'formal' };
 }
 
-/** Una lettera per chiamata (modelli piccoli): 1 repair, poi la lettera-modello. */
-export async function writeLetter(provider: LlmProvider, log: LlmCall[], job: LetterJob): Promise<LetterResult> {
+/** Prompt e numeri ammessi di una lettera (usati anche da bench:models, così il banco prova lo stesso prompt del gioco). */
+export function letterPrompt(job: LetterJob) {
   const k = job.knowledge;
   const situation = letterSituation(k, job.to);
   const replyTo = job.replyTo ? `da ${job.replyTo.fromTitle}, oggetto "${job.replyTo.subject}", tono ${job.replyTo.tone}:\n${job.replyTo.body}` : 'nessuna';
-  // numeri ammessi: la situazione del mittente, la lettera ricevuta, la data; per le bozze del giocatore anche la sua traccia
-  const facts = [situation, replyTo, job.date, italianDate(job.date), ...(job.kind === 'draft' && job.gist ? [job.gist] : [])];
-  const r = await callStructured(provider, log, { turn: k.turn, factionId: job.factionId }, {
-    role: 'diplomat', ...roleConfig(job.campaign, 'diplomat'),
+  return {
     system: template('letter', { fromTitle: job.fromTitle, factionName: k.ownFaction.name, toTitle: job.toTitle, profile: profileShort(job.profile) }),
     user: template('letter-user', {
       date: italianDate(job.date), toTitle: job.toTitle, to: job.to,
       relation: job.relation ? `fiducia ${job.relation.trust}, tensione ${job.relation.tension}` : 'non nota',
       memory: memoryFor(job.memory, job.to), intent: job.intent || 'non specificato', replyTo, gist: job.gist || 'a tua scelta, coerente con l\'intento', tone: job.tone ?? 'a tua scelta', situation,
     }),
+    // numeri ammessi: la situazione del mittente, la lettera ricevuta, la data; per le bozze del giocatore anche la sua traccia
+    facts: [situation, replyTo, job.date, italianDate(job.date), ...(job.kind === 'draft' && job.gist ? [job.gist] : [])],
+  };
+}
+
+/** Controllo sui fatti: il testo può contenere solo numeri presenti nella situazione del mittente. */
+export const letterErrors = (v: { subject: string; body: string }, facts: string[]) => {
+  const bad = numbersNotInFacts(`${v.subject}\n${v.body}`, facts);
+  return bad.length ? [`numeri non presenti nella situazione del mittente: ${bad.join(', ')}`] : [];
+};
+
+/** Una lettera per chiamata (modelli piccoli): 1 repair, poi la lettera-modello. */
+export async function writeLetter(provider: LlmProvider, log: LlmCall[], job: LetterJob): Promise<LetterResult> {
+  const k = job.knowledge;
+  const { system, user, facts } = letterPrompt(job);
+  const r = await callStructured(provider, log, { turn: k.turn, factionId: job.factionId }, {
+    role: 'diplomat', ...roleConfig(job.campaign, 'diplomat'), system, user,
     schemaName: 'Letter', jsonSchema: LETTER_SCHEMA, keepLengths: true,
     meta: { kind: job.kind, factionId: job.factionId, to: job.to, turn: k.turn, seed: job.campaign.seed, fromTitle: job.fromTitle, toTitle: job.toTitle, replySubject: job.replyTo?.subject, gist: job.gist, tone: job.tone },
-  }, LetterOut, (v) => {
-    const bad = numbersNotInFacts(`${v.subject}\n${v.body}`, facts);
-    return bad.length ? [`numeri non presenti nella situazione del mittente: ${bad.join(', ')}`] : [];
-  }, 1);
+  }, LetterOut, (v) => letterErrors(v, facts), 1);
   if (!r.value) return { ...templateLetter(job), source: 'template', model: 'template', errors: r.errors };
   // il tono richiesto (intento della fazione o scelta del giocatore) prevale: è quello che il motore applica
   return { subject: r.value.subject.trim(), body: r.value.body.trim(), tone: job.tone ?? r.value.tone, source: 'ai', model: r.model, errors: [] };

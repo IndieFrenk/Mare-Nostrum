@@ -68,6 +68,37 @@
    "minimum": 0,
    "maximum": 1
   },
+  "letterIntents": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "gist": {
+      "type": "string"
+     },
+     "tone": {
+      "type": "string",
+      "enum": [
+       "cordial",
+       "formal",
+       "firm",
+       "threatening",
+       "conciliatory"
+      ]
+     }
+    },
+    "required": [
+     "to",
+     "gist",
+     "tone"
+    ]
+   }
+  },
   "schemaVersion": {
    "type": "number",
    "const": 1
@@ -96,7 +127,8 @@
     "intel_analyst",
     "order_parser",
     "reflection",
-    "repair"
+    "repair",
+    "diplomat"
    ]
   },
   "promptHash": {
@@ -831,6 +863,60 @@
          "amount",
          "type"
         ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "const": "LETTER"
+         },
+         "target": {
+          "type": "string",
+          "minLength": 2
+         },
+         "subject": {
+          "type": "string"
+         },
+         "body": {
+          "type": "string"
+         },
+         "tone": {
+          "type": "string",
+          "enum": [
+           "cordial",
+           "formal",
+           "firm",
+           "threatening",
+           "conciliatory"
+          ]
+         },
+         "visibility": {
+          "type": "string",
+          "enum": [
+           "private",
+           "public"
+          ]
+         },
+         "inReplyTo": {
+          "type": "string"
+         },
+         "model": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "target",
+         "subject",
+         "body",
+         "tone",
+         "visibility"
+        ]
        }
       ]
      }
@@ -970,6 +1056,56 @@
     "completionTokens",
     "latencyMs"
    ]
+  },
+  "letters": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "actionId": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "reply",
+       "initiative"
+      ]
+     },
+     "inReplyTo": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "ai",
+       "template"
+      ]
+     },
+     "model": {
+      "type": "string"
+     },
+     "errors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "actionId",
+     "to",
+     "kind",
+     "source",
+     "model",
+     "errors"
+    ]
+   }
   }
  },
  "required": [

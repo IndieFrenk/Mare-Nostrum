@@ -252,7 +252,8 @@
         "intel_analyst",
         "order_parser",
         "reflection",
-        "repair"
+        "repair",
+        "diplomat"
        ]
       },
       {
@@ -448,6 +449,14 @@
      "items": {
       "type": "string"
      }
+    },
+    "leaderTitle": {
+     "default": "",
+     "type": "string"
+    },
+    "capital": {
+     "default": "",
+     "type": "string"
     }
    },
    "required": [
@@ -942,6 +951,95 @@
      "headline",
      "body",
      "factsRef"
+    ]
+   }
+  },
+  "letters": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "date": {
+      "type": "string"
+     },
+     "from": {
+      "type": "string",
+      "minLength": 2
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "fromTitle": {
+      "type": "string"
+     },
+     "toTitle": {
+      "type": "string"
+     },
+     "place": {
+      "type": "string"
+     },
+     "subject": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "tone": {
+      "type": "string",
+      "enum": [
+       "cordial",
+       "formal",
+       "firm",
+       "threatening",
+       "conciliatory"
+      ]
+     },
+     "visibility": {
+      "type": "string",
+      "enum": [
+       "private",
+       "public"
+      ]
+     },
+     "inReplyTo": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "human",
+       "ai",
+       "template"
+      ]
+     },
+     "model": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "turn",
+     "date",
+     "from",
+     "to",
+     "fromTitle",
+     "toTitle",
+     "place",
+     "subject",
+     "body",
+     "tone",
+     "visibility",
+     "source"
     ]
    }
   }

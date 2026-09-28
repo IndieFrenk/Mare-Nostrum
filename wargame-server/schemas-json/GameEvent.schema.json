@@ -58,7 +58,8 @@
     "INDICATORS_CHANGED",
     "TURN_ADVANCED",
     "TURN_CLOSED",
-    "STATEMENT"
+    "STATEMENT",
+    "LETTER_SENT"
    ]
   },
   "actor": {
