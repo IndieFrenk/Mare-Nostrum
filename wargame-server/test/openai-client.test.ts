@@ -46,3 +46,29 @@ describe('client OpenAI-compatible (OmniRoute)', () => {
     expect(d.usage.promptTokens).toBeGreaterThan(0);
   }, 60_000);
 });
+
+describe('client OpenAI-compatible: errori 400 che non riguardano lo schema', () => {
+  it('un modello non disponibile fallisce subito e non spegne json_schema per gli altri modelli', async () => {
+    const seen: { model: string; response_format: { type: string } }[] = [];
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        const b = JSON.parse(body);
+        seen.push(b);
+        if (b.model === 'nope') { res.statusCode = 400; return res.end('{"error":{"message":"Model \'nope\' is not available in the active live catalog"}}'); }
+        res.end(JSON.stringify({ model: b.model, choices: [{ message: { content: '{"ok":true}' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+      });
+    }).listen(0);
+    await new Promise((r) => server.once('listening', r));
+    const http = new OpenAiCompatProvider(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`);
+    const req = (model: string): LlmRequest => ({ role: 'repair', model, temperature: 0, maxTokens: 10, timeoutMs: 5000, system: 's', user: 'u', schemaName: 'P', jsonSchema: { type: 'object' }, meta: {} });
+    const t0 = Date.now();
+    await expect(http.complete(req('nope'))).rejects.toThrow(/LLM HTTP 400/);
+    expect(Date.now() - t0).toBeLessThan(1500); // nessun retry con backoff
+    expect(seen.filter((b) => b.model === 'nope')).toHaveLength(1);
+    await expect(http.complete(req('ok'))).resolves.toMatchObject({ text: '{"ok":true}' });
+    expect(seen.at(-1)!.response_format.type).toBe('json_schema');
+    server.close();
+  });
+});

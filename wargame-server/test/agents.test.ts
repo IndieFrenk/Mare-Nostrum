@@ -69,3 +69,13 @@ describe('agenti', () => {
     expect(amb.ambiguities.length).toBeGreaterThan(0);
   });
 });
+
+describe('riflessione: note sulle relazioni scritte come oggetti', () => {
+  it('le riduce a una frase invece di scartare la memoria', async () => {
+    const { noteText } = await import('../src/agents/reflection.js');
+    expect(noteText('già una frase')).toBe('già una frase');
+    expect(noteText({ trust: -2, tension: 3, note: 'proposta sul Mar Rosso' })).toBe('proposta sul Mar Rosso — trust -2, tension 3');
+    expect(noteText({ trust: 0, tension: 0, notes: [] })).toBe('trust 0, tension 0');
+    expect(noteText({ EGY: { note: 'x' } })).toBe('{"EGY":{"note":"x"}}');
+  });
+});

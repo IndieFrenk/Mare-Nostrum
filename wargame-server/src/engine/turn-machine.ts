@@ -85,6 +85,12 @@ export class Engine {
   /** Esegue le fasi fino a PLAYER_ORDERS del turno successivo o a CMO_PENDING. */
   advance(id: string): Promise<Campaign> {
     return this.store.withLock(id, async () => {
+      try { return await this.runPhases(id); } finally { this.onProgress(id, { done: true }); }
+    }, 'turno');
+  }
+
+  private async runPhases(id: string): Promise<Campaign> {
+    {
       const c = await this.store.getCampaign(id);
       if (c.status === 'ended') throw new GameError('CAMPAIGN_ENDED', 'campagna conclusa');
       const ctx = await this.ctxFor(c);
@@ -124,7 +130,7 @@ export class Engine {
           await this.flush(ctx, c, true);
         }
       }
-    });
+    }
   }
 
   private pendingCmo(s: WorldState) { return Object.values(s.engagements).filter((e) => e.status === 'pending_cmo'); }
@@ -244,7 +250,7 @@ export class Engine {
       await this.store.saveCmo(id, ctx.turn, engagementId, { package: eng.cmoPackage, aar: 'autoResolve' in body ? null : body, result: ctx.state.engagements[engagementId] });
       await this.flush(ctx, c);
       return ctx.state.engagements[engagementId];
-    });
+    }, 'cmo');
   }
 
   async fork(id: string, fromTurn: number) {
@@ -267,7 +273,7 @@ export class Engine {
       c.updatedAt = new Date().toISOString();
       await this.store.saveCampaign(c);
       return c;
-    });
+    }, 'config');
   }
 
   async end(id: string) {

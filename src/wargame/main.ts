@@ -27,8 +27,8 @@ function topbar(s: UiState) {
     g ? [res('TTF', `${g.ttfEurMwh} €/MWh`, 'Prezzo gas'), res('Brent', `${g.brentUsd} $`, 'Prezzo petrolio'), res('Rotte', `${g.medShippingRisk}/100`, 'Rischio navigazione'), res('Migrazioni', `${g.migrationPressure}/100`, 'Pressione migratoria')] : null,
     h('div', { class: 'wg-spacer' }),
     h('div', { class: 'wg-date' }, h('b', {}, c.date), h('small', {}, `T${c.currentTurn} · ${c.phase}`)),
-    h('button', { class: 'wg-len', title: 'Durata del turno (passa a settimanale in crisi acuta)', onclick: () => configure({ turnLength: c.turnLength === 'week' ? 'month' : 'week' }) }, c.turnLength === 'week' ? 'Settimana' : 'Mese'),
-    h('button', { class: 'wg-play', disabled: !canRun || s.busy, onclick: runTurn, 'aria-label': c.phase === 'CMO_PENDING' ? 'Prosegui' : 'Esegui turno' }, s.busy ? '…' : '▶'),
+    h('button', { class: 'wg-len', disabled: s.busy || !!s.running, title: 'Durata del turno (passa a settimanale in crisi acuta)', onclick: () => configure({ turnLength: c.turnLength === 'week' ? 'month' : 'week' }) }, c.turnLength === 'week' ? 'Settimana' : 'Mese'),
+    h('button', { class: 'wg-play', disabled: !canRun || s.busy || !!s.running, onclick: runTurn, title: s.running ? 'Turno in corso sul server' : undefined, 'aria-label': c.phase === 'CMO_PENDING' ? 'Prosegui' : 'Esegui turno' }, s.busy || s.running ? '…' : '▶'),
   );
 }
 
@@ -63,7 +63,9 @@ function render(s: UiState) {
       (['politica', 'diplomazia', 'tensione', 'crisi'] as const).map((m) => h('button', { class: s.mapMode === m ? 'on' : '', onclick: () => set({ mapMode: m }) }, m)),
       h('button', { onclick: () => set({ globe: !s.globe }) }, s.globe ? 'Mappa piana' : 'Globo'),
       h('button', { onclick: leaveCampaign }, 'Campagne')),
-    h('div', { id: 'wg-log' }, s.error ? h('span', { class: 'wg-err' }, s.error) : s.busy ? s.progress[s.progress.length - 1] ?? 'Elaborazione…' : ''),
+    h('div', { id: 'wg-log' }, s.error ? h('span', { class: 'wg-err' }, s.error)
+      : s.running ? `Turno in corso da ${Math.max(0, Math.round((Date.now() - s.running.since) / 60_000))} min · ${s.progress[s.progress.length - 1] ?? 'gli agenti stanno decidendo'}`
+      : s.busy ? s.progress[s.progress.length - 1] ?? 'Elaborazione…' : ''),
   ];
   hud.replaceChildren(...parts.filter((x): x is Node => !!x));
 }

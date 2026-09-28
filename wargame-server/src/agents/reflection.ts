@@ -6,6 +6,17 @@ import { callStructured } from './repair.js';
 
 const Out = AgentMemory.omit({ schemaVersion: true, factionId: true, updatedTurn: true }).extend({ lessons: z.array(z.string()) });
 
+/** Molti modelli scrivono le note come oggetti ({trust, tension, note}): le riduciamo a una frase invece di scartare la memoria. */
+export function noteText(v: unknown): unknown {
+  if (typeof v === 'string' || v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(noteText).filter((x) => typeof x === 'string' && x).join('; ');
+  const o = v as Record<string, unknown>;
+  const text = [o.note, o.notes, o.text, o.summary].map(noteText).find((x) => typeof x === 'string' && x);
+  const nums = Object.entries(o).filter(([, x]) => typeof x === 'number').map(([k, x]) => `${k} ${x}`).join(', ');
+  return [text, nums].filter(Boolean).join(' — ') || JSON.stringify(o).slice(0, 200);
+}
+const OutLenient = Out.extend({ relationshipNotes: z.record(z.string(), z.preprocess(noteText, z.string())) });
+
 /** Limiti imposti dal codice: memoria compatta per controllare il contesto. */
 export function clampMemory(m: AgentMemory): AgentMemory {
   const words = m.rollingSummary.split(/\s+/);
@@ -23,7 +34,7 @@ export async function reflect(provider: LlmProvider, log: LlmCall[], c: Campaign
     system: template('reflection', { factionId: i.factionId }),
     user: template('reflection-user', { memory: JSON.stringify(i.memory), decision: JSON.stringify(i.decision ? { assessment: i.decision.situationAssessment, intent: i.decision.privateIntent, orders: i.decision.orders } : null), events: events.join('\n') }),
     schemaName: 'AgentMemory', jsonSchema: z.toJSONSchema(Out, { io: 'input' }) as Record<string, unknown>, meta: { memory: i.memory, decision: i.decision, events, turn },
-  }, Out);
+  }, OutLenient);
   const base = r.value ?? { ...i.memory, rollingSummary: `${i.memory.rollingSummary} T${turn}: ${i.decision?.privateIntent ?? 'nessuna decisione'}.`.trim() };
   return clampMemory({ ...i.memory, ...base, schemaVersion: 1, factionId: i.factionId, updatedTurn: turn });
 }

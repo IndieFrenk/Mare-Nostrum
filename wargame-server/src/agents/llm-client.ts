@@ -24,10 +24,17 @@ export function extractJson(text: string): unknown {
   throw new Error('JSON troncato');
 }
 
-/** Client OpenAI-compatible (OmniRoute): json_schema se supportato, altrimenti json_object; 2 retry con backoff. */
+/** Errore HTTP che non ha senso ripetere (modello inesistente, richiesta rifiutata). */
+class FatalHttpError extends Error {}
+
+/**
+ * Client OpenAI-compatible (OmniRoute): json_schema se il modello lo supporta, altrimenti json_object; 2 retry con backoff.
+ * Il passaggio a json_object è per modello e solo quando il 400 parla davvero di response_format/schema:
+ * un 400 per altri motivi (es. modello non disponibile) non deve spegnere json_schema per tutti.
+ */
 export class OpenAiCompatProvider implements LlmProvider {
   name = 'openai-compat';
-  private jsonSchemaUnsupported = false;
+  private jsonSchemaUnsupported = new Set<string>();
   constructor(readonly baseUrl = process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1', readonly apiKey = process.env.LLM_API_KEY) {}
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
@@ -37,6 +44,7 @@ export class OpenAiCompatProvider implements LlmProvider {
       const t0 = Date.now();
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), req.timeoutMs);
+      const plainJson = this.jsonSchemaUnsupported.has(req.model);
       try {
         const res = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST', signal: ctl.signal,
@@ -44,14 +52,27 @@ export class OpenAiCompatProvider implements LlmProvider {
           body: JSON.stringify({
             model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
             messages: [{ role: 'system', content: req.system }, { role: 'user', content: req.user }],
-            response_format: this.jsonSchemaUnsupported ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: req.jsonSchema, strict: false } },
+            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: req.jsonSchema, strict: false } },
           }),
         });
-        if (res.status === 400 && !this.jsonSchemaUnsupported) { this.jsonSchemaUnsupported = true; attempt--; continue; }
-        if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-        const j = (await res.json()) as { model?: string; choices: { message: { content: string } }[]; usage?: { prompt_tokens: number; completion_tokens: number } };
-        return { text: j.choices[0]?.message.content ?? '', usage: { promptTokens: j.usage?.prompt_tokens ?? 0, completionTokens: j.usage?.completion_tokens ?? 0 }, latencyMs: Date.now() - t0, model: j.model ?? req.model };
-      } catch (e) { lastErr = e; } finally { clearTimeout(timer); }
+        if (!res.ok) {
+          const body = (await res.text()).slice(0, 300);
+          if (res.status === 400 && !plainJson && /response_format|json_schema|schema/i.test(body)) { this.jsonSchemaUnsupported.add(req.model); attempt--; continue; }
+          const msg = `LLM HTTP ${res.status}: ${body}`;
+          if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) throw new FatalHttpError(msg);
+          throw new Error(msg);
+        }
+        const j = (await res.json()) as { model?: string; choices: { message: { content: unknown } }[]; usage?: { prompt_tokens: number; completion_tokens: number } };
+        // alcuni provider (via OmniRoute) restituiscono content già come oggetto JSON o come lista di parti
+        const content = j.choices[0]?.message.content;
+        const text = typeof content === 'string' ? content
+          : Array.isArray(content) ? content.map((x) => (typeof x === 'string' ? x : (x as { text?: string })?.text ?? '')).join('')
+          : content == null ? '' : JSON.stringify(content);
+        return { text, usage: { promptTokens: j.usage?.prompt_tokens ?? 0, completionTokens: j.usage?.completion_tokens ?? 0 }, latencyMs: Date.now() - t0, model: j.model ?? req.model };
+      } catch (e) {
+        if (e instanceof FatalHttpError) throw e;
+        lastErr = e;
+      } finally { clearTimeout(timer); }
     }
     throw lastErr;
   }

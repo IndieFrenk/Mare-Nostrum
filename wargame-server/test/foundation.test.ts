@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import * as S from '../src/schemas/index.js';
 import { Rng } from '../src/engine/rng.js';
@@ -61,6 +63,30 @@ describe('store', () => {
     await expect(s.withLock('c1', async () => 1)).rejects.toBeInstanceOf(LockError);
     release(); await first;
     await expect(s.withLock('c1', async () => 2)).resolves.toBe(2);
+  });
+
+  it('il lock resta valido per tutto il turno e si libera solo se il processo che lo tiene è morto', async () => {
+    const dir = tmp();
+    const s = new JsonStore(dir);
+    let release!: () => void;
+    const first = s.withLock('c2', () => new Promise<void>((r) => (release = r)), 'turno');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(await s.lockInfo('c2')).toMatchObject({ op: 'turno', pid: process.pid });
+    const err = await s.withLock('c2', async () => 1).catch((e) => e);
+    expect(err).toBeInstanceOf(LockError);
+    expect(err.message).toMatch(/turno è in corso/);
+    release(); await first;
+    expect(await s.lockInfo('c2')).toBeNull();
+    // lock di un altro processo vivo (il padre), iniziato 10 minuti fa ma rinnovato adesso: resta valido
+    const lockPath = path.join(dir, 'c3', '.lock');
+    await fs.mkdir(path.dirname(lockPath), { recursive: true });
+    await fs.writeFile(lockPath, JSON.stringify({ pid: process.ppid, op: 'turno', since: Date.now() - 600_000, at: Date.now() }));
+    await expect(s.withLock('c3', async () => 3)).rejects.toBeInstanceOf(LockError);
+    expect(await s.lockInfo('c3')).toMatchObject({ op: 'turno', pid: process.ppid });
+    // lock di un processo morto (es. server riavviato a metà turno): si riprende
+    await fs.writeFile(lockPath, JSON.stringify({ pid: 2 ** 22 + 12345, op: 'turno', since: Date.now(), at: Date.now() }));
+    expect(await s.lockInfo('c3')).toBeNull();
+    await expect(s.withLock('c3', async () => 4)).resolves.toBe(4);
   });
 
   it('fork copia solo fino al turno richiesto', async () => {

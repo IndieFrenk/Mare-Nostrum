@@ -38,6 +38,12 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
     return engine.createCampaign({ ...b, config: { debugGodView: b.debugGodView ?? false, cmoOnRequest: b.cmoOnRequest ?? false } });
   });
   app.get<Id>(`${P}/campaigns/:id`, async (req) => store.getCampaign(req.params.id));
+  /** Operazione in corso sulla campagna (es. un turno con gli agenti LLM): la UI la usa per non rilanciare ▶. */
+  app.get<Id>(`${P}/campaigns/:id/status`, async (req) => {
+    const c = await store.getCampaign(req.params.id);
+    const lock = await store.lockInfo(c.id);
+    return { running: !!lock, op: lock?.op ?? null, since: lock?.since ?? null, turn: c.currentTurn, phase: c.phase };
+  });
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/fork`, async (req) => engine.fork(req.params.id, z.object({ fromTurn: z.number().int() }).parse(req.body).fromTurn));
   app.post<Id>(`${P}/campaigns/:id/end`, async (req) => engine.end(req.params.id));
   app.get<Id>(`${P}/campaigns/:id/knowledge`, async (req) => engine.knowledge(req.params.id));

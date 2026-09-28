@@ -31,11 +31,21 @@ export interface Store {
   getNarrative(id: string, turn: number): Promise<TurnNarrative | null>;
   saveNarrative(id: string, id2: number, n: TurnNarrative): Promise<void>;
   appendLlmCalls(id: string, turn: number, c: LlmCall[]): Promise<void>;
-  withLock<T>(id: string, fn: () => Promise<T>): Promise<T>;
+  withLock<T>(id: string, fn: () => Promise<T>, op?: string): Promise<T>;
+  /** Chi tiene il lock della campagna (questo processo o un altro ancora vivo), o null. */
+  lockInfo(id: string): Promise<LockInfo | null>;
   fork(id: string, fromTurn: number, newId: string): Promise<Campaign>;
 }
 
-export class LockError extends Error { code = 'CAMPAIGN_LOCKED'; }
+export interface LockInfo { op: string; since: number; pid: number }
+export class LockError extends Error {
+  code = 'CAMPAIGN_LOCKED';
+  constructor(message: string, public details?: LockInfo) { super(message); }
+}
+
+const LOCK_OPS: Record<string, string> = { turno: 'un turno è in corso', cmo: 'si sta registrando un ingaggio CMO', config: 'si sta cambiando la configurazione' };
+const pidAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; } };
+const hhmm = (ms: number) => new Date(ms).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
 
 export class JsonStore implements Store {
   constructor(readonly root: string) {}
@@ -134,17 +144,46 @@ export class JsonStore implements Store {
     await this.write(this.dir(id, 'cmo', `turn-${pad(turn)}`, `${engagementId}.json`), data);
   }
 
-  async withLock<T>(id: string, fn: () => Promise<T>, staleMs = 120_000): Promise<T> {
+  /** Lock tenuti da questo processo: un secondo withLock sulla stessa campagna fallisce subito. */
+  private held = new Map<string, LockInfo>();
+
+  /**
+   * Lock di campagna su file (`.lock`), valido per tutta l'operazione anche se dura molti minuti (turni con LLM veri):
+   * chi lo tiene lo rinnova ogni 20 s. È considerato abbandonato solo se il processo che lo tiene è morto
+   * o ha smesso di rinnovarlo da più di `staleMs`.
+   */
+  async withLock<T>(id: string, fn: () => Promise<T>, op = 'turno', staleMs = 90_000): Promise<T> {
+    const busy = (h: LockInfo) => new LockError(`Campagna occupata: ${LOCK_OPS[h.op] ?? h.op} (dalle ${hhmm(h.since)}). Attendi che finisca.`, h);
+    const mine = this.held.get(id);
+    if (mine) throw busy(mine);
     const lock = this.dir(id, '.lock');
     await fs.mkdir(path.dirname(lock), { recursive: true });
+    const info: LockInfo = { op, since: Date.now(), pid: process.pid };
+    const body = () => JSON.stringify({ ...info, at: Date.now() });
     try {
-      await fs.writeFile(lock, JSON.stringify({ pid: process.pid, at: Date.now() }), { flag: 'wx' });
+      await fs.writeFile(lock, body(), { flag: 'wx' });
     } catch {
-      const held = JSON.parse(await fs.readFile(lock, 'utf8').catch(() => '{"at":0}'));
-      if (Date.now() - held.at < staleMs) throw new LockError(`campagna ${id} bloccata da pid ${held.pid}`);
-      await fs.writeFile(lock, JSON.stringify({ pid: process.pid, at: Date.now() }));
+      const other = JSON.parse(await fs.readFile(lock, 'utf8').catch(() => '{"at":0}')) as Partial<LockInfo> & { at: number };
+      const alive = other.pid !== undefined && other.pid !== process.pid && pidAlive(other.pid);
+      if (alive && Date.now() - other.at < staleMs) throw busy({ op: other.op ?? 'turno', since: other.since ?? other.at, pid: other.pid! });
+      await fs.writeFile(lock, body()); // abbandonato (processo morto, riavvio del server o rinnovo fermo)
     }
-    try { return await fn(); } finally { await fs.rm(lock, { force: true }); }
+    this.held.set(id, info);
+    const beat = setInterval(() => { fs.writeFile(lock, body()).catch(() => {}); }, 20_000);
+    beat.unref();
+    try { return await fn(); } finally {
+      clearInterval(beat);
+      this.held.delete(id);
+      await fs.rm(lock, { force: true });
+    }
+  }
+
+  async lockInfo(id: string): Promise<LockInfo | null> {
+    const mine = this.held.get(id);
+    if (mine) return mine;
+    const other = JSON.parse(await fs.readFile(this.dir(id, '.lock'), 'utf8').catch(() => 'null')) as (Partial<LockInfo> & { at: number }) | null;
+    if (!other?.pid || other.pid === process.pid || !pidAlive(other.pid) || Date.now() - other.at >= 90_000) return null;
+    return { op: other.op ?? 'turno', since: other.since ?? other.at, pid: other.pid };
   }
 
   /** Copia i file fino a fromTurn (snapshot di chiusura) e riparte dall'apertura di fromTurn+1. */

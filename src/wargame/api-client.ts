@@ -37,6 +37,7 @@ export const api = {
   validate: (id: string, o: OrdersBody) => req<Validation>('POST', `${c(id)}/orders/validate`, o),
   submit: (id: string, o: OrdersBody) => req<{ validation: Validation }>('POST', `${c(id)}/orders`, o),
   advance: (id: string) => req<Campaign>('POST', `${c(id)}/advance`),
+  status: (id: string) => req<{ running: boolean; op: string | null; since: number | null; turn: number; phase: string }>('GET', `${c(id)}/status`),
   cmo: (id: string) => req<PendingCmo[]>('GET', `${c(id)}/cmo`),
   cmoUrl: (id: string, engagementId: string, format: 'txt' | 'json') => `${BASE}${c(id)}/cmo?format=${format}&engagementId=${encodeURIComponent(engagementId)}`,
   aar: (id: string, engagementId: string, body: AfterActionReport | { autoResolve: true }) => req<unknown>('POST', `${c(id)}/cmo/${encodeURIComponent(engagementId)}/aar`, body),

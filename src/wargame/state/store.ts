@@ -26,6 +26,8 @@ export interface UiState {
   submitted: boolean;
   progress: string[];
   busy: boolean;
+  /** operazione in corso sul server (es. un turno con gli agenti LLM), anche partita prima di ricaricare la pagina */
+  running: { op: string; since: number } | null;
   error: string | null;
 }
 
@@ -36,7 +38,7 @@ const listeners = new Set<Listener>();
 
 export const state: UiState = {
   campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [],
-  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, error: null,
+  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null,
 };
 
 export function set(patch: Partial<UiState>) {
