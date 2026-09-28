@@ -58,7 +58,7 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
         }
         zoneOk(ord.zoneId); cost += PARAMS.sortieCost.ISR * ord.assetIds.length; break;
       case 'SOF_OP': zoneOk(ord.zoneId); cost += PARAMS.sortieCost.SOF_OP; if (ord.unitIds.some((id) => s.units[id]?.type !== 'sof_team')) errors.push(`${ord.id}: SOF_OP richiede unità sof_team`); break;
-      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: fazione ${ord.target} sconosciuta`); if (++cyberOps > PARAMS.maxCyberOpsPerTurn) errors.push(`${ord.id}: al massimo ${PARAMS.maxCyberOpsPerTurn} operazioni cyber per turno`); cost += PARAMS.sortieCost.CYBER_OP; break;
+      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: bersaglio ${ord.target} non è una fazione`); else if (ord.target === factionId) errors.push(`${ord.id}: un'operazione cyber non può colpire la propria fazione`); if (++cyberOps > PARAMS.maxCyberOpsPerTurn) errors.push(`${ord.id}: al massimo ${PARAMS.maxCyberOpsPerTurn} operazioni cyber per turno`); cost += PARAMS.sortieCost.CYBER_OP; break;
       case 'ESCORT': if (!s.units[ord.protect] && !s.infrastructure[ord.protect] && !/^convoglio/i.test(ord.protect)) errors.push(`${ord.id}: oggetto da scortare sconosciuto`); break;
       default: break;
     }
@@ -76,7 +76,13 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
   }
   let letters = 0;
   for (const d of o.diplomacy) {
-    if ('target' in d && typeof d.target === 'string' && !s.factions[d.target]) errors.push(`${d.id}: destinatario ${d.target} sconosciuto`);
+    // il destinatario è sempre una fazione (mai una zona come CANALE_SICILIA) e non la fazione stessa
+    const targets = 'target' in d ? (Array.isArray(d.target) ? d.target : [d.target]) : [];
+    if (d.kind === 'PROPOSE_AGREEMENT') targets.push(...d.agreement.parties.filter((x) => x !== factionId));
+    for (const t of new Set(targets)) {
+      if (!s.factions[t]) errors.push(`${d.id}: destinatario ${t} sconosciuto (non è una fazione)`);
+      else if (t === factionId && d.kind !== 'LETTER') errors.push(`${d.id}: ${d.kind} non può essere rivolto alla propria fazione`);
+    }
     if (d.kind === 'LETTER') {
       letters++;
       if (d.target === factionId) errors.push(`${d.id}: una lettera non può essere indirizzata a sé stessi`);

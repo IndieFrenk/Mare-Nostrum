@@ -84,3 +84,84 @@ describe('console ordini: posture per zona dal parser', () => {
     expect(r.orders.diplomacy[0]).toMatchObject({ kind: 'DEMARCHE', target: 'TUN' });
   });
 });
+
+describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)', () => {
+  const setup = async (reply: unknown, seed: string) => {
+    const e = makeEngine(new ScriptedParser(reply));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
+    return { e, c };
+  };
+
+  it('4B: CYBER_OP e DEMARCHE con una zona come destinatario → errori, avviso cyber e movimento senza unità', async () => {
+    const { e, c } = await setup({ orders: { ...empty,
+      military: [{ id: 'o1', kind: 'CYBER_OP', target: 'CANALE_SICILIA', targetRef: 'partenze', effect: 'espionage' }],
+      diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'CANALE_SICILIA', message: 'Più controlli', visibility: 'public' }] }, ambiguities: [] }, 'q4b');
+    const r = await e.parseOrders(c.id, FRASE_1);
+    expect(r.validation.valid).toBe(false);
+    expect(r.validation.errors.filter((x) => x.includes('CANALE_SICILIA') && x.includes('non è una fazione'))).toHaveLength(2);
+    expect(r.validation.risks.some((x) => x.includes('CYBER_OP') && x.includes('non richiesta'))).toBe(true);
+    expect(r.ambiguities.some((x) => x.includes('muovere forze') && x.includes('«manda»'))).toBe(true);
+    expect(r.ambiguities.some((x) => x.includes('ITA-F590 è nominata'))).toBe(true);
+    expect(r.ambiguities.some((x) => x.includes('Tunisia (TUN) è nominata'))).toBe(true);
+  });
+
+  it('9B: due CYBER_OP disruption contro la Grecia → avviso «alleato» e cyber non richiesta, SHOW_OF_FORCE mancante', async () => {
+    const { e, c } = await setup({ orders: { ...empty, military: [
+      { id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' },
+      { id: 'o2', kind: 'CYBER_OP', target: 'GRC', targetRef: 'comandi', effect: 'disruption' }] }, ambiguities: [] }, 'q9b');
+    const r = await e.parseOrders(c.id, FRASE_2);
+    // il validatore le accetta (la Grecia è una fazione): gli avvisi vengono dai controlli
+    expect(r.validation.errors).toEqual([]);
+    expect(r.validation.risks.filter((x) => x.includes('contro Grecia (GRC), alleato (NATO, EU)'))).toHaveLength(1);
+    expect(r.validation.risks.filter((x) => x.includes('non richiesta'))).toHaveLength(2);
+    expect(r.ambiguities.some((x) => x.includes('muovere forze') && x.includes('porta'))).toBe(true);
+    expect(r.ambiguities.some((x) => x.includes('rassicurare'))).toBe(true);
+  });
+
+  it('9B sulla frase 1: risposta corretta → nessun avviso', async () => {
+    const { e, c } = await setup({ orders: { ...empty,
+      military: [{ id: 'm1', kind: 'MOVE', unitIds: ['ITA-F590'], to: 'CANALE_SICILIA', speed: 'cruise' }],
+      diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'TUN', message: 'Più controlli sulle partenze', visibility: 'public' }] }, ambiguities: [] }, 'ok9b');
+    const r = await e.parseOrders(c.id, FRASE_1);
+    expect(r.validation.valid).toBe(true);
+    expect(r.validation.risks.filter((x) => x.startsWith('⚠'))).toEqual([]);
+    expect(r.ambiguities).toEqual([]);
+  });
+
+  it('SHOW_OF_FORCE della Cavour nello Ionio e REASSURANCE alla Grecia → nessun avviso', async () => {
+    const { e, c } = await setup({ orders: { ...empty,
+      military: [{ id: 'm1', kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],
+      diplomacy: [{ id: 'd1', kind: 'REASSURANCE', target: 'GRC', message: 'Nessuna minaccia per Atene', visibility: 'public' }] }, ambiguities: [] }, 'ok2');
+    const r = await e.parseOrders(c.id, FRASE_2);
+    expect(r.validation.valid).toBe(true);
+    expect(r.validation.risks.filter((x) => x.startsWith('⚠'))).toEqual([]);
+    expect(r.ambiguities).toEqual([]);
+  });
+
+  it('minacce, sanzioni, strike e blocchi verso un alleato (anche per fiducia ≥ 40) sono segnalati', async () => {
+    const { e, c } = await setup({ orders: { ...empty,
+      military: [{ id: 'm1', kind: 'BLOCKADE', unitIds: ['ITA-F591'], zoneId: 'EGEO', roe: 'WEAPONS_TIGHT' }],
+      diplomacy: [{ id: 'd1', kind: 'THREAT', target: 'USA', message: 'x', visibility: 'public' }, { id: 'd2', kind: 'SANCTION', target: 'TUR', scope: 'x' }, { id: 'd3', kind: 'SANCTION', target: 'RUS', scope: 'x' }] }, ambiguities: [] }, 'ostili');
+    const r = await e.parseOrders(c.id, 'Minaccia gli Stati Uniti, sanziona Turchia e Russia e blocca l\'Egeo con la Fasan');
+    const alleati = r.validation.risks.filter((x) => x.includes('alleato'));
+    expect(alleati.some((x) => x.startsWith('⚠ THREAT contro Stati Uniti (USA)'))).toBe(true);
+    expect(alleati.some((x) => x.startsWith('⚠ SANCTION contro Turchia (TUR), alleato (NATO)'))).toBe(true);
+    expect(alleati.some((x) => x.includes('BLOCKADE in EGEO contro Grecia (GRC)'))).toBe(true);
+    expect(alleati.some((x) => x.includes('Russia'))).toBe(false);
+  });
+
+  it('il validatore rifiuta destinatari che non sono fazioni anche negli accordi e verso sé stessi', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'val', seed: 'val' });
+    const v = await e.validate(c.id, { ...empty,
+      military: [{ id: 'c1', kind: 'CYBER_OP', target: 'ITA', targetRef: 'x', effect: 'espionage' }],
+      diplomacy: [
+        { id: 'a1', kind: 'PROPOSE_AGREEMENT', target: ['EGEO'], agreement: { type: 'migration', parties: ['ITA', 'IONIO'], terms: 'x', endTurn: null, visibility: 'public' } },
+        { id: 'a2', kind: 'DEMARCHE', target: 'ITA', message: 'x', visibility: 'public' },
+      ] });
+    expect(v.valid).toBe(false);
+    expect(v.errors).toEqual(expect.arrayContaining([
+      'c1: un\'operazione cyber non può colpire la propria fazione', 'a1: destinatario EGEO sconosciuto (non è una fazione)', 'a1: destinatario IONIO sconosciuto (non è una fazione)', 'a2: DEMARCHE non può essere rivolto alla propria fazione',
+    ]));
+  });
+});
