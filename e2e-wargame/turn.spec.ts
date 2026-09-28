@@ -12,8 +12,9 @@ test('un turno completo con LLM mock, senza rete verso servizi esterni', async (
   await expect(page.getByText('Quadro strategico')).toBeVisible();
 
   await page.getByRole('button', { name: /^Console Ordini/ }).click();
-  await page.getByPlaceholder(/Pattugliare/).fill('Pattugliare CANALE_SICILIA con ITA-F592');
+  await page.getByPlaceholder(/Manda la Bergamini/).fill('Manda la Margottini a pattugliare il Canale di Sicilia');
   await page.getByRole('button', { name: 'Interpreta → bozza' }).click();
+  await expect(page.getByText(/Margottini → ITA-F592/)).toBeVisible();
   await page.getByRole('button', { name: 'Valida' }).click();
   await expect(page.getByText(/Ordini validi/)).toBeVisible();
 

@@ -19,8 +19,20 @@ async function guarded(fn: () => Promise<void>) {
   } finally { set({ busy: false }); }
 }
 
+let llmTimer: ReturnType<typeof setInterval> | null = null;
+/** Stato dei modelli per il pallino della barra in alto; `fresh` salta la cache di 30 s del server. */
+export async function checkLlm(fresh = false) {
+  const llm = await api.llmStatus(state.campaignId, fresh).catch(() => null);
+  set({ llm });
+  return llm;
+}
+/** true se ▶ va bloccato: modelli irraggiungibili e server che non gioca senza (WARGAME_ALLOW_OFFLINE non impostato) */
+export const llmBlocked = (s = state) => !!s.llm && !s.llm.reachable && !s.llm.offlineAllowed;
+
 export const openCampaign = (id: string) => guarded(async () => {
   remember(id);
+  if (!llmTimer) llmTimer = setInterval(() => { if (state.campaignId) void checkLlm(); }, 60_000);
+  void checkLlm();
   closeStream?.();
   closeStream = api.stream(id, (m) => {
     if (m.done) { void checkRunning().then((r) => { if (!r && !state.busy) void refresh(); }); return; }
@@ -85,9 +97,13 @@ export const selectUnit = (unitId: string | null, add = false) => guarded(async 
 export const validateDraft = () => guarded(async () => { set({ validation: await api.validate(state.campaignId!, state.draft) }); });
 
 export const parseText = (text: string) => guarded(async () => {
-  const r = await api.parse(state.campaignId!, text);
+  let r: Awaited<ReturnType<typeof api.parse>>;
+  try { r = await api.parse(state.campaignId!, text); } catch (e) { if ((e as ApiError).code === 'LLM_UNREACHABLE') void checkLlm(true); throw e; }
   const d = state.draft;
-  set({ draft: { military: [...d.military, ...r.orders.military], diplomacy: [...d.diplomacy, ...r.orders.diplomacy], procurement: [...d.procurement, ...r.orders.procurement], statements: [...d.statements, ...r.orders.statements] }, validation: r.validation, error: r.ambiguities.length ? `Da chiarire: ${r.ambiguities.join(' · ')}` : null });
+  const names = r.recognized.map((x) => `${x.alias} → ${x.id}`);
+  const stances = r.stanceOrders.map((x) => `${x.stance}${x.zoneId ? ` in ${x.zoneId}` : ''}`);
+  const parseNote = [names.length ? `Nomi riconosciuti: ${names.join(' · ')}` : '', stances.length ? `Unità scelte dallo stato maggiore per: ${stances.join(', ')}` : ''].filter(Boolean).join('\n') || null;
+  set({ draft: { military: [...d.military, ...r.orders.military], diplomacy: [...d.diplomacy, ...r.orders.diplomacy], procurement: [...d.procurement, ...r.orders.procurement], statements: [...d.statements, ...r.orders.statements] }, validation: r.validation, parseNote, error: r.ambiguities.length ? `Da chiarire: ${r.ambiguities.join(' · ')}` : null });
 });
 
 export const submitDraft = () => guarded(async () => {
@@ -99,11 +115,15 @@ export const submitDraft = () => guarded(async () => {
 export const runTurn = () => guarded(async () => {
   const id = state.campaignId!;
   if (await checkRunning()) return; // già in corso (altra scheda o prima di ricaricare): lo seguiamo e basta
+  // modelli spenti: niente turno tutto in dottrina (il server lo rifiuterebbe comunque con 503)
+  const llm = await checkLlm();
+  if (llm && !llm.reachable && !llm.offlineAllowed) { set({ error: `I modelli non rispondono: accendi il PC con Ollama (${llm.baseUrl}${llm.error ? ` — ${llm.error}` : ''}).` }); return; }
   if (state.campaign?.phase === 'PLAYER_ORDERS' && !state.submitted) await api.submit(id, state.draft);
   set({ running: { op: 'turno', since: Date.now() }, progress: [] });
   try {
     await api.advance(id);
   } catch (e) {
+    if ((e as ApiError).code === 'LLM_UNREACHABLE') { void checkLlm(true); throw e; }
     // risposta persa (timeout, rete) o turno già partito: il server va avanti da solo, la UI lo segue
     if (await checkRunning()) return;
     throw e;
