@@ -8,7 +8,7 @@ import { ReplayAgents } from '../agents/replay.js';
 import { JsonStore } from '../store/json-store.js';
 import type { Campaign, LlmCall } from '../schemas/index.js';
 
-/** Simulazione headless: `sim -- --turns 5 --mock` · `sim -- --replay <id>` · smoke LLM reale senza --mock. */
+/** Simulazione headless: `sim -- --turns 5 --mock [--mode rules|llm]` · `sim -- --replay <id>` · smoke LLM reale senza --mock. */
 export async function runSim(engine: Engine, c: Campaign, turns: number, player?: (turn: number) => Promise<void>) {
   const t0 = Date.now();
   while (c.currentTurn <= turns) {
@@ -24,7 +24,7 @@ export async function runSim(engine: Engine, c: Campaign, turns: number, player?
 }
 
 async function main() {
-  const { values } = parseArgs({ options: { turns: { type: 'string', default: '5' }, mock: { type: 'boolean', default: false }, replay: { type: 'string' }, seed: { type: 'string' }, scenario: { type: 'string', default: 'med-2026' } } });
+  const { values } = parseArgs({ options: { turns: { type: 'string', default: '5' }, mock: { type: 'boolean', default: false }, replay: { type: 'string' }, seed: { type: 'string' }, scenario: { type: 'string', default: 'med-2026' }, mode: { type: 'string' } } });
   const store = new JsonStore(config.dataDir);
   if (values.replay) {
     const src = await store.getCampaign(values.replay);
@@ -37,16 +37,17 @@ async function main() {
     });
     const [a, b] = await Promise.all([store.getState(src.id, last), store.getState(r.campaign.id, last)]);
     const same = JSON.stringify(a) === JSON.stringify(b);
-    console.log(`replay ${r.campaign.id}: turni 1-${last}, stato ${same ? 'IDENTICO' : 'DIVERGENTE'}`);
+    console.log(`replay ${r.campaign.id} (fazioni: ${r.campaign.config.factionMode}): turni 1-${last}, stato ${same ? 'IDENTICO' : 'DIVERGENTE'}`);
     process.exit(same ? 0 : 1);
   }
   const provider = values.mock ? new MockLLMProvider() : new OpenAiCompatProvider();
   const engine = new Engine(store, new LlmAgents(provider));
   engine.onProgress = (_, m) => { if (m.agent) console.log(`  · ${m.agent}: ${m.status}`); };
-  const c = await engine.createCampaign({ scenarioId: values.scenario!, name: `Sim ${new Date().toISOString()}`, seed: values.seed });
+  const mode = values.mode === 'llm' || values.mode === 'rules' ? values.mode : undefined;
+  const c = await engine.createCampaign({ scenarioId: values.scenario!, name: `Sim ${new Date().toISOString()}`, seed: values.seed, ...(mode ? { config: { factionMode: mode } } : {}) });
   const r = await runSim(engine, c, Number(values.turns));
   const s = await store.getState(r.campaign.id);
-  console.log(`campagna ${r.campaign.id}: turno ${r.campaign.currentTurn} (${r.campaign.phase}), ${r.ms} ms, FOED ${s.factions.ITA.budget.discretionary} M€`);
+  console.log(`campagna ${r.campaign.id} (fazioni: ${r.campaign.config.factionMode}): turno ${r.campaign.currentTurn} (${r.campaign.phase}), ${r.ms} ms, FOED ${s.factions.ITA.budget.discretionary} M€`);
   const { readdir, readFile } = await import('node:fs/promises');
   const dir = store.dir(r.campaign.id, 'llm-log');
   const calls = (await Promise.all((await readdir(dir).catch(() => [])).map((f) => readFile(`${dir}/${f}`, 'utf8'))))

@@ -4939,7 +4939,7 @@
     "diplomacyStyle": "conciliatory",
     "zoneInterests": {
      "GOLFO": 1,
-     "MAR_ROSSO": 0.3
+     "MAR_ROSSO": 0.2
     },
     "maxStancesPerTurn": 1
    }

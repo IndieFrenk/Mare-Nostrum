@@ -69,14 +69,19 @@ export const PARAMS = {
     detenteBelow: 0.5, detenteFrom: 5, detenteSpan: 3, ceasefireAt: 8,
     /** Coercizione, il rovescio della distensione: da questa escalation i profili aggressivi (≥ forceAt) coinvolti nella crisi fanno
      *  una dimostrazione di forza invece della sola presenza. Senza, nessuna fazione a regole esercita pressione e gli ingaggi
-     *  nascono solo dal giocatore (0 in 5 turni nel primo playtest). */
-    coerceFrom: 5,
+     *  nascono solo dal giocatore (0 in 5 turni nel primo playtest); a 5 (il Mar Rosso parte da lì) gli scontri erano ~30 per
+     *  partita di 20 turni, con flotte intere distrutte. */
+    coerceFrom: 6,
     /** Ritiro: al massimo tanti ritiri per turno dalle zone dove la fazione ha forze ma nessuna regola le chiede più (le unità
      *  impegnate in una zona non si spostano da sole: senza ritiro restano lì finché non si logorano). */
     maxWithdrawals: 2,
     /** Alleato: accordo di difesa in comune (NATO, UE, bilaterali) o fiducia ≥ allyTrust. Avversario (unico bersaglio cyber):
      *  fiducia ≤ adversaryTrust e tensione ≥ adversaryTension. */
     allyTrust: 40, adversaryTrust: -20, adversaryTension: 50,
+    /** Alleato stretto: accordo di difesa con al massimo 3 parti o fiducia ≥ closeAllyTrust. Solo loro sostengono un alleato dopo
+     *  un atto senza zona (sanzioni, minacce, cyber): con tutta la NATO e l'UE una sanzione alla Francia portava 10 rassicurazioni
+     *  a turno (56 in 10 turni nel playtest). Per un atto in una zona sostiene chi ha interesse in quella zona. */
+    closeAllyTrust: 60,
     /** Cyber: al massimo un'operazione per turno dalle regole; disruption invece di espionage solo con aggressività e tensione
      *  verso il bersaglio almeno così (il resto è spionaggio, il meno ostile). */
     cyberDisruption: { aggressiveness: 0.6, tension: 80 },

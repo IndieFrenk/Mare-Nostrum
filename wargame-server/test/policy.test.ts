@@ -117,6 +117,17 @@ describe('decisore a regole', () => {
     expect(at(5).zoneStances).toContainEqual({ zoneId: 'MAR_ROSSO', stance: 'presence', intensity: 2 });
   });
 
+  it('sceglie solo posture che le proprie unità possono eseguire: senza navi adatte ripiega sul pattugliamento', () => {
+    // l'Iran senza motovedette: nel Mar Rosso restano i lanciatori di droni, buoni solo per pattugliare
+    const k = knowledgeOf('IRN', { mutate: (s) => { s.units['IRN-FAC']!.status = 'destroyed'; s.crises.RED_SEA!.escalation = 7; } });
+    const d = decide(k);
+    expect(d.zoneStances).toContainEqual({ zoneId: 'MAR_ROSSO', stance: 'patrol', intensity: 3 });
+    expect(d.rationale).toContainEqual({ rule: 'crisis', text: 'Crisi RED_SEA a 7/10 in MAR_ROSSO (interesse 1): dimostrazione di forza, intensità 3 (pattugliamento: nessuna unità adatta a dimostrazione di forza)' });
+    // senza nessuna unità adatta la zona non si sceglie affatto
+    const none = decide(knowledgeOf('IRN', { mutate: (s) => { s.units['IRN-FAC']!.status = 'destroyed'; s.units['IRN-DRONES']!.status = 'destroyed'; } }));
+    expect(none.zoneStances).toEqual([]);
+  });
+
   it('ritiro dalle zone dove la fazione ha forze ma nessuna regola le chiede più', () => {
     const k = knowledgeOf('GRC', {
       mutate: (s) => { const u = s.units['GRC-MEKO1']!; Object.assign(u, { status: 'deployed', zoneId: 'ADRIATICO', currentTask: { id: 'x', kind: 'PATROL', unitIds: [u.id], zoneId: 'ADRIATICO', roe: 'WEAPONS_TIGHT' } }); },
@@ -126,6 +137,23 @@ describe('decisore a regole', () => {
     expect(d.rationale).toContainEqual({ rule: 'withdraw', text: 'Ritiro da ADRIATICO: nessuna crisi, obiettivo o minaccia che chieda di restarci' });
     // la fregata già nell'Egeo resta: lì c'è ancora una ragione
     expect(d.zoneStances.some((z) => z.zoneId === 'EGEO' && z.stance === 'withdraw')).toBe(false);
+  });
+
+  it('alleati sotto pressione: sostegno da chi ha interesse nella zona o, per atti senza zona, solo dagli alleati stretti', () => {
+    const events = [rel('RUS', 'GRC', 'BLOCKADE in MEDITERRANEO_ORIENTALE'), rel('RUS', 'FRA', 'sanzioni: energia')];
+    // blocco russo contro la Grecia nel Mediterraneo orientale: la Francia (interesse 0,5 lì) scorta il traffico se ha posto
+    // tra le posture, altrimenti rassicura la Grecia
+    const fra = decide(knowledgeOf('FRA', { events: [events[0]!], mutate: (s) => { s.factions.FRA!.policy!.maxStancesPerTurn = 4; } }));
+    expect(fra.rationale).toContainEqual({ rule: 'ally', text: 'Sostegno a GRC dopo il blocco navale di RUS in MEDITERRANEO_ORIENTALE: scorta al traffico' });
+    expect(fra.zoneStances).toContainEqual({ zoneId: 'MEDITERRANEO_ORIENTALE', stance: 'escort_shipping', intensity: 1 });
+    // con il tetto di 3 posture già pieno (crisi e obiettivi) la scorta non entra: rassicurazione
+    const busy = decide(knowledgeOf('FRA', { events: [events[0]!] }));
+    expect(busy.rationale).toContainEqual({ rule: 'ally', text: 'Sostegno a GRC dopo il blocco navale di RUS: rassicurazione' });
+    expect(busy.orders.diplomacy).toContainEqual(expect.objectContaining({ kind: 'REASSURANCE', target: 'GRC' }));
+    // sanzioni russe alla Francia: la Germania (fiducia 60) la rassicura, la Spagna (fiducia 50, solo NATO/UE) no
+    const sanction = [events[1]!];
+    expect(decide(knowledgeOf('DEU', { events: sanction })).orders.diplomacy).toContainEqual(expect.objectContaining({ kind: 'REASSURANCE', target: 'FRA' }));
+    expect(decide(knowledgeOf('ESP', { events: sanction })).rationale.some((r) => r.rule === 'ally')).toBe(false);
   });
 
   it('mai operazioni cyber verso alleati, anche ostili; sì verso gli avversari', () => {

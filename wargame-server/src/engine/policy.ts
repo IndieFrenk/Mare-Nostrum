@@ -2,6 +2,7 @@ import type { Base, DecisionOutput, DiploAction, FactionKnowledge, FactionPolicy
 import { LETTER_LIMITS, POLICY_RULES } from '../schemas/index.js';
 import { PARAMS } from './params.js';
 import { taskZone } from './movement.js';
+import { candidates } from './stances.js';
 import type { Rng } from './rng.js';
 
 /**
@@ -53,6 +54,11 @@ const RISK: Record<string, number> = {
   REASSURANCE: 0.1, BACKCHANNEL: 0.1, PROPOSE_AGREEMENT: 0.1, UNSC_DRAFT: 0.2, CYBER_OP: 0.4,
 };
 const ruleRank = (r: PolicyRule) => POLICY_RULES.indexOf(r);
+/** posture di ripiego se le unità della fazione non possono fare quella scelta (la prima è la scelta stessa) */
+const FALLBACK: Record<Exclude<Stance, 'withdraw'>, Exclude<Stance, 'withdraw'>[]> = {
+  show_of_force: ['show_of_force', 'presence', 'patrol'], presence: ['presence', 'patrol'], patrol: ['patrol'],
+  escort_shipping: ['escort_shipping', 'patrol'], blockade: ['blockade', 'show_of_force', 'patrol'], air_defense: ['air_defense', 'patrol'],
+};
 
 interface Cand { score: number; rule: PolicyRule; text: string }
 interface StanceCand extends Cand { zoneId: string; stance: Exclude<Stance, 'withdraw'>; intensity: 1 | 2 | 3 }
@@ -148,7 +154,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     // la risposta di forza esce con probabilità = aggressività (tiro registrato): smorza le spirali sanzione → sanzione
     const force = aggressive && i.rng.chance(`regole ${me}: risposta di forza a ${x.from}`, p.aggressiveness).ok;
     const score = P.score.threat + sev;
-    if (force && x.zoneId && canDeploy && i.geo.zones[x.zoneId]) addStance({ zoneId: x.zoneId, stance: 'show_of_force', intensity: x.kind === 'engagement' || x.kind === 'strike' ? 3 : 2, score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: dimostrazione di forza` });
+    if (force && x.zoneId && canDeploy && i.geo.zones[x.zoneId]) addStance({ zoneId: x.zoneId, stance: 'show_of_force', intensity: x.kind === 'strike' ? 3 : 2, score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: dimostrazione di forza` });
     else if (force && !isAlly(x.from)) addDiplo('SANCTION', x.from, { score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: sanzioni` });
     else { const kind = soft ? 'BACKCHANNEL' : 'DEMARCHE'; addDiplo(kind, x.from, { score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: ${DIPLO_IT[kind]}` }); }
     addLetter(x.from, 'firm', `Rispondere con fermezza a ${act.noun} di ${nm(x.from)}${x.zoneId ? ` in ${zoneName(x.zoneId)}` : ''}: il nostro Governo non accetta pressioni e chiede di tornare al dialogo.`, score);
@@ -207,18 +213,25 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   }
 
   // 6) alleati sotto pressione (atto ostile di una fazione non alleata): scorta al traffico nella zona o rassicurazione
+  const closeAlly = (x: string) => defense.some((a) => a.parties.length <= 3 && a.parties.includes(x)) || rel(x).trust >= P.closeAllyTrust;
   const pressured = new Map<string, Incident>();
   for (const x of k.incidents) {
     if (x.to === me || x.from === me || !isHostile(x) || !others.has(x.to) || !isAlly(x.to) || isAlly(x.from)) continue;
+    // atto in una zona: lo sostiene chi ha interesse lì; senza zona (sanzioni, minacce, cyber) solo un alleato stretto
+    if (x.zoneId ? interest(x.zoneId) < P.minInterest : !closeAlly(x.to)) continue;
     const cur = pressured.get(x.to);
     if (!cur || severity(x) > severity(cur)) pressured.set(x.to, x);
   }
   const ally = [...pressured.values()].sort((a, b) => severity(b) - severity(a) || a.to.localeCompare(b.to))[0];
+  /** rassicurazione all'alleato: subito, o se la scorta non entra tra le posture scelte */
+  const reassureAlly = () => addDiplo('REASSURANCE', ally!.to, { score: P.score.ally, rule: 'ally', text: `Sostegno a ${ally!.to} dopo ${ACT[ally!.kind as Hostile].noun} di ${ally!.from}: rassicurazione` });
+  let allyEscort: StanceCand | null = null;
   if (ally) {
-    const act = ACT[ally.kind as Hostile]; const z = ally.zoneId;
-    if (z && canDeploy && i.geo.zones[z] && i.geo.zones[z]!.terrain !== 'land' && interest(z) >= P.minInterest)
-      addStance({ zoneId: z, stance: 'escort_shipping', intensity: 1, score: P.score.ally, rule: 'ally', text: `Sostegno a ${ally.to} dopo ${act.noun} di ${ally.from} in ${z}: scorta al traffico` });
-    else addDiplo('REASSURANCE', ally.to, { score: P.score.ally, rule: 'ally', text: `Sostegno a ${ally.to} dopo ${act.noun} di ${ally.from}: rassicurazione` });
+    const z = ally.zoneId;
+    if (z && canDeploy && i.geo.zones[z] && i.geo.zones[z]!.terrain !== 'land' && interest(z) >= P.minInterest) {
+      allyEscort = { zoneId: z, stance: 'escort_shipping', intensity: 1, score: P.score.ally, rule: 'ally', text: `Sostegno a ${ally.to} dopo ${ACT[ally.kind as Hostile].noun} di ${ally.from} in ${z}: scorta al traffico` };
+      addStance(allyEscort);
+    } else reassureAlly();
   }
 
   // 7) cyber: solo verso avversari (mai alleati), con probabilità cyberPropensity × offense / 10, un'operazione al turno
@@ -241,10 +254,12 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     responses.push({ action: { id: '', kind: 'RESPOND_AGREEMENT', agreementId: a.id, response: accept ? 'accept' : 'reject' }, text: `Accordo ${a.id} (${a.type}) proposto da ${from}: ${accept ? 'accettato' : 'respinto'} (fiducia ${t})` });
   }
 
-  // routine: nessuna postura da altre regole → pattugliamento leggero della zona di maggiore interesse
-  if (!stances.length && canDeploy) {
-    const z = topZone(true) ?? topZone();
-    if (z) addStance({ zoneId: z, stance: 'patrol', intensity: 1, score: P.score.routine, rule: 'routine', text: `Pattugliamento di routine in ${z} (zona di maggiore interesse)` });
+  // routine: pattugliamento leggero della zona di maggiore interesse non ancora coperta da un'altra regola (punteggio più basso:
+  // entra solo se resta posto nel tetto del profilo)
+  if (canDeploy) {
+    const covered = new Set(stances.map((c) => c.zoneId));
+    const z = best(Object.keys(p.zoneInterests).filter((x) => interest(x) >= P.minInterest && !covered.has(x) && i.geo.zones[x]?.terrain !== 'land'));
+    if (z) addStance({ zoneId: z, stance: 'patrol', intensity: 1, score: P.score.routine, rule: 'routine', text: `Pattugliamento di routine in ${z} (zona d'interesse ${interest(z)})` });
   }
 
   // scelta: una postura per zona e un'azione per destinatario (vince il punteggio più alto), nei tetti del profilo
@@ -254,7 +269,17 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     return [...m.values()].sort((a, b) => byScore(a, b) || key(a).localeCompare(key(b)));
   };
   const rankedStances = oneEach(stances, (c) => c.zoneId);
-  const chosenStances = rankedStances.slice(0, p.maxStancesPerTurn);
+  // si sceglie solo ciò che le proprie unità possono fare: se per la postura non c'è nessuna unità adatta si ripiega su una
+  // meno impegnativa (dimostrazione di forza → presenza → pattugliamento), altrimenti la zona lascia il posto alla successiva
+  const chosenStances: StanceCand[] = [];
+  for (const c of rankedStances) {
+    if (chosenStances.length >= p.maxStancesPerTurn) break;
+    const zone = i.geo.zones[c.zoneId]!;
+    const st = FALLBACK[c.stance].find((x) => candidates(live, zone, x, new Set(), i.geo.zones).length > 0);
+    if (!st) continue;
+    if (st !== c.stance) { c.text = `${c.text} (${STANCE_IT[st]}: nessuna unità adatta a ${STANCE_IT[c.stance]})`; c.stance = st; }
+    chosenStances.push(c);
+  }
   // le altre regole che chiedevano la stessa postura nella stessa zona: soddisfatte dalla scelta (intensità massima), citate nelle motivazioni
   const joined = chosenStances.flatMap((c) => {
     const same = stances.filter((x) => x !== c && x.zoneId === c.zoneId && x.stance === c.stance);
@@ -262,6 +287,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     if (n !== c.intensity) { c.intensity = n; c.text = c.text.replace(/intensità \d/, `intensità ${n}`); }
     return same.filter((x, j) => same.findIndex((y) => y.text === x.text) === j && x.text !== c.text);
   });
+  if (allyEscort && !chosenStances.includes(allyEscort)) reassureAlly();
   const rankedDiplo = oneEach(diplo, (c) => c.key);
   const chosenDiplo = rankedDiplo.slice(0, P.maxDiplomacy);
   // una lettera per destinatario (la ragione più forte), al massimo due: il tetto per fazione e per turno lo applica il motore
@@ -284,7 +310,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   // ogni decisione ha almeno una motivazione, anche quando non c'è niente da fare
   if (!rationale.length) rationale.push({ rule: 'routine', text: 'Nessuna azione: nessuna minaccia, crisi, obiettivo o accordo che chieda di agire' });
   const optionsConsidered = [
-    ...rankedStances.map((c, j) => ({ label: `${c.rule}: ${STANCE_IT[c.stance]} in ${c.zoneId}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.stance] ?? 0.2, chosen: j < p.maxStancesPerTurn })),
+    ...rankedStances.map((c) => ({ label: `${c.rule}: ${STANCE_IT[c.stance]} in ${c.zoneId}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.stance] ?? 0.2, chosen: chosenStances.includes(c) })),
     ...rankedDiplo.map((c, j) => ({ label: `${c.rule}: ${DIPLO_IT[c.kind]} a ${c.target}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.kind] ?? 0.2, chosen: j < P.maxDiplomacy })),
   ].slice(0, 8);
 
