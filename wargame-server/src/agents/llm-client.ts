@@ -5,7 +5,7 @@ export interface LlmRequest {
   system: string; user: string; schemaName: string; jsonSchema: Record<string, unknown>;
   /** input strutturati: ignorati dai modelli reali, usati dal MockLLMProvider */
   meta: Record<string, unknown>;
-  /** tiene maxLength nello schema inviato (lettere): i modelli locali si fermano prima; se il provider lo rifiuta si toglie */
+  /** tiene maxLength/maxProperties nello schema inviato (lettere, parser): i modelli locali si fermano prima; se il provider li rifiuta si tolgono */
   keepLengths?: boolean;
 }
 export interface LlmResponse { text: string; usage: { promptTokens: number; completionTokens: number }; latencyMs: number; model: string }
@@ -31,7 +31,9 @@ export function extractJson(text: string): unknown {
  * constraint minLength»). La risposta viene comunque validata con Zod, quindi i vincoli non si perdono.
  */
 // minItems/maxItems restano: fermano i modelli locali che ripetono gli elementi di una lista
-const UNSUPPORTED = new Set(['minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
+const UNSUPPORTED = new Set(['minLength', 'maxLength', 'maxProperties', 'pattern', 'format', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
+/** limiti di lunghezza tenuti con `keepLengths` (tolti insieme se il provider li rifiuta) */
+export const LENGTH_KEYS = ['maxLength', 'maxProperties'] as const;
 export function portableSchema(s: unknown, names = false, keep: readonly string[] = []): unknown {
   if (Array.isArray(s)) return s.map((x) => portableSchema(x, false, keep));
   if (!s || typeof s !== 'object') return s;
@@ -74,14 +76,14 @@ export class OpenAiCompatProvider implements LlmProvider {
           body: JSON.stringify({
             ...this.extra, model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
             messages: [{ role: 'system', content: req.system }, { role: 'user', content: req.user }],
-            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema, false, lengths ? ['maxLength'] : []), strict: false } },
+            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema, false, lengths ? LENGTH_KEYS : []), strict: false } },
           }),
         });
         if (!res.ok) {
           const body = (await res.text()).slice(0, 300);
           // 400 diretto o 502 di una combo che ha provato un provider incompatibile (es. Cohere: niente record/minLength)
-          if ((res.status === 400 || res.status === 502) && !plainJson && /response_format|json_schema|maxLength/i.test(body)) {
-            // prima si prova senza maxLength, poi (se ancora rifiutato) si passa a json_object
+          if ((res.status === 400 || res.status === 502) && !plainJson && /response_format|json_schema|maxLength|maxProperties/i.test(body)) {
+            // prima si prova senza maxLength/maxProperties, poi (se ancora rifiutato) si passa a json_object
             if (lengths) this.lengthsUnsupported.add(req.model); else this.jsonSchemaUnsupported.add(req.model);
             attempt--; continue;
           }

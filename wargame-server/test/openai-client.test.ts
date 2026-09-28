@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OpenAiCompatProvider, portableSchema } from '../src/agents/llm-client.js';
+import { LENGTH_KEYS, OpenAiCompatProvider, portableSchema } from '../src/agents/llm-client.js';
 import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import type { LlmRequest } from '../src/agents/llm-client.js';
 import { makeEngine } from './helpers.js';
@@ -93,5 +93,11 @@ describe('schema portabile per response_format', () => {
   it('per le lettere tiene maxLength (i modelli locali si fermano prima), toglie il resto', () => {
     const s = { type: 'object', properties: { subject: { type: 'string', minLength: 1, maxLength: 120 }, list: { type: 'array', items: { type: 'string', maxLength: 300 }, maxItems: 2 } } };
     expect(portableSchema(s, false, ['maxLength'])).toEqual({ type: 'object', properties: { subject: { type: 'string', maxLength: 120 }, list: { type: 'array', items: { type: 'string', maxLength: 300 }, maxItems: 2 } } });
+  });
+
+  it('maxProperties (munizioni di uno STRIKE nel parser) segue maxLength: solo con keepLengths', () => {
+    const s = { type: 'object', additionalProperties: { type: 'number' }, maxProperties: 3 };
+    expect(portableSchema(s)).toEqual({ type: 'object', additionalProperties: { type: 'number' } });
+    expect(portableSchema(s, false, LENGTH_KEYS)).toEqual(s);
   });
 });

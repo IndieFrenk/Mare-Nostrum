@@ -108,6 +108,82 @@ describe('posture per zona → ordini (traduttore deterministico)', () => {
   });
 });
 
+describe('posture per zona: unità nominate dal giocatore (prefer)', () => {
+  const patrolCS = [{ zoneId: 'CANALE_SICILIA', stance: 'patrol', intensity: 1 }] as const;
+
+  it('«Bergamini» + postura patrol nel Canale di Sicilia → PATROL con ITA-F590 (senza prefer: la nave più vicina)', () => {
+    const units = unitsOf('ITA');
+    expect(translateStances({ ...base, units, stances: [...patrolCS] }).orders).toEqual([{ id: 'stance-1', kind: 'PATROL', unitIds: ['ITA-F593'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' }]);
+    const r = translateStances({ ...base, units, stances: [...patrolCS], prefer: ['ITA-F590'] });
+    expect(r.orders).toEqual([{ id: 'stance-1', kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' }]);
+    expect(r.notes).toEqual([]);
+  });
+
+  it('«Cavour» + show_of_force intensità 2 nello Ionio → la Cavour c\'è e conta nell\'intensità', () => {
+    const stances = [{ zoneId: 'IONIO', stance: 'show_of_force', intensity: 2 }] as const;
+    expect(idsOf(translateStances({ ...base, units: unitsOf('ITA'), stances: [...stances] }).orders[0] as never)).not.toContain('ITA-CAVOUR');
+    const ids = idsOf(translateStances({ ...base, units: unitsOf('ITA'), stances: [...stances], prefer: ['ITA-CAVOUR'] }).orders[0] as never);
+    expect(ids[0]).toBe('ITA-CAVOUR');
+    expect(ids).toHaveLength(3);
+  });
+
+  it('il sottomarino nominato entra anche dove gli scaglioni (POOLS) non lo metterebbero, e anche se impegnato altrove', () => {
+    const units = unitsOf('ITA');
+    // presence: gli scaglioni non hanno sottomarini
+    const presence = translateStances({ ...base, units, stances: [{ zoneId: 'IONIO', stance: 'presence', intensity: 1 }], prefer: ['ITA-S526'] });
+    expect(presence.orders).toEqual([{ id: 'stance-1', kind: 'PRESENCE', unitIds: ['ITA-S526'], zoneId: 'IONIO', roe: 'WEAPONS_HOLD' }]);
+    // patrol intensità 1: senza prefer andrebbe una fregata
+    expect(idsOf(translateStances({ ...base, units, stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 1 }] }).orders[0] as never)).not.toContain('ITA-S526');
+    expect(idsOf(translateStances({ ...base, units, stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 1 }], prefer: ['ITA-S526'] }).orders[0] as never)).toEqual(['ITA-S526']);
+    // impegnata in un compito nel Mar Rosso (busyElsewhere): nominata, va lo stesso
+    Object.assign(units.find((u) => u.id === 'ITA-F595')!, { currentTask: { kind: 'PATROL', zoneId: 'MAR_ROSSO' } });
+    const busy = translateStances({ ...base, units, stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 3 }] });
+    expect(idsOf(busy.orders[0] as never)).not.toContain('ITA-F595');
+    expect(idsOf(translateStances({ ...base, units, stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 1 }], prefer: ['ITA-F595'] }).orders[0] as never)).toEqual(['ITA-F595']);
+  });
+
+  it('più posture: ogni unità nominata va in quella della zona più vicina; con una postura sola vanno tutte lì', () => {
+    const units = unitsOf('ITA');
+    const two = translateStances({ ...base, units, prefer: ['ITA-S526', 'ITA-F590'],
+      stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 1 }, { zoneId: 'TIRRENO', stance: 'patrol', intensity: 1 }] });
+    expect(two.orders.map((o) => [('zoneId' in o ? o.zoneId : null), idsOf(o as never)])).toEqual([['IONIO', ['ITA-S526']], ['TIRRENO', ['ITA-F590']]]);
+    // una postura sola, intensità 1, tre unità nominate: entrano tutte
+    const one = translateStances({ ...base, units, stances: [...patrolCS], prefer: ['ITA-F590', 'ITA-F591', 'ITA-F592'] });
+    expect(idsOf(one.orders[0] as never)).toEqual(['ITA-F590', 'ITA-F591', 'ITA-F592']);
+  });
+
+  it('un\'unità nominata non adatta non entra: danneggiata, prontezza bassa, nave in zona terrestre, budget', () => {
+    const units = unitsOf('ITA');
+    Object.assign(units.find((u) => u.id === 'ITA-F590')!, { status: 'damaged', damage: 30 } satisfies Partial<Unit>);
+    Object.assign(units.find((u) => u.id === 'ITA-F591')!, { readiness: 45 });
+    const r = translateStances({ ...base, units, stances: [...patrolCS], prefer: ['ITA-F590', 'ITA-F591'] });
+    expect(r.orders[0]).toEqual({ id: 'stance-1', kind: 'REPAIR', unitIds: ['ITA-F590'] });
+    expect(idsOf(r.orders[1] as never)).toEqual(['ITA-F593']);
+    expect(r.notes).toEqual(['unità nominata ITA-F590: danneggiata, va in riparazione', 'unità nominata ITA-F591: prontezza 45 sotto 50']);
+    const land = translateStances({ ...base, units: unitsOf('ITA'), stances: [{ zoneId: 'LIBIA_TERRA', stance: 'presence', intensity: 1 }], prefer: ['ITA-F592'] });
+    expect(land.orders.flatMap((o) => idsOf(o as never))).not.toContain('ITA-F592');
+    expect(land.notes).toContain('unità nominata ITA-F592: unità navale, LIBIA_TERRA è una zona terrestre');
+    const poor = translateStances({ ...base, budget: 1, units: unitsOf('ITA'), stances: [...patrolCS], prefer: ['ITA-F590'] }); // fregata 1,5 M€
+    expect(poor.orders.flatMap((o) => idsOf(o as never))).not.toContain('ITA-F590');
+    expect(poor.notes).toContain('unità nominata ITA-F590: budget insufficiente');
+  });
+
+  it('withdraw: prima le unità nominate fuori base, poi quelle schierate nella zona', () => {
+    const r = translateStances({ ...base, units: unitsOf('ITA'), stances: [{ zoneId: 'MAR_ROSSO', stance: 'withdraw', intensity: 1 }], prefer: ['ITA-P431'] });
+    expect(r.orders).toEqual([{ id: 'stance-1', kind: 'RETURN_TO_BASE', unitIds: ['ITA-P431', 'ITA-F595'] }]);
+  });
+
+  it('senza prefer (fazioni IA) il risultato non cambia', () => {
+    const units = unitsOf('ITA');
+    Object.assign(units.find((u) => u.id === 'ITA-F595')!, { currentTask: { kind: 'PATROL', zoneId: 'MAR_ROSSO' } });
+    const stances = [{ zoneId: 'EGEO', stance: 'show_of_force', intensity: 3 }, { zoneId: 'IONIO', stance: 'patrol', intensity: 2 }, { zoneId: 'MAR_ROSSO', stance: 'withdraw', intensity: 1 }, { zoneId: 'LIBIA_TERRA', stance: 'presence', intensity: 1 }] as const;
+    const without = translateStances({ ...base, units, stances: [...stances], exclude: ['ITA-F590'] });
+    expect(translateStances({ ...base, units, stances: [...stances], exclude: ['ITA-F590'], prefer: [] })).toEqual(without);
+    // nominata ma già in un ordine esplicito (exclude): nessun effetto
+    expect(translateStances({ ...base, units, stances: [...stances], exclude: ['ITA-F590'], prefer: ['ITA-F590'] })).toEqual(without);
+  });
+});
+
 describe('posture per zona in una decisione IA', () => {
   it('le posture diventano ordini validati, registrati con la loro origine ed eseguiti dal motore', async () => {
     const mock = new MockLLMProvider();

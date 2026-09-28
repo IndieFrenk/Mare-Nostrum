@@ -104,13 +104,16 @@ function parser(m: M) {
   const diplomacy: M[] = [];
   const zoneStances: M[] = [];
   const ambiguities: string[] = [];
-  const kind = /rientr/.test(text) ? 'RETURN_TO_BASE' : /mostr|dimostr/.test(text) ? 'SHOW_OF_FORCE' : /pattugl|scort/.test(text) ? 'PATROL' : 'PRESENCE';
-  if (units.length && zone) military.push(kind === 'RETURN_TO_BASE' ? { id: 'p1', kind, unitIds: units.map((u) => u.id) } : { id: 'p1', kind, unitIds: units.map((u) => u.id), zoneId: zone, roe: /fuoco libero|weapons free/.test(text) ? 'WEAPONS_FREE' : kind === 'PRESENCE' ? 'WEAPONS_HOLD' : 'WEAPONS_TIGHT' });
-  else if (units.length && kind === 'RETURN_TO_BASE') military.push({ id: 'p1', kind, unitIds: units.map((u) => u.id) });
-  // forze in una zona senza unità nominate: postura per zona (le unità le sceglie il motore)
-  else if (zone && /presenza|pattugl|dimostr/.test(text)) zoneStances.push({ zoneId: zone, stance: kind === 'SHOW_OF_FORCE' ? 'show_of_force' : kind === 'PATROL' ? 'patrol' : 'presence', intensity: /più|rafforz/.test(text) ? 2 : 1 });
+  const stance = /rientr/.test(text) ? 'withdraw' : /mostr|dimostr/.test(text) ? 'show_of_force' : /pattugl/.test(text) ? 'patrol' : /scort/.test(text) ? 'escort_shipping' : 'presence';
+  // lo stesso errore di qwen3.5 4B/9B: anche con le unità nominate («Bergamini [ITA-F590]») nessun ordine con il loro id, solo
+  // una postura nella zona (il motore mette per prime le unità nominate), e per il rientro alla base niente (JSON troncato:
+  // completa il motore). Senza unità nominate: postura se il testo chiede forze in una zona.
+  if (zone && stance !== 'withdraw' && (units.length || /presenza|pattugl|dimostr|scort/.test(text))) zoneStances.push({ zoneId: zone, stance, intensity: !units.length && /più|rafforz/.test(text) ? 2 : 1 });
   const dkind = /rassicur/.test(text) ? 'REASSURANCE' : /minacc/.test(text) ? 'THREAT' : /chied|sollecit|protest/.test(text) ? 'DEMARCHE' : null;
   if (dkind) for (const f of factions) diplomacy.push({ id: `d-${f}`, kind: dkind, target: f, message: 'Richiesta formale del Governo italiano.', visibility: 'public' });
+  // aiuti: le frasi diplomatiche i modelli locali le sbagliano di rado; per il cyber nessuna CYBER_OP (la completa il motore)
+  const amount = Number(/(\d+)\s*milion/.exec(text)?.[1] ?? 0);
+  if (/aiut/.test(text) && amount) for (const f of factions) diplomacy.push({ id: `a-${f}`, kind: 'AID', target: f, amount, type: /militar/.test(text) ? 'military' : 'economic' });
   if (!military.length && !zoneStances.length && !diplomacy.length) {
     if (!units.length) ambiguities.push('Nessuna unità riconosciuta nella direttiva.');
     if (!zone) ambiguities.push('Nessuna zona riconosciuta nella direttiva.');

@@ -166,7 +166,7 @@ if (wants('parser')) {
         const pr = parserPrompt(k, scenario, c.text);
         let verdict: Verdict = 'sbagliato'; let why: string[] = [];
         try {
-          const r = await p.complete({ role: 'order_parser', model, temperature: cfg.temperature, maxTokens: cfg.maxTokens, timeoutMs: 300_000, system: pr.system, user: pr.user, schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA,
+          const r = await p.complete({ role: 'order_parser', model, temperature: cfg.temperature, maxTokens: cfg.maxTokens, timeoutMs: 300_000, system: pr.system, user: pr.user, schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA, keepLengths: true,
             meta: { text: pr.recognition.text, original: c.text, legal: pr.legal, recognized: pr.recognition.hits } });
           const v = ParsedLenient.safeParse(extractJson(r.text));
           if (!v.success) why = [`schema: ${v.error.issues.slice(0, 2).map((i) => `${i.path.join('.')} ${i.message}`).join(' | ')}`];
@@ -174,6 +174,8 @@ if (wants('parser')) {
             const d = finishParsed({ state, scenario, factionId: player, knowledge: k, turnLength: campaign.turnLength, text: c.text,
               parsed: { ...v.data, ambiguities: [...v.data.ambiguities, ...nameAmbiguities(pr.recognition)], recognized: pr.recognition.hits } });
             ({ verdict, reasons: why } = scoreParsed(c, d));
+            // da dove vengono gli ordini con unità: postura del modello (unità nominate per prime) o completamento del motore
+            if (verdict === 'corretto') why = [[d.stanceOrders.some((x) => x.stance !== 'worn') ? 'via postura' : '', d.ambiguities.some((x) => x.startsWith('Ordine completato dal motore')) ? 'completato dal motore' : ''].filter(Boolean).join(' + ')].filter(Boolean);
           }
         } catch (e) { why = [`errore: ${(e as Error).message}`]; }
         st[verdict]++; st.secs += (Date.now() - t0) / 1000;

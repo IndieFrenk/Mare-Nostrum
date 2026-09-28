@@ -28,8 +28,8 @@
     "ISR": ["Israele", "israeliani"],
     "ALG": ["Algeria", "Algeri", "algerini"],
     "TUN": ["Tunisia", "Tunisi", "tunisini"],
-    "LBY_GNU": ["Libia", "libici", "Tripoli", "GNU", "governo di Tripoli"],
-    "LBY_LNA": ["Libia", "libici", "Haftar", "LNA", "Bengasi", "Cirenaica"],
+    "LBY_GNU": ["Libia", "libici", "Tripoli", "GNU", "governo di Tripoli", "Libia occidentale", "Tripolitania"],
+    "LBY_LNA": ["Libia", "libici", "Haftar", "LNA", "Bengasi", "Cirenaica", "Libia orientale"],
     "IRN": ["Iran", "Teheran", "iraniani"],
     "NATO": ["NATO", "Alleanza Atlantica"],
     "EU": ["UE", "Unione Europea", "Bruxelles"]

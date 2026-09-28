@@ -102,6 +102,7 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
     const t = translateStances({
       units: k.ownUnits, zones: i.scenario.world.zones, stances: d.zoneStances, turnLength: i.campaign.turnLength,
       exclude: d.orders.military.flatMap((o) => ('unitIds' in o ? o.unitIds : [])), budget: f.budget.discretionary - spent,
+      // niente `prefer`: le unità nominate valgono solo per la Console Ordini (così le decisioni IA e il replay non cambiano)
     });
     t.orders.forEach((o, j) => origins.set(o, t.origins[j]!));
     stanceNotes.set(d, t.notes);
