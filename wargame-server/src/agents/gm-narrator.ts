@@ -42,11 +42,21 @@ export async function writeNews(provider: LlmProvider, log: LlmCall[], c: Campai
   const items = events.filter((e) => ['RANDOM_EVENT', 'ENGAGEMENT_OPENED', 'STATEMENT', 'CRISIS_CHANGED', 'INFRA_STATUS', 'CYBER_EFFECT', 'SOF_RESULT'].includes(e.type)).slice(0, 25)
     .map((e) => ({ id: e.id, type: e.type, actor: e.actor, text: JSON.stringify(e.payload).slice(0, 300) }));
   if (!items.length) return [];
+  // come per gli ordini: una notizia con numeri inventati si scarta da sola, le altre restano (repair solo se non ne resta nessuna)
+  const texts = items.map((i) => i.text);
   const r = await callStructured(provider, log, { turn }, {
     role: 'gm_narrator', ...c.config.llm.gm_narrator,
     system: template('news', { outlets: Object.keys(OUTLETS).join(', ') }), user: JSON.stringify(items),
     schemaName: 'News', jsonSchema: z.toJSONSchema(NewsOut) as Record<string, unknown>, meta: { kind: 'news', events: items },
-  }, NewsOut, (o) => { const bad = numbersNotInFacts(JSON.stringify(o), items.map((i) => i.text + ' ' + i.id)); return bad.length ? [`numeri non presenti negli eventi: ${bad.join(', ')}`] : []; });
+  }, NewsOut, (o, warn) => {
+    const bad = o.news.map((n) => numbersNotInFacts(`${n.headline} ${n.body}`, texts));
+    const errs = o.news.flatMap((n, j) => (bad[j]!.length ? [`notizia «${n.headline.slice(0, 60)}»: numeri non presenti negli eventi: ${bad[j]!.join(', ')}`] : []));
+    const kept = o.news.filter((_, j) => !bad[j]!.length);
+    if (o.news.length && !kept.length) return errs;
+    errs.forEach(warn);
+    o.news = kept;
+    return [];
+  });
   return (r.value?.news ?? []).map((n, idx) => {
     const o = OUTLETS[n.outlet] ?? OUTLETS.ANSA;
     return { id: `N${turn}-${idx + 1}`, turn, outlet: OUTLETS[n.outlet] ? n.outlet : 'ANSA', outletFaction: o.faction, bias: o.bias, headline: n.headline, body: n.body, factsRef: n.eventIds };

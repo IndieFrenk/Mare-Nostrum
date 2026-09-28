@@ -8,10 +8,12 @@ import { listScenarios, loadScenario } from '../engine/scenario.js';
 import { GameError, type Engine } from '../engine/turn-machine.js';
 import { LockError } from '../store/json-store.js';
 import { layer } from './layers.js';
+import { mockStatus, type LlmStatusSource } from '../agents/llm-status.js';
+import { llmDefaults } from '../config.js';
 
-const STATUS: Record<string, number> = { NOT_FOUND: 404, WRONG_PHASE: 409, INVALID_ORDERS: 422, CAMPAIGN_LOCKED: 423, FORBIDDEN: 403, BAD_TURN: 400, CAMPAIGN_ENDED: 409, VALIDATION: 400 };
+const STATUS: Record<string, number> = { NOT_FOUND: 404, WRONG_PHASE: 409, INVALID_ORDERS: 422, CAMPAIGN_LOCKED: 423, FORBIDDEN: 403, BAD_TURN: 400, CAMPAIGN_ENDED: 409, VALIDATION: 400, LLM_UNREACHABLE: 503 };
 
-export function registerRoutes(app: FastifyInstance, engine: Engine) {
+export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmStatusSource = mockStatus()) {
   const store = engine.store;
   const bus = new EventEmitter().setMaxListeners(100);
   engine.onProgress = (id, msg) => bus.emit(id, msg);
@@ -32,10 +34,31 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
   };
   type Id = { Params: { id: string } };
 
+  /** modello per ruolo: quelli della campagna (cambiano in corsa con /config) o i predefiniti del server */
+  const modelsFor = async (campaignId?: string) => {
+    const cfg = campaignId ? (await store.getCampaign(campaignId)).config.llm : llmDefaults();
+    return Object.fromEntries(Object.entries(cfg).filter(([, v]) => v).map(([r, v]) => [r, v!.model]));
+  };
+  /**
+   * Prima di un'operazione che chiama i modelli: se non rispondono, 503 subito invece di un turno tutto in dottrina.
+   * Un «irraggiungibile» in cache si riprova subito (il giocatore può aver appena acceso il PC).
+   */
+  const requireLlm = async (campaignId?: string) => {
+    if (!llm.enforced) return;
+    const models = await modelsFor(campaignId);
+    let st = await llm.status(models);
+    if (!st.reachable && st.cached) st = await llm.status(models, true);
+    if (!st.reachable) throw new GameError('LLM_UNREACHABLE', `I modelli non rispondono: accendi il PC con Ollama (${st.baseUrl}${st.error ? ` — ${st.error}` : ''}). Per giocare lo stesso con gli ordini di dottrina avvia il server con WARGAME_ALLOW_OFFLINE=1.`, st);
+  };
+
+  /** Stato dei modelli (cache 30 s; ?fresh=1 riprova subito): raggiungibili, modello per ruolo, modelli mancanti, latenza. */
+  app.get<{ Querystring: { campaignId?: string; fresh?: string } }>(`${P}/llm/status`, async (req) => llm.status(await modelsFor(req.query.campaignId), req.query.fresh === '1'));
+
   app.get(`${P}/scenarios`, async () => listScenarios());
   app.get(`${P}/campaigns`, async () => store.listCampaigns());
   app.post<{ Body: unknown }>(`${P}/campaigns`, async (req) => {
     const b = z.object({ scenarioId: z.string().default('med-2026'), name: z.string().min(1), seed: z.string().optional(), turnLength: z.enum(['week', 'month']).optional(), debugGodView: z.boolean().optional(), cmoOnRequest: z.boolean().optional() }).parse(req.body);
+    await requireLlm(); // la creazione gioca già il primo briefing
     return engine.createCampaign({ ...b, config: { debugGodView: b.debugGodView ?? false, cmoOnRequest: b.cmoOnRequest ?? false } });
   });
   app.get<Id>(`${P}/campaigns/:id`, async (req) => store.getCampaign(req.params.id));
@@ -72,7 +95,11 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
     const budget = s.factions[c.playerFaction].budget.discretionary;
     return { budget, items: loadScenario(c.scenarioId).catalog.items.map((i) => ({ ...i, available: i.leadTimeTurns !== null && i.cost <= budget })), bases: Object.values(s.bases).filter((b) => b.factionId === c.playerFaction).map((b) => ({ id: b.id, name: b.name })), deliveries: s.pendingDeliveries.filter((d) => d.factionId === c.playerFaction) };
   });
-  app.post<Id & { Body: { text: string } }>(`${P}/campaigns/:id/orders/parse`, async (req) => engine.parseOrders(req.params.id, z.object({ text: z.string().min(1) }).parse(req.body).text));
+  app.post<Id & { Body: { text: string } }>(`${P}/campaigns/:id/orders/parse`, async (req) => {
+    const { text } = z.object({ text: z.string().min(1) }).parse(req.body);
+    await requireLlm(req.params.id);
+    return engine.parseOrders(req.params.id, text);
+  });
   /** Lettere visibili al giocatore (sue, a lui, pubbliche): tutti i turni, o solo `turn`. */
   app.get<Id & { Querystring: { turn?: string } }>(`${P}/campaigns/:id/letters`, async (req) => {
     const c = await store.getCampaign(req.params.id);
@@ -80,13 +107,18 @@ export function registerRoutes(app: FastifyInstance, engine: Engine) {
     return (await Promise.all(turns.map((t) => store.getLetters(c.id, t)))).flat().filter((l) => letterVisibleTo(l, c.playerFaction));
   });
   /** Bozza scritta dall'LLM a nome dell'Italia: il giocatore la rivede e la manda come ordine LETTER. Non cambia lo stato. */
-  app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/letters/draft`, async (req) => engine.draftLetter(req.params.id, z.object({
-    target: z.string(), gist: z.string().min(1).max(LETTER_LIMITS.gist), tone: LetterTone, inReplyTo: z.string().optional(),
-  }).parse(req.body)));
+  app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/letters/draft`, async (req) => {
+    const b = z.object({ target: z.string(), gist: z.string().min(1).max(LETTER_LIMITS.gist), tone: LetterTone, inReplyTo: z.string().optional() }).parse(req.body);
+    await requireLlm(req.params.id);
+    return engine.draftLetter(req.params.id, b);
+  });
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders/validate`, async (req) => engine.validate(req.params.id, OrdersBody.parse(req.body)));
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/orders`, async (req) => engine.submitOrders(req.params.id, OrdersBody.parse(req.body)));
   app.post<Id>(`${P}/campaigns/:id/advance`, async (req) => {
-    try { return await engine.advance(req.params.id); } catch (e) { bus.emit(req.params.id, { error: (e as Error).message }); throw e; }
+    try {
+      await requireLlm(req.params.id);
+      return await engine.advance(req.params.id);
+    } catch (e) { bus.emit(req.params.id, { error: (e as Error).message }); throw e; }
   });
   app.post<Id & { Body: unknown }>(`${P}/campaigns/:id/config`, async (req) => engine.configure(req.params.id, z.object({
     turnLength: z.enum(['week', 'month']).optional(), cmoOnRequest: z.boolean().optional(), debugGodView: z.boolean().optional(),

@@ -1,5 +1,6 @@
 import type { Order, Stance, Unit, UnitType, Zone, ZoneStance } from '../schemas/index.js';
 import { distanceKm } from './geo.js';
+import { taskZone } from './movement.js';
 import { PARAMS } from './params.js';
 
 /**
@@ -36,17 +37,22 @@ export interface StanceOrigin { stance: Stance | 'worn'; zoneId: string | null }
 export interface StanceResult { orders: Order[]; origins: StanceOrigin[]; notes: string[] }
 
 const byId = (a: Unit, b: Unit) => a.id.localeCompare(b.id);
-/** unità schierate ma impegnate altrove: non si distolgono (lo può fare solo un ordine esplicito) */
-const busyElsewhere = (u: Unit, zoneId: string) => u.status === 'deployed' && !!u.currentTask && u.zoneId !== zoneId;
+const out = (u: Unit) => u.status === 'deployed' || u.status === 'transit';
+/** zona del compito in corso di un'unità schierata o in transito (null: nessun compito di zona) */
+const taskZoneOf = (u: Unit, zones: Record<string, Zone>) => (out(u) ? taskZone({ zones, units: {}, infrastructure: {} }, u.currentTask) ?? (u.currentTask ? u.zoneId : null) : null);
+/** unità fuori base impegnate in un'altra zona (anche se ancora in viaggio): non si distolgono (lo può fare solo un ordine esplicito) */
+const busyElsewhere = (u: Unit, zone: Zone, zones: Record<string, Zone>) => { const tz = taskZoneOf(u, zones); return tz !== null && tz !== zone.id; };
+/** l'unità è già nella zona (anche in base) o ci sta andando per un compito: prima scelta, e la postura la conferma */
+const inZone = (u: Unit, zone: Zone, zones: Record<string, Zone>) => u.zoneId === zone.id || taskZoneOf(u, zones) === zone.id;
 
 /** Unità candidate per una postura in una zona, nell'ordine in cui il motore le sceglie. */
-export function candidates(units: Unit[], zone: Zone, stance: Exclude<Stance, 'withdraw'>, used: Set<string>): Unit[] {
+export function candidates(units: Unit[], zone: Zone, stance: Exclude<Stance, 'withdraw'>, used: Set<string>, zones: Record<string, Zone> = { [zone.id]: zone }): Unit[] {
   const tiers = POOLS[stance][zone.terrain === 'land' ? 'land' : 'sea'];
   if (!tiers) return [];
-  const ok = (u: Unit) => !used.has(u.id) && (u.status === 'ready' || u.status === 'deployed') && u.readiness >= PARAMS.stances.minReadiness && !busyElsewhere(u, zone.id)
+  const ok = (u: Unit) => !used.has(u.id) && (u.status === 'ready' || out(u)) && u.readiness >= PARAMS.stances.minReadiness && !busyElsewhere(u, zone, zones)
     // le navi non vanno nelle zone terrestri (stessa regola del validatore)
     && !(zone.terrain === 'land' && (u.domain === 'sea' || u.domain === 'subsurface'));
-  const rank = (u: Unit) => [u.zoneId === zone.id ? 0 : 1, Math.round(distanceKm(u.location, zone.center))] as const;
+  const rank = (u: Unit) => [inZone(u, zone, zones) ? 0 : 1, Math.round(distanceKm(u.location, zone.center))] as const;
   return tiers.flatMap((types) => units.filter((u) => types.includes(u.type) && ok(u)).sort((a, b) => {
     const [ra, rb] = [rank(a), rank(b)];
     return ra[0] - rb[0] || ra[1] - rb[1] || byId(a, b);
@@ -75,16 +81,16 @@ export function translateStances(i: StanceInput): StanceResult {
     const label = `postura ${st.stance} in ${st.zoneId}`;
     if (!zone) { notes.push(`${label}: zona sconosciuta`); continue; }
     if (st.stance === 'withdraw') {
-      const out = units.filter((u) => !used.has(u.id) && u.zoneId === zone.id && (u.status === 'deployed' || u.status === 'transit'));
-      if (!out.length) { notes.push(`${label}: nessuna unità schierata da ritirare`); continue; }
-      push({ id: '', kind: 'RETURN_TO_BASE', unitIds: out.map((u) => u.id) }, { stance: 'withdraw', zoneId: zone.id });
-      out.forEach((u) => used.add(u.id));
+      const back = units.filter((u) => !used.has(u.id) && out(u) && inZone(u, zone, i.zones));
+      if (!back.length) { notes.push(`${label}: nessuna unità schierata da ritirare`); continue; }
+      push({ id: '', kind: 'RETURN_TO_BASE', unitIds: back.map((u) => u.id) }, { stance: 'withdraw', zoneId: zone.id });
+      back.forEach((u) => used.add(u.id));
       continue;
     }
     if (!POOLS[st.stance][zone.terrain === 'land' ? 'land' : 'sea']) { notes.push(`${label}: postura possibile solo in zone di mare`); continue; }
     const want = PARAMS.stances.unitsByIntensity[Math.max(1, Math.min(3, Math.round(st.intensity)))]!;
     const picked: Unit[] = []; let tooExpensive = 0;
-    for (const u of candidates(units, zone, st.stance, used)) {
+    for (const u of candidates(units, zone, st.stance, used, i.zones)) {
       if (picked.length >= want) break;
       // solo le unità che partono dalla base costano (stessa regola del validatore)
       const cost = u.status === 'ready' ? u.opCostPerTurn * mult : 0;
@@ -107,7 +113,7 @@ export function translateStances(i: StanceInput): StanceResult {
 export function stanceForces(units: Unit[], zones: Record<string, Zone>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const z of Object.values(zones).filter((x) => x.terrain !== 'land').sort((a, b) => a.id.localeCompare(b.id))) {
-    const n = new Set((['patrol', 'show_of_force', 'air_defense'] as const).flatMap((s) => candidates(units, z, s, new Set()).map((u) => u.id))).size;
+    const n = new Set((['patrol', 'show_of_force', 'air_defense'] as const).flatMap((s) => candidates(units, z, s, new Set(), zones).map((u) => u.id))).size;
     if (n) out[z.id] = n;
   }
   return out;

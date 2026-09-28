@@ -113,6 +113,8 @@ export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   /** lettere scritte nel turno (risposte e iniziative): il testo è negli ordini (azioni LETTER), qui l'esito della scrittura */
   letters: z.array(z.object({
     actionId: z.string(), to: FactionId, kind: z.enum(['reply', 'initiative']), inReplyTo: z.string().optional(),
+    /** iniziativa innescata dal motore (minaccia, blocco, sanzione, ingaggio, tensione, accordo) invece che da letterIntents */
+    trigger: z.enum(['threat', 'blockade', 'sanction', 'engagement', 'tension', 'agreement']).optional(),
     source: z.enum(['ai', 'template']), model: z.string(), errors: z.array(z.string()),
   })).default([]),
 });

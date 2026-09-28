@@ -1,4 +1,4 @@
-import type { Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
+import type { LlmStatus, Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
 
 export interface UiState {
   campaignId: string | null;
@@ -33,6 +33,10 @@ export interface UiState {
   /** operazione in corso sul server (es. un turno con gli agenti LLM), anche partita prima di ricaricare la pagina */
   running: { op: string; since: number } | null;
   error: string | null;
+  /** stato dei modelli (pallino nella barra in alto), aggiornato ogni 60 s e prima di ▶ */
+  llm: LlmStatus | null;
+  /** esito dell'ultima «Interpreta»: nomi riconosciuti e ordini nati dalle posture */
+  parseNote: string | null;
 }
 
 export const emptyDraft = (): OrdersBody => ({ military: [], diplomacy: [], procurement: [], statements: [] });
@@ -42,7 +46,7 @@ const listeners = new Set<Listener>();
 
 export const state: UiState = {
   campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [], letters: [], lettersSeen: [],
-  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null,
+  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null, llm: null, parseNote: null,
 };
 
 export function set(patch: Partial<UiState>) {

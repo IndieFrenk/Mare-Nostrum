@@ -21,6 +21,11 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-spacer { flex: 1; }
 .wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
 .wg-len { font-size: 11px; margin-right: 6px; }
+/* stato dei modelli: verde = rispondono, giallo = rispondono ma manca un modello o sono lenti, rosso = irraggiungibili */
+.wg-llm { display: flex; align-items: center; gap: 5px; margin-right: 6px; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 12px; padding: 3px 8px; color: var(--dim); cursor: help; }
+.wg-llm i { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); box-shadow: 0 0 4px currentColor; }
+.wg-llm.ok i { background: var(--ok); color: var(--ok); } .wg-llm.warn i { background: var(--warn); color: var(--warn); } .wg-llm.down i { background: var(--err); color: var(--err); }
+.wg-llm.down { border-color: var(--err); color: var(--err); }
 .wg-play { width: 44px; height: 40px; font-size: 20px; background: linear-gradient(#e2c472, #a8853a); color: #1a1408; border: 2px solid #f0d890; border-radius: 50%; }
 
 /* menu sinistro a icone */

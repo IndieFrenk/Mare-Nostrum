@@ -1,7 +1,8 @@
 // Partita automatica attraverso l'API HTTP, come farebbe la UI: N turni con ordini del giocatore (pattuglie, diplomazia,
 // acquisti, dichiarazioni, una lettera ogni 2 turni a TUR/LBY_GNU/EGY), ingaggi CMO risolti in automatico, controlli di coerenza
-// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA, lettere-modello; ordini IA
-// alle unità, quanti dalle posture per zona, ingaggi del turno).
+// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA e quante dagli inneschi del motore,
+// lettere-modello; ordini IA
+// alle unità, quanti dalle posture per zona, ingaggi del turno; unità IA impegnate in un compito; posture emesse/tradotte/senza unità).
 // Uso: npm run playtest -- --turns 10 [--base http://127.0.0.1:8787] [--name playtest] [--minor-every 2 --reflect-every 3]
 // Report: stampa a video e JSON in <WARGAME_DATA_DIR>/../playtest/<id>.json
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -121,12 +122,22 @@ while (c.currentTurn <= target && c.status === 'active') {
   const byKind: Record<string, number> = {};
   for (const o of unitOrders) byKind[o.kind] = (byKind[o.kind] ?? 0) + 1;
   const engagements = (pm.events as J[]).filter((e) => e.type === 'ENGAGEMENT_OPENED' && e.turn === t).length;
+  // posture: emesse dalle decisioni, tradotte in almeno un ordine, senza unità (note del traduttore in validation.errors)
+  const stanceNotes = decisions.flatMap((d) => (d.validation.errors as string[]).filter((x) => x.startsWith('postura — ')));
+  const stances = {
+    emitted: decisions.reduce((n, d) => n + ((d.zoneStances ?? []) as J[]).length, 0),
+    translated: decisions.reduce((n, d) => n + new Set(((d.stanceOrders ?? []) as J[]).filter((x) => x.stance !== 'worn').map((x) => `${x.stance}@${x.zoneId}`)).size, 0),
+    noUnits: stanceNotes.filter((x) => x.includes('nessuna unità')).length,
+  };
   const done = await call('GET', `/campaigns/${c.id}/narrative/${t}`);
   if (!done.debriefing) problem(t, 'debriefing mancante');
   const fallbackNarr = [done.briefing, done.debriefing].filter((x) => x && x.sections.every((s: J) => /Nessuna variazione rilevante|^$/.test(s.body) || x.factsRef.length === 0)).length;
   const events = await call('GET', `/campaigns/${c.id}/events?turn=${t}`);
   const s = pm.state as J;
   const ita = s.factions.ITA;
+  // unità IA fuori base con un compito in corso (continuano il compito del turno prima finché non rientrano o sono logorate)
+  const aiIds = new Set(Object.values(s.factions as Record<string, J>).filter((f) => f.controller === 'ai').map((f) => f.id));
+  const busyUnits = Object.values(s.units as Record<string, J>).filter((u) => aiIds.has(u.factionId) && ['deployed', 'transit'].includes(u.status) && u.currentTask).length;
   if (ita.budget.discretionary < 0) problem(t, `FOED negativo: ${ita.budget.discretionary}`);
   for (const [id, cr] of Object.entries(s.crises as Record<string, J>)) if (cr.escalation < 0 || cr.escalation > 10) problem(t, `crisi ${id} fuori scala: ${cr.escalation}`);
   const rejected = (pm.events as J[]).filter((e) => e.type === 'ORDER_REJECTED').length;
@@ -139,29 +150,32 @@ while (c.currentTurn <= target && c.status === 'active') {
   const aiLetters = decisions.flatMap((d) => (d.letters ?? []) as J[]);
   const letterRow = {
     sent: letters.filter((l) => l.from === 'ITA').map((l) => `${l.to}: ${l.subject}`), received: letters.filter((l) => l.to === 'ITA').map((l) => `${l.from}${l.inReplyTo ? ' (risposta)' : ''}: ${l.subject}`),
-    replies: replies.map((r) => `${r.to}: ${r.reply ? 'sì' : 'no'}`), aiInitiative: aiLetters.filter((l) => l.kind === 'initiative').length, aiReplies: aiLetters.filter((l) => l.kind === 'reply').length,
+    replies: replies.map((r) => `${r.to}: ${r.reply ? 'sì' : 'no'}`), aiInitiative: aiLetters.filter((l) => l.kind === 'initiative').length, aiTriggered: aiLetters.filter((l) => l.trigger).length, aiReplies: aiLetters.filter((l) => l.kind === 'reply').length,
     template: aiLetters.filter((l) => l.source === 'template').map((l) => `${l.actionId}: ${(l.errors as string[]).join('; ').slice(0, 120)}`),
   };
   const row = {
     turn: t, minutes: +((Date.now() - tt) / 60_000).toFixed(1), decisions: decisions.length, firstTry, repaired, fallback: fallback.length, doctrine, byModel, fallbackDetail: fallback,
     aiOrders: orderCount, rejectedOrders: rejected, cmo,
     unitOrders: { total: unitOrders.length, perFaction: +(unitOrders.length / Math.max(1, decisions.length)).toFixed(2), fromStances: stanceOrders.filter((x) => x.stance !== 'worn').length, worn: stanceOrders.filter((x) => x.stance === 'worn').length, byKind },
-    engagements, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
+    engagements, busyUnits, stances, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
     letters: letterRow,
     foed: ita.budget.discretionary, stability: ita.stability, crises: Object.fromEntries(Object.entries(s.crises as Record<string, J>).map(([id, cr]) => [id, cr.escalation])),
   };
   turns.push(row);
   console.log(`  ${row.minutes} min · decisioni IA ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
   console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
+  console.log(`  unità IA impegnate ${busyUnits} · posture emesse ${stances.emitted} / tradotte ${stances.translated} / senza unità ${stances.noUnits}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
-  console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} · lettere-modello ${letterRow.template.length}`);
+  console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} (dagli inneschi del motore ${letterRow.aiTriggered}) · lettere-modello ${letterRow.template.length}`);
   for (const x of [...letterRow.sent.map((l) => `→ ${l}`), ...letterRow.received.map((l) => `← ${l}`)]) console.log(`    ✉ ${x}`);
   if (letterRow.template.length) console.log(`  lettere-modello: ${letterRow.template.join(' | ')}`);
 }
 const unitAvg = turns.reduce((a, r) => a + r.unitOrders.perFaction, 0) / Math.max(1, turns.length);
+const fromT2 = turns.filter((r) => r.turn >= 2);
+const initiativeAvg = fromT2.reduce((a, r) => a + r.letters.aiInitiative, 0) / Math.max(1, fromT2.length);
 const report = { campaign: c.id, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), cadence: c.config.agentCadence, turns, problems,
-  unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0) };
+  unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0), aiInitiativesPerTurnFromT2: +initiativeAvg.toFixed(2) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(report, null, 1));
-console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements}\nreport ${out}`);
+console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}\nreport ${out}`);

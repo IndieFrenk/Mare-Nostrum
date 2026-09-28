@@ -1,6 +1,8 @@
 import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
 
 export type * from '../../wargame-server/src/schemas/index';
+export type { LlmStatus } from '../../wargame-server/src/agents/llm-status';
+import type { LlmStatus } from '../../wargame-server/src/agents/llm-status';
 
 const BASE = `${import.meta.env.VITE_WARGAME_API ?? 'http://127.0.0.1:8787'}/api/wg`;
 
@@ -19,6 +21,8 @@ export interface CatalogView { budget: number; items: (CatalogItem & { available
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
 export interface Postmortem { turn: number; decisions: AgentDecision[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
 export type FC = GeoJSON.FeatureCollection;
+/** bozza di «Interpreta»: ordini, avvisi, nomi riconosciuti e ordini nati dalle posture per zona */
+export interface ParsedDraft { orders: OrdersBody; ambiguities: string[]; validation: Validation; recognized: { alias: string; id: string; kind: string }[]; stanceOrders: { orderId: string; stance: string; zoneId: string | null }[] }
 export interface LetterDraft { target: string; inReplyTo?: string; subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
 
 const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
@@ -34,7 +38,8 @@ export const api = {
   ledger: (id: string) => req<LedgerEntry[]>('GET', `${c(id)}/ledger`),
   catalog: (id: string) => req<CatalogView>('GET', `${c(id)}/catalog`),
   events: (id: string, turn: number) => req<GameEvent[]>('GET', `${c(id)}/events?turn=${turn}`),
-  parse: (id: string, text: string) => req<{ orders: OrdersBody; ambiguities: string[]; validation: Validation }>('POST', `${c(id)}/orders/parse`, { text }),
+  parse: (id: string, text: string) => req<ParsedDraft>('POST', `${c(id)}/orders/parse`, { text }),
+  llmStatus: (campaignId?: string | null, fresh = false) => req<LlmStatus>('GET', `/llm/status?${new URLSearchParams({ ...(campaignId ? { campaignId } : {}), ...(fresh ? { fresh: '1' } : {}) })}`),
   validate: (id: string, o: OrdersBody) => req<Validation>('POST', `${c(id)}/orders/validate`, o),
   submit: (id: string, o: OrdersBody) => req<{ validation: Validation }>('POST', `${c(id)}/orders`, o),
   letters: (id: string, turn?: number) => req<DiploLetter[]>('GET', `${c(id)}/letters${turn === undefined ? '' : `?turn=${turn}`}`),

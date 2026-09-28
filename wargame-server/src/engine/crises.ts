@@ -1,3 +1,4 @@
+import type { GameEvent } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { evaluate } from './conditions.js';
 import { PARAMS } from './params.js';
@@ -21,21 +22,44 @@ export function deescalateByAgreement(ctx: TurnCtx, ag: { id: string; type: stri
   }
 }
 
-export function evolveCrises(ctx: TurnCtx) {
+/** Azioni distensive (RELATION_CHANGED con detente) del turno precedente tra due fazioni coinvolte nella crisi. */
+export function detenteActions(prevEvents: GameEvent[], involved: string[]) {
+  return prevEvents.filter((e) => e.type === 'RELATION_CHANGED' && (e.payload as { detente?: boolean }).detente
+    && involved.includes(String(e.payload.a)) && involved.includes(String(e.payload.b))).length;
+}
+
+/** Probabilità di raffreddamento di una crisi: base se il turno prima è stato quieto (× (1 + calma)) più il bonus delle azioni distensive. */
+export function crisisCoolChance(quiet: boolean, calmness: number, detente: number) {
+  const base = quiet ? PARAMS.crisisCoolChance * (1 + calmness) : 0;
+  return Math.min(0.9, base + PARAMS.detenteCoolBonus * Math.min(detente, PARAMS.detenteMaxActions));
+}
+
+/** `prevEvents`: eventi del turno precedente (azioni distensive tra le parti di ogni crisi). */
+export function evolveCrises(ctx: TurnCtx, prevEvents: GameEvent[] = []) {
   for (const c of Object.values(ctx.state.crises)) {
     if (c.status === 'resolved' || c.status === 'frozen') continue;
     const r = ctx.rng.roll(`deriva crisi ${c.id}`, '2d6');
     if (r.total >= PARAMS.crisisDriftUp) ctx.escalate(c.id, 1, 'deriva: deterioramento spontaneo');
     else if (r.total <= PARAMS.crisisDriftDown) ctx.escalate(c.id, -1, 'deriva: raffreddamento');
-    // senza nuovi incidenti nel turno precedente la crisi tende a calmarsi, tanto più se le parti non sono in tensione
+    // senza nuovi incidenti nel turno precedente la crisi tende a calmarsi, tanto più se le parti non sono in tensione;
+    // la diplomazia tra le parti (azioni distensive del turno prima) aumenta la probabilità anche dopo un turno agitato
     const quiet = !c.history.some((h) => h.turn === ctx.turn - 1 && h.delta > 0);
-    if (quiet && c.escalation > 0 && ctx.rng.chance(`raffreddamento ${c.id}`, Math.min(0.9, PARAMS.crisisCoolChance * (1 + calm(ctx, c.involved)))).ok) {
-      ctx.escalate(c.id, -1, 'nessun nuovo incidente: raffreddamento');
+    const detente = detenteActions(prevEvents, c.involved);
+    const p = crisisCoolChance(quiet, calm(ctx, c.involved), detente);
+    if (c.escalation > 0 && p > 0 && ctx.rng.chance(`raffreddamento ${c.id}`, p).ok) {
+      ctx.escalate(c.id, -1, detente ? `diplomazia tra le parti (${detente} azioni distensive): raffreddamento` : 'nessun nuovo incidente: raffreddamento');
     }
   }
   const table = ctx.scenario.events;
   const touched = new Set<string>();
-  const escalateOnce = (id: string, delta: number, cause: string) => { if (!touched.has(id)) { touched.add(id); ctx.escalate(id, delta, cause); } };
+  const escalateOnce = (id: string, delta: number, cause: string) => {
+    const c = ctx.state.crises[id];
+    if (!c || touched.has(id)) return;
+    touched.add(id);
+    // saturazione: una crisi già grave non sale per ogni incidente (PARAMS.randomEventSaturation)
+    if (delta > 0 && !ctx.rng.chance(`effetto su ${id}: ${cause}`, Math.max(0, 1 - c.escalation / PARAMS.randomEventSaturation)).ok) return;
+    ctx.escalate(id, delta, cause);
+  };
   for (const z of Object.values(ctx.state.zones)) {
     const rows = table.filter((e) => e.zones.includes(z.id) && e.minTension <= z.tension);
     if (!rows.length || !ctx.rng.chance(`evento casuale in ${z.id}`, PARAMS.randomEventChance * (0.5 + z.tension / 100)).ok) continue;

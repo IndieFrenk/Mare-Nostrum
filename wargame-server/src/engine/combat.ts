@@ -26,7 +26,7 @@ export function openEngagement(ctx: TurnCtx, zoneId: string, sides: Engagement['
   if (eng.resolution === 'cmo') eng.cmoPackage = buildCmoPackage(ctx, eng, opts.objective);
   ctx.emit('ENGAGEMENT_OPENED', sides[0].factionId, { engagement: eng }, { targets: sides.map((s) => s.factionId), causedBy: opts.orderId ? { orderId: opts.orderId } : null });
   for (let i = 0; i < sides.length; i++) for (let j = i + 1; j < sides.length; j++) ctx.relate(sides[i].factionId, sides[j].factionId, -10, 15, `scontro in ${zoneId}`, { incident: true });
-  for (const c of Object.values(ctx.state.crises).filter((c) => c.zoneIds.includes(zoneId))) ctx.escalate(c.id, major ? 2 : 1, `ingaggio ${eng.id}`);
+  for (const c of Object.values(ctx.state.crises).filter((c) => c.zoneIds.includes(zoneId))) ctx.escalate(c.id, major ? 2 : 1, `ingaggio ${eng.id}`, { byOrders: true });
   if (eng.resolution === 'auto') resolveSalvo(ctx, eng.id, 0);
   return ctx.state.engagements[eng.id];
 }

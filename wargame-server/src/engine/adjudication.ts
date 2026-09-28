@@ -62,7 +62,7 @@ function posture(ctx: TurnCtx, f: string, m: Order) {
       if (m.kind === 'SHOW_OF_FORCE') { ctx.emit('FACTION_CHANGED', f, { factionId: f, delta: { credibility: 1 } }); present.forEach((o) => ctx.relate(f, o, -2, 5, `dimostrazione di forza in ${m.zoneId}`, { propagate: false })); }
       if (m.kind === 'BLOCKADE' || m.kind === 'EXCLUSION_ZONE') {
         present.forEach((o) => ctx.relate(f, o, -5, 10, `${m.kind} in ${m.zoneId}`));
-        Object.values(s.crises).filter((c) => c.zoneIds.includes(m.zoneId)).forEach((c) => ctx.escalate(c.id, 1, `${m.kind} di ${f}`));
+        Object.values(s.crises).filter((c) => c.zoneIds.includes(m.zoneId)).forEach((c) => ctx.escalate(c.id, 1, `${m.kind} di ${f}`, { byOrders: true }));
       }
       if (m.kind === 'EVACUATION') ctx.emit('FACTION_CHANGED', f, { factionId: f, delta: { credibility: 2 } }, { causedBy: { orderId: m.id } });
     }
@@ -85,7 +85,7 @@ function action(ctx: TurnCtx, f: string, m: Order) {
     }
     ctx.spend(f, -(PARAMS.sortieCost.STRIKE + Object.entries(m.munitions).reduce((a, [k, q]) => a + (ctx.catalog.munitions[k]?.cost ?? 1) * q, 0)), 'operations', m.id, `Strike su ${m.targetRef}`);
     if (victim) ctx.relate(f, victim, -25, 25, `strike su ${m.targetRef}`, { incident: true });
-    Object.values(s.crises).filter((c) => c.zoneIds.includes(zoneId)).forEach((c) => ctx.escalate(c.id, 2, `strike di ${f} su ${m.targetRef}`));
+    Object.values(s.crises).filter((c) => c.zoneIds.includes(zoneId)).forEach((c) => ctx.escalate(c.id, 2, `strike di ${f} su ${m.targetRef}`, { byOrders: true }));
     const player = ctx.campaign.playerFaction;
     const defenders = Object.values(s.units).filter((u) => u.factionId === victim && u.zoneId === zoneId && u.status !== 'destroyed').map((u) => u.id);
     if ((f === player || victim === player) && victim && (n >= ctx.campaign.config.cmoThreshold.missileSalvo || unit || ctx.campaign.config.cmoOnRequest)) {

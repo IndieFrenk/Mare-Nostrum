@@ -24,7 +24,7 @@ export function applyEnergy(ctx: TurnCtx) {
     ttfEurMwh: Math.round(35 + lost * PARAMS.energy.ttfPerLostShare + red),
     medShippingRisk: Math.min(100, Math.round(20 + red * 6 + chokes * 15)),
     brentUsd: Math.round(72 + red * 1.5 + chokes * 6),
-    migrationPressure: Math.min(100, Math.round(20 + (ctx.state.crises.SAHEL_MIG?.escalation ?? 0) * 8)),
+    migrationPressure: migrationTarget(ctx),
   };
   const delta = Object.fromEntries(Object.entries(target).map(([k, v]) => [k, Math.round((v - g[k as keyof typeof g]) / 2)]).filter(([, v]) => v !== 0));
   if (Object.keys(delta).length) ctx.emit('INDICATORS_CHANGED', 'world', { delta });
@@ -32,4 +32,11 @@ export function applyEnergy(ctx: TurnCtx) {
     ctx.emit('FACTION_CHANGED', 'world', { factionId: 'ITA', delta: { stability: -Math.round(lost * PARAMS.energy.stabilityPerLostShare) } }, { visibility: ['ITA'] });
     ctx.spend('ITA', -Math.round(lost * PARAMS.energy.penaltyPerLostShare), 'penalty', 'energy', `Approvvigionamento energetico ridotto (${Math.round(lost * 100)}% dei flussi)`);
   }
+}
+
+/** Bersaglio della pressione migratoria (PARAMS.migration): cresce con la crisi SAHEL_MIG, scende con gli accordi migratori attivi. */
+export function migrationTarget(ctx: TurnCtx) {
+  const m = PARAMS.migration;
+  const agreements = Object.values(ctx.state.agreements).filter((a) => a.status === 'active' && a.type === 'migration').length;
+  return Math.max(0, Math.min(100, Math.round(m.base + (ctx.state.crises.SAHEL_MIG?.escalation ?? 0) * m.perLevel - agreements * m.perAgreement)));
 }

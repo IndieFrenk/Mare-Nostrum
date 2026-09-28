@@ -96,17 +96,26 @@ function news(m: M) {
 function parser(m: M) {
   const text = String(m.text).toLowerCase();
   const legal = m.legal as M;
+  // il testo arriva con gli id già risolti tra parentesi quadre («Bergamini [ITA-F590]»)
   const units = (legal.units as M[]).filter((u) => text.includes(u.id.toLowerCase()) || text.includes(String(u.name).toLowerCase().split(' (')[0]));
   const zone = [...legal.seaZones, ...legal.landZones].find((z) => text.includes(z.toLowerCase()) || text.includes(z.toLowerCase().replace(/_/g, ' ')));
+  const factions = ((m.recognized ?? []) as M[]).filter((h) => h.kind === 'faction' && h.id !== 'ITA').map((h) => h.id as string);
   const military: M[] = [];
+  const diplomacy: M[] = [];
+  const zoneStances: M[] = [];
   const ambiguities: string[] = [];
-  if (!units.length) ambiguities.push('Nessuna unità riconosciuta nella direttiva.');
-  if (!zone) ambiguities.push('Nessuna zona riconosciuta nella direttiva.');
-  if (units.length && zone) {
-    const kind = /rientr/.test(text) ? 'RETURN_TO_BASE' : /scort/.test(text) ? 'PATROL' : /mostr|dimostr/.test(text) ? 'SHOW_OF_FORCE' : 'PATROL';
-    military.push(kind === 'RETURN_TO_BASE' ? { id: 'p1', kind, unitIds: units.map((u) => u.id) } : { id: 'p1', kind, unitIds: units.map((u) => u.id), zoneId: zone, roe: /fuoco libero|weapons free/.test(text) ? 'WEAPONS_FREE' : 'WEAPONS_TIGHT' });
+  const kind = /rientr/.test(text) ? 'RETURN_TO_BASE' : /mostr|dimostr/.test(text) ? 'SHOW_OF_FORCE' : /pattugl|scort/.test(text) ? 'PATROL' : 'PRESENCE';
+  if (units.length && zone) military.push(kind === 'RETURN_TO_BASE' ? { id: 'p1', kind, unitIds: units.map((u) => u.id) } : { id: 'p1', kind, unitIds: units.map((u) => u.id), zoneId: zone, roe: /fuoco libero|weapons free/.test(text) ? 'WEAPONS_FREE' : kind === 'PRESENCE' ? 'WEAPONS_HOLD' : 'WEAPONS_TIGHT' });
+  else if (units.length && kind === 'RETURN_TO_BASE') military.push({ id: 'p1', kind, unitIds: units.map((u) => u.id) });
+  // forze in una zona senza unità nominate: postura per zona (le unità le sceglie il motore)
+  else if (zone && /presenza|pattugl|dimostr/.test(text)) zoneStances.push({ zoneId: zone, stance: kind === 'SHOW_OF_FORCE' ? 'show_of_force' : kind === 'PATROL' ? 'patrol' : 'presence', intensity: /più|rafforz/.test(text) ? 2 : 1 });
+  const dkind = /rassicur/.test(text) ? 'REASSURANCE' : /minacc/.test(text) ? 'THREAT' : /chied|sollecit|protest/.test(text) ? 'DEMARCHE' : null;
+  if (dkind) for (const f of factions) diplomacy.push({ id: `d-${f}`, kind: dkind, target: f, message: 'Richiesta formale del Governo italiano.', visibility: 'public' });
+  if (!military.length && !zoneStances.length && !diplomacy.length) {
+    if (!units.length) ambiguities.push('Nessuna unità riconosciuta nella direttiva.');
+    if (!zone) ambiguities.push('Nessuna zona riconosciuta nella direttiva.');
   }
-  return { orders: { military, diplomacy: [], procurement: [], statements: [] }, ambiguities };
+  return { orders: { military, diplomacy, procurement: [], statements: [] }, zoneStances, ambiguities };
 }
 
 function reflection(m: M) {

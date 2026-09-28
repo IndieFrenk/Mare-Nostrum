@@ -15,7 +15,8 @@
     "geo:build": "tsx scripts/build-geo.ts",
     "llm:check": "tsx src/cli/llm-check.ts",
     "bench:models": "tsx src/cli/bench-models.ts",
-    "playtest": "tsx src/cli/playtest.ts"
+    "playtest": "tsx src/cli/playtest.ts",
+    "balance": "tsx src/cli/balance.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",
