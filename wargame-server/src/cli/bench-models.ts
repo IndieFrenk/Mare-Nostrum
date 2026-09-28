@@ -6,12 +6,19 @@
 // - narratore: schema + numeri non presenti nei fatti
 // - riflessione: schema della memoria
 // - lettera: risposta di una fazione a una lettera di esempio del giocatore (stesso prompt del gioco): schema, lunghezze e numeri
-// Uso: npm run bench:models -- <cartella-campagna> <modello|combo>... [--runs N]   (config da wargame-server/.env)
+// - parser: frasi italiane del giocatore per la Console Ordini (cli/parser-cases.ts), stesso prompt e stessi controlli del
+//   gioco (nomi → id, posture, parse-review); per modello: corretti / sbagliati / pericolosi (ostili verso alleati, cyber non chiesta)
+// Uso: npm run bench:models -- <cartella-campagna> <modello|combo>... [--runs N] [--solo parser,fazioni,narratore,riflessione,lettera] [--mock]
+// (config da wargame-server/.env; --mock usa il provider finto al posto dei modelli, per provare il banco)
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { z, type ZodType } from 'zod';
 import '../config.js';
+import { MockLLMProvider } from '../agents/mock-provider.js';
+import { parserPrompt, ParsedLenient, PARSER_SCHEMA, nameAmbiguities } from '../agents/order-parser.js';
+import { finishParsed } from '../engine/parse-review.js';
+import { PARSER_CASES, scoreParsed, type Verdict } from './parser-cases.js';
 import { AgentMemory, DecisionOutput, type DecisionOutput as DecisionOutputT, type LlmCall, type OrdersBody } from '../schemas/index.js';
 import { extractJson, OpenAiCompatProvider } from '../agents/llm-client.js';
 import { template } from '../agents/prompts.js';
@@ -26,24 +33,28 @@ import { loadScenario } from '../engine/scenario.js';
 import { validateOrders } from '../engine/validators.js';
 import { JsonStore } from '../store/json-store.js';
 
-const { values: opt, positionals } = parseArgs({ allowPositionals: true, options: { runs: { type: 'string', default: '1' }, 'all-factions': { type: 'boolean', default: false } } });
+const { values: opt, positionals } = parseArgs({ allowPositionals: true, options: { runs: { type: 'string', default: '1' }, 'all-factions': { type: 'boolean', default: false }, solo: { type: 'string', default: '' }, mock: { type: 'boolean', default: false } } });
 const [dir, ...models] = positionals;
-if (!dir || !models.length) { console.error('uso: bench:models -- <cartella-campagna> <modello>... [--runs N]'); process.exit(2); }
+if (!dir || !models.length) { console.error('uso: bench:models -- <cartella-campagna> <modello>... [--runs N] [--solo parser,...] [--mock]'); process.exit(2); }
+const only = new Set(opt.solo.split(',').map((x) => x.trim()).filter(Boolean));
+const wants = (n: string) => !only.size || only.has(n);
 const campaignDir = path.resolve(dir);
 const store = new JsonStore(path.dirname(campaignDir));
 const campaignId = path.basename(campaignDir);
 const campaign = await store.getCampaign(campaignId);
 const state = await store.getState(campaignId, 1).catch(() => store.getState(campaignId));
 const scenario = loadScenario(campaign.scenarioId);
-const calls = readFileSync(path.join(campaignDir, 'llm-log/turn-0001.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as LlmCall);
+const needLog = ['fazioni', 'narratore', 'riflessione', 'lettera'].some(wants);
+const calls = needLog ? readFileSync(path.join(campaignDir, 'llm-log/turn-0001.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as LlmCall) : [];
 const pick = (role: string, withFaction = true) => {
   const c = calls.find((x) => x.role === role && (!withFaction || x.factionId));
   if (!c) throw new Error(`nessuna chiamata ${role} nel log`);
   return { factionId: c.factionId ?? '', ...(c.request as { system: string; user: string }) };
 };
-const major = pick('faction_major');
-const refl = pick('reflection');
-const narr = pick('gm_narrator', false);
+const none = { factionId: '', system: '', user: '' };
+const major = needLog ? pick('faction_major') : none;
+const refl = wants('riflessione') ? pick('reflection') : none;
+const narr = wants('narratore') ? pick('gm_narrator', false) : none;
 const refsOf = async (f: string) => new Set(((await store.getKnowledge(campaignId, f, 1))?.contacts ?? []).map((c) => c.id));
 const newFormat = template('faction', { maxLetters: '2' }).split('FORMATO')[1];
 const ReflOut = AgentMemory.omit({ schemaVersion: true, factionId: true, updatedTurn: true }).extend({ lessons: z.array(z.string()) });
@@ -104,15 +115,15 @@ const letterTest = async (): Promise<Test | null> => {
     ],
   };
 };
-const letter = await letterTest();
+const letter = wants('lettera') ? await letterTest() : null;
 const tests: Test[] = [
-  ...await Promise.all(factionCalls.map(factionTest)),
+  ...(wants('fazioni') ? await Promise.all(factionCalls.map(factionTest)) : []),
   { nome: 'narratore', system: template('narrator', { doc: 'il briefing di situazione', headings: 'Quadro strategico, Minacce, Energia e rotte, Forze proprie, Raccomandazioni' }), user: narr.user, schema: NarrOut, maxTokens: 2000,
     check: (v: { title: string; sections: unknown }) => { const bad = numbersNotInFacts(JSON.stringify([v.title, v.sections]), facts); return bad.length ? [`numeri inventati: ${bad.join(', ')}`] : []; } },
   { nome: 'riflessione', system: template('reflection', { factionId: refl.factionId }), user: refl.user, schema: ReflOut, maxTokens: 2000, check: () => [] },
   ...(letter ? [letter] : []),
-];
-const p = new OpenAiCompatProvider();
+].filter((t) => wants(t.nome.startsWith('fazione') ? 'fazioni' : t.nome));
+const p = opt.mock ? new MockLLMProvider() : new OpenAiCompatProvider();
 const summary: Record<string, { ok: number; schema: number; halluc: number; err: number; secs: number; n: number }> = {};
 for (const model of models) {
   for (let run = 0; run < Number(opt.runs); run++) {
@@ -140,6 +151,38 @@ for (const model of models) {
     }
   }
 }
+// ——— parser: frasi del giocatore → bozza finale (stesso percorso di POST /orders/parse) → confronto con l'atteso ———
+const parserStats: Record<string, Record<Verdict | 'secs', number>> = {};
+if (wants('parser')) {
+  const player = campaign.playerFaction;
+  const k = await store.getKnowledge(campaignId, player, 1);
+  if (!k) throw new Error(`knowledge ${player} del turno 1 mancante`);
+  const cfg = campaign.config.llm.order_parser;
+  for (const model of models) {
+    for (let run = 0; run < Number(opt.runs); run++) {
+      for (const [n, c] of PARSER_CASES.entries()) {
+        const st = (parserStats[model] ??= { corretto: 0, sbagliato: 0, pericoloso: 0, secs: 0 });
+        const t0 = Date.now();
+        const pr = parserPrompt(k, scenario, c.text);
+        let verdict: Verdict = 'sbagliato'; let why: string[] = [];
+        try {
+          const r = await p.complete({ role: 'order_parser', model, temperature: cfg.temperature, maxTokens: cfg.maxTokens, timeoutMs: 300_000, system: pr.system, user: pr.user, schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA,
+            meta: { text: pr.recognition.text, original: c.text, legal: pr.legal, recognized: pr.recognition.hits } });
+          const v = ParsedLenient.safeParse(extractJson(r.text));
+          if (!v.success) why = [`schema: ${v.error.issues.slice(0, 2).map((i) => `${i.path.join('.')} ${i.message}`).join(' | ')}`];
+          else {
+            const d = finishParsed({ state, scenario, factionId: player, knowledge: k, turnLength: campaign.turnLength, text: c.text,
+              parsed: { ...v.data, ambiguities: [...v.data.ambiguities, ...nameAmbiguities(pr.recognition)], recognized: pr.recognition.hits } });
+            ({ verdict, reasons: why } = scoreParsed(c, d));
+          }
+        } catch (e) { why = [`errore: ${(e as Error).message}`]; }
+        st[verdict]++; st.secs += (Date.now() - t0) / 1000;
+        console.log(`${model.padEnd(28)} parser #${String(n + 1).padStart(2)} ${verdict.toUpperCase().padEnd(10)} ${c.text.slice(0, 60).padEnd(60)} ${why.slice(0, 2).join(' | ').slice(0, 160)}`);
+      }
+    }
+  }
+}
+
 console.log('\nRIEPILOGO (ok / schema sbagliato / allucinazioni / errori · secondi medi)');
 for (const [k, s] of Object.entries(summary)) console.log(`${k.padEnd(42)} ${s.ok}/${s.n} ok · ${s.schema} schema · ${s.halluc} alluc. · ${s.err} err · ${(s.secs / s.n).toFixed(0)} s`);
 console.log('\nORDINI MILITARI DELLE FAZIONI (espliciti + tradotti dalle posture, per tipo)');
@@ -147,4 +190,11 @@ const UNIT_KINDS = ['PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE',
 for (const [m, st] of Object.entries(orderStats)) {
   const withUnits = UNIT_KINDS.reduce((a, k) => a + (st.kinds[k] ?? 0), 0);
   console.log(`${m.padEnd(28)} ${st.decisions} decisioni · ${st.stances} posture → ${st.fromStance} ordini · ordini con unità ${withUnits} · ${Object.entries(st.kinds).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ') || 'nessun ordine'}`);
+}
+if (Object.keys(parserStats).length) {
+  console.log(`\nPARSER — Console Ordini (${PARSER_CASES.length} frasi × ${opt.runs}: corretti / sbagliati / pericolosi · secondi medi)`);
+  for (const [m, st] of Object.entries(parserStats)) {
+    const n = st.corretto + st.sbagliato + st.pericoloso;
+    console.log(`${m.padEnd(28)} ${st.corretto} corretti · ${st.sbagliato} sbagliati · ${st.pericoloso} pericolosi su ${n} · ${(st.secs / Math.max(1, n)).toFixed(1)} s`);
+  }
 }

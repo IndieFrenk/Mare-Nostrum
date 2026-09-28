@@ -3,6 +3,7 @@ import type { LlmProvider, LlmRequest, LlmResponse } from '../src/agents/llm-cli
 import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import { buildLexicon, recognize } from '../src/engine/names.js';
 import { loadScenario } from '../src/engine/scenario.js';
+import { PARSER_CASES, scoreParsed } from '../src/cli/parser-cases.js';
 import { makeEngine } from './helpers.js';
 
 /** Provider finto: il parser restituisce la risposta scritta nel test (gli errori visti con i modelli locali), il resto è il mock. */
@@ -163,5 +164,28 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(v.errors).toEqual(expect.arrayContaining([
       'c1: un\'operazione cyber non può colpire la propria fazione', 'a1: destinatario EGEO sconosciuto (non è una fazione)', 'a1: destinatario IONIO sconosciuto (non è una fazione)', 'a2: DEMARCHE non può essere rivolto alla propria fazione',
     ]));
+  });
+});
+
+describe('banco «parser»: casi e punteggio', () => {
+  it('almeno 12 frasi, incluse le due dei modelli locali', () => {
+    expect(PARSER_CASES.length).toBeGreaterThanOrEqual(12);
+    expect(PARSER_CASES.map((c) => c.text)).toEqual(expect.arrayContaining([FRASE_1, FRASE_2]));
+  });
+
+  it('4B → sbagliato, 9B → pericoloso, risposta giusta → corretto', async () => {
+    const run = async (reply: unknown, text: string, seed: string) => {
+      const e = makeEngine(new ScriptedParser(reply));
+      const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
+      return scoreParsed(PARSER_CASES.find((x) => x.text === text)!, await e.parseOrders(c.id, text));
+    };
+    const q4b = await run({ orders: { ...empty, diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'CANALE_SICILIA', message: 'x', visibility: 'public' }] } }, FRASE_1, 's4b');
+    expect(q4b.verdict).toBe('sbagliato');
+    expect(q4b.reasons).toContain('manca PATROL/MOVE/PRESENCE ITA-F590 in CANALE_SICILIA');
+    const q9b = await run({ orders: { ...empty, military: [{ id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' }] } }, FRASE_2, 's9b');
+    expect(q9b.verdict).toBe('pericoloso');
+    const ok = await run({ orders: { ...empty, military: [{ id: 'm1', kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],
+      diplomacy: [{ id: 'd1', kind: 'REASSURANCE', target: 'GRC', message: 'x', visibility: 'public' }] } }, FRASE_2, 'sok');
+    expect(ok).toEqual({ verdict: 'corretto', reasons: [] });
   });
 });
