@@ -24,12 +24,25 @@ export function extractJson(text: string): unknown {
   throw new Error('JSON troncato');
 }
 
+/**
+ * Toglie dallo schema i vincoli che diversi provider rifiutano in response_format (es. Cohere: «non-supported
+ * constraint minLength»). La risposta viene comunque validata con Zod, quindi i vincoli non si perdono.
+ */
+const UNSUPPORTED = new Set(['minLength', 'maxLength', 'pattern', 'format', 'minItems', 'maxItems', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
+export function portableSchema(s: unknown, names = false): unknown {
+  if (Array.isArray(s)) return s.map((x) => portableSchema(x));
+  if (!s || typeof s !== 'object') return s;
+  // dentro `properties`/`$defs` le chiavi sono nomi di campi (anche «format»): si tengono tutte
+  return Object.fromEntries(Object.entries(s).filter(([k]) => names || !UNSUPPORTED.has(k))
+    .map(([k, v]) => [k, portableSchema(v, !names && (k === 'properties' || k === '$defs' || k === 'definitions'))]));
+}
+
 /** Errore HTTP che non ha senso ripetere (modello inesistente, richiesta rifiutata). */
 class FatalHttpError extends Error {}
 
 /**
  * Client OpenAI-compatible (OmniRoute): json_schema se il modello lo supporta, altrimenti json_object; 2 retry con backoff.
- * Il passaggio a json_object è per modello e solo quando il 400 parla davvero di response_format/schema:
+ * Il passaggio a json_object è per modello (o combo) e solo quando l'errore parla davvero di response_format/json_schema:
  * un 400 per altri motivi (es. modello non disponibile) non deve spegnere json_schema per tutti.
  */
 export class OpenAiCompatProvider implements LlmProvider {
@@ -52,12 +65,13 @@ export class OpenAiCompatProvider implements LlmProvider {
           body: JSON.stringify({
             model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
             messages: [{ role: 'system', content: req.system }, { role: 'user', content: req.user }],
-            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: req.jsonSchema, strict: false } },
+            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema), strict: false } },
           }),
         });
         if (!res.ok) {
           const body = (await res.text()).slice(0, 300);
-          if (res.status === 400 && !plainJson && /response_format|json_schema|schema/i.test(body)) { this.jsonSchemaUnsupported.add(req.model); attempt--; continue; }
+          // 400 diretto o 502 di una combo che ha provato un provider incompatibile (es. Cohere: niente record/minLength)
+          if ((res.status === 400 || res.status === 502) && !plainJson && /response_format|json_schema/i.test(body)) { this.jsonSchemaUnsupported.add(req.model); attempt--; continue; }
           const msg = `LLM HTTP ${res.status}: ${body}`;
           if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) throw new FatalHttpError(msg);
           throw new Error(msg);

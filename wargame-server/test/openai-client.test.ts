@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { OpenAiCompatProvider } from '../src/agents/llm-client.js';
+import { OpenAiCompatProvider, portableSchema } from '../src/agents/llm-client.js';
 import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import type { LlmRequest } from '../src/agents/llm-client.js';
 import { makeEngine } from './helpers.js';
@@ -56,6 +56,7 @@ describe('client OpenAI-compatible: errori 400 che non riguardano lo schema', ()
       req.on('end', () => {
         const b = JSON.parse(body);
         seen.push(b);
+        if (b.model === 'combo' && b.response_format.type === 'json_schema') { res.statusCode = 502; return res.end('{"error":{"message":"cohere: [400]: invalid \'json_schema\' provided: object type must specify properties"}}'); }
         if (b.model === 'nope') { res.statusCode = 400; return res.end('{"error":{"message":"Model \'nope\' is not available in the active live catalog"}}'); }
         res.end(JSON.stringify({ model: b.model, choices: [{ message: { content: '{"ok":true}' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }));
       });
@@ -69,6 +70,20 @@ describe('client OpenAI-compatible: errori 400 che non riguardano lo schema', ()
     expect(seen.filter((b) => b.model === 'nope')).toHaveLength(1);
     await expect(http.complete(req('ok'))).resolves.toMatchObject({ text: '{"ok":true}' });
     expect(seen.at(-1)!.response_format.type).toBe('json_schema');
+    // combo che passa a un provider senza json_schema (502 con l'errore dentro): si ripiega su json_object per quella combo
+    await expect(http.complete(req('combo'))).resolves.toMatchObject({ text: '{"ok":true}' });
+    expect(seen.filter((b) => b.model === 'combo').map((b) => b.response_format.type)).toEqual(['json_schema', 'json_object']);
+    await http.complete(req('ok'));
+    expect(seen.at(-1)!.response_format.type).toBe('json_schema');
     server.close();
+  });
+});
+
+describe('schema portabile per response_format', () => {
+  it('toglie i vincoli che Cohere & co. rifiutano, lascia struttura e tipi', () => {
+    const s = { $schema: 'x', type: 'object', properties: { factionId: { type: 'string', minLength: 2 }, list: { type: 'array', items: { type: 'number', minimum: 0 }, maxItems: 3 } }, required: ['factionId'] };
+    expect(portableSchema(s)).toEqual({ type: 'object', properties: { factionId: { type: 'string' }, list: { type: 'array', items: { type: 'number' } } }, required: ['factionId'] });
+    // un campo che si chiama «format» resta
+    expect(portableSchema({ type: 'object', properties: { format: { type: 'string', maxLength: 5 } } })).toEqual({ type: 'object', properties: { format: { type: 'string' } } });
   });
 });

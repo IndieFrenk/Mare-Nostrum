@@ -53,6 +53,7 @@ describe('agenti', () => {
   it('validatore numeri del narratore', () => {
     expect(numbersNotInFacts('FOED a 3200 M€, 5 unità', ['FOED disponibile: 3200 M€.', '5 unità schierate'])).toEqual([]);
     expect(numbersNotInFacts('Perse 3 fregate', ['nessuna perdita'])).toEqual(['3']);
+    expect(numbersNotInFacts('Tensione in Egeo (F3-2, F3-E1; D3-14).', ['tensione in Egeo'])).toEqual([]);
   });
 
   it('estrae JSON da testo con prosa e stringhe con parentesi', () => {
