@@ -104,3 +104,30 @@ describe('cadenza degli agenti (risparmio di chiamate LLM)', () => {
     for (let t = 1; t <= 4; t++) expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(src.id, t));
   }, 60_000);
 });
+
+describe('ordini impossibili scartati invece di buttare la decisione', () => {
+  it('un ordine ISR con un asset inventato viene tolto, il resto della decisione resta valido', async () => {
+    const mock = new MockLLMProvider();
+    const provider = { name: 'bugiardo', complete: async (r: Parameters<MockLLMProvider['complete']>[0]) => {
+      const res = await mock.complete(r);
+      if (r.role !== 'faction_major' || r.meta.factionId !== 'TUR') return res;
+      const d = JSON.parse(res.text);
+      d.orders.military.push({ id: 'x', kind: 'ISR', assetIds: ['TUR-SATELLITE-INVENTATO'], zoneId: 'EGEO' });
+      return { ...res, text: JSON.stringify(d) };
+    } };
+    const e = makeEngine(provider as never);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'drop', seed: 'drop' });
+    await e.advance(c.id);
+    const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
+    expect(d.validation).toMatchObject({ valid: true, fallbackUsed: false, repairAttempts: 0 });
+    expect(d.validation.errors.some((x) => x.startsWith('scartato') && x.includes('TUR-SATELLITE-INVENTATO'))).toBe(true);
+    expect(d.orders.military.some((o) => o.kind === 'ISR' && o.assetIds.includes('TUR-SATELLITE-INVENTATO'))).toBe(false);
+  }, 30_000);
+
+  it('il prompt di una fazione senza asset ISR non mostra il formato ISR', async () => {
+    const { trimFormat } = await import('../src/agents/faction-agent.js');
+    const s = 'A\n- ISR: {...}\n- SOF_OP: {...}\n- PATROL, PRESENCE: {...}';
+    expect(trimFormat(s, ['PATROL', 'PRESENCE'])).toBe('A\n- PATROL, PRESENCE: {...}');
+    expect(trimFormat(s, ['ISR', 'SOF_OP', 'PATROL'])).toBe(s);
+  });
+});

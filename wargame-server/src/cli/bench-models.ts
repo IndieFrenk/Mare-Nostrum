@@ -12,6 +12,8 @@ import '../config.js';
 import { AgentMemory, DecisionOutput, type LlmCall, type OrdersBody } from '../schemas/index.js';
 import { extractJson, OpenAiCompatProvider } from '../agents/llm-client.js';
 import { template } from '../agents/prompts.js';
+import { legalActions, memoryText, situation } from '../agents/context-builder.js';
+import { trimFormat } from '../agents/faction-agent.js';
 import { numbersNotInFacts } from '../agents/repair.js';
 import { loadScenario } from '../engine/scenario.js';
 import { validateOrders } from '../engine/validators.js';
@@ -44,8 +46,14 @@ const facts = narr.user.split('\n').filter((l) => l.startsWith('['));
 type Test = { nome: string; system: string; user: string; schema: ZodType; maxTokens: number; check: (v: never) => string[] };
 const factionTest = async (c: { factionId: string; system: string; user: string }): Promise<Test> => {
   const refs = await refsOf(c.factionId);
+  // il messaggio utente si ricostruisce col codice attuale (azioni lecite, situazione), il resto viene dal log
+  const k = await store.getKnowledge(campaignId, c.factionId, 1);
+  const mem = await store.getMemory(campaignId, c.factionId);
+  const legal = k ? legalActions(k, scenario) : null;
+  const user = k && mem ? template('faction-user', { turn: '1', date: campaign.date, situation: JSON.stringify(situation(k)), memory: memoryText(mem), legal: JSON.stringify(legal) }) : c.user;
+  const system = `${c.system.split('FORMATO')[0]}FORMATO${newFormat}`;
   return {
-    nome: `fazione ${c.factionId}`, system: `${c.system.split('FORMATO')[0]}FORMATO${newFormat}`, user: c.user, schema: DecisionOutput, maxTokens: 3000,
+    nome: `fazione ${c.factionId}`, system: legal ? trimFormat(system, legal.orderKinds) : system, user, schema: DecisionOutput, maxTokens: 3000,
     check: (v: { orders: OrdersBody }) => {
       let n = 0; const id = () => `B-${++n}`;
       const o = { military: v.orders.military.map((x) => ({ ...x, id: id() })), diplomacy: v.orders.diplomacy.map((x) => ({ ...x, id: id() })), procurement: v.orders.procurement.map((x) => ({ ...x, id: id() })), statements: v.orders.statements.map((x) => ({ ...x, id: id() })) } as OrdersBody;

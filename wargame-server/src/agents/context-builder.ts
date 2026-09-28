@@ -15,7 +15,9 @@ export function legalActions(k: FactionKnowledge, sc: Scenario) {
     procurement: sc.catalog.items.filter((i) => i.leadTimeTurns !== null && i.cost <= f.budget.discretionary).map((i) => ({ id: i.id, name: i.name, cost: i.cost })),
     pendingAgreements: k.knownAgreements.filter((a) => a.status === 'proposed' && a.parties.includes(f.id)).map((a) => a.id),
     factions: Object.keys(k.beliefs),
-    orderKinds: ['MOVE', 'PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'AIR_DEFENSE', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN', 'EVACUATION'],
+    // solo i tipi di ordine che la fazione può davvero eseguire: i modelli piccoli altrimenti inventano asset ISR o squadre SOF
+    orderKinds: ['MOVE', 'PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'AIR_DEFENSE', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN', 'EVACUATION']
+      .filter((kind) => (kind !== 'ISR' || f.isrAssets.length > 0) && (kind !== 'SOF_OP' || k.ownUnits.some((u) => u.type === 'sof_team' && u.status !== 'destroyed'))),
     diploKinds: ['DEMARCHE', 'THREAT', 'REASSURANCE', 'PROPOSE_AGREEMENT', 'RESPOND_AGREEMENT', 'SANCTION', 'LIFT_SANCTION', 'BACKCHANNEL', 'NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT', 'ENERGY_DEAL', 'AID'],
   };
 }

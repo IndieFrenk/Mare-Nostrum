@@ -20,7 +20,7 @@ military:
 - PATROL, PRESENCE, SHOW_OF_FORCE, BLOCKADE, EXCLUSION_ZONE: {"id","kind","unitIds":[...],"zoneId":"ZONA","roe":ROE}
 - ESCORT: {"id","kind":"ESCORT","unitIds":[...],"protect":"id da proteggere","roe":ROE}
 - STRIKE: {"id","kind":"STRIKE","unitIds":[...],"targetRef":"contatto o infrastruttura","munitions":{"nome munizione":numero},"roe":ROE}
-- ISR: {"id","kind":"ISR","assetIds":["asset ISR tuo"],"zoneId":"ZONA"} (senza unitIds)
+- ISR: {"id","kind":"ISR","assetIds":["id preso SOLO da isrAssets nelle AZIONI LECITE"],"zoneId":"ZONA"} (senza unitIds). Gli asset ISR NON sono unità: navi, aerei e droni delle tue unità si usano con PATROL/PRESENCE. Se ISR non è in orderKinds, non usarlo.
 - SOF_OP: {"id","kind":"SOF_OP","unitIds":[...],"objective":"...","zoneId":"ZONA","deniability":"overt"|"covert"}
 - CYBER_OP: {"id","kind":"CYBER_OP","target":"FAZIONE","targetRef":"...","effect":"espionage"|"disruption"|"defense_hardening"} (senza unitIds)
 - AIR_DEFENSE: {"id","kind":"AIR_DEFENSE","unitIds":[...],"zoneId":"ZONA","alert":"low"|"high"}
@@ -39,4 +39,5 @@ diplomacy:
 "target" è UNA sola fazione (stringa), tranne in PROPOSE_AGREEMENT dove è un elenco.
 procurement: {"id","itemId":"articolo del catalogo","qty":intero>=1,"destinationBaseId":"tua base"}
 statements: {"id","audience":"a chi è rivolta","text":"...","tone":"conciliatory"|"firm"|"threatening"}
+Usa solo i tipi elencati in orderKinds e solo id presenti nelle AZIONI LECITE (unità, asset, zone, basi, articoli): mai inventarne.
 Meglio pochi ordini corretti che molti sbagliati: un ordine con campi mancanti fa scartare la risposta.

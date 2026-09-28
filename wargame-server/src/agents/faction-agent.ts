@@ -21,6 +21,11 @@ function normalize(o: OrdersBody, factionId: string, turn: number): OrdersBody {
   };
 }
 
+/** Toglie dal FORMATO del prompt i tipi di ordine che la fazione non può usare (i modelli piccoli copiano gli esempi). */
+export function trimFormat(system: string, kinds: string[]): string {
+  return system.split('\n').filter((l) => { const m = l.match(/^- ([A-Z_]+)(?:,|:)/); return !m || !['ISR', 'SOF_OP'].includes(m[1]!) || kinds.includes(m[1]!); }).join('\n');
+}
+
 /** Fallback dottrinale: ordini minimi coerenti con la postura, generati senza LLM. */
 export function doctrineOrders(i: DecideInput): OrdersBody {
   const k = i.knowledge;
@@ -53,10 +58,28 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
   const cfg = i.campaign.config.llm[role];
   const legal = legalActions(k, i.scenario);
   const refs = new Set(k.contacts.map((c) => c.id));
-  const check = (d: DecisionOutputT) => validateOrders(i.state, i.scenario.catalog, i.factionId, normalize(d.orders, i.factionId, k.turn), refs, i.campaign.turnLength).errors;
+  // Gli ordini impossibili (unità/asset/zone inesistenti, unità già impegnata…) vengono scartati uno per uno, come farebbe
+  // uno stato maggiore, invece di buttare l'intera decisione e chiedere un «repair» al modello: restano nel registro.
+  const dropped: string[] = [];
+  const check = (d: DecisionOutputT) => {
+    const errorsOf = () => validateOrders(i.state, i.scenario.catalog, i.factionId, normalize(d.orders, i.factionId, k.turn), refs, i.campaign.turnLength).errors;
+    for (let pass = 0; pass < 3; pass++) {
+      const errs = errorsOf();
+      if (!errs.length) return [];
+      const norm = normalize(d.orders, i.factionId, k.turn);
+      const bad = new Set(errs.map((e) => e.split(':')[0]));
+      const keep = <T>(list: T[], ids: { id: string }[]) => list.filter((_, j) => !bad.has(ids[j]!.id));
+      const next = { military: keep(d.orders.military, norm.military), diplomacy: keep(d.orders.diplomacy, norm.diplomacy), procurement: keep(d.orders.procurement, norm.procurement), statements: keep(d.orders.statements, norm.statements) };
+      const removed = Object.values(d.orders).flat().length - Object.values(next).flat().length;
+      if (!removed) return errs; // errori non legati a un ordine (es. budget): serve il repair
+      dropped.push(...errs.filter((e) => bad.has(e.split(':')[0]!)));
+      d.orders = next;
+    }
+    return errorsOf();
+  };
   const r = await callStructured(provider, log, { turn: k.turn, factionId: i.factionId }, {
     role, ...cfg,
-    system: template('faction', { factionName: f.name, factionId: f.id, date: i.campaign.date, profile: i.profile }),
+    system: trimFormat(template('faction', { factionName: f.name, factionId: f.id, date: i.campaign.date, profile: i.profile }), legal.orderKinds),
     user: template('faction-user', { turn: String(k.turn), date: i.campaign.date, situation: JSON.stringify(situation(k)), memory: memoryText(i.memory), legal: JSON.stringify(legal) }),
     schemaName: 'AgentDecision', jsonSchema: DECISION_SCHEMA,
     meta: { factionId: i.factionId, turn: k.turn, seed: i.campaign.seed, legal, situation: situation(k), posture: f.posture },
@@ -69,7 +92,7 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
     situationAssessment: out?.situationAssessment ?? 'Fallback dottrinale: nessuna decisione valida dal modello.',
     threats: out?.threats ?? [], optionsConsidered: out?.optionsConsidered ?? [], privateIntent: out?.privateIntent ?? 'mantenere la postura',
     orders, confidence: out?.confidence ?? 0.2,
-    validation: { valid: !!out, errors: r.errors, repairAttempts: r.repairAttempts, fallbackUsed: !out },
+    validation: { valid: !!out, errors: [...dropped.map((e) => `scartato — ${e}`), ...r.errors], repairAttempts: r.repairAttempts, fallbackUsed: !out },
     usage: r.usage,
   };
 }
