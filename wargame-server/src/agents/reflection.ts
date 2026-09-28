@@ -38,7 +38,7 @@ export async function reflect(provider: LlmProvider, log: LlmCall[], c: Campaign
   const r = await callStructured(provider, log, { turn, factionId: i.factionId }, {
     role: 'reflection', ...c.config.llm.reflection,
     system: template('reflection', { factionId: i.factionId }),
-    user: template('reflection-user', { memory: JSON.stringify(i.memory), decision: JSON.stringify(i.decision ? { assessment: i.decision.situationAssessment, intent: i.decision.privateIntent, orders: i.decision.orders } : null), events: events.join('\n') }),
+    user: template('reflection-user', { memory: JSON.stringify(i.memory), decision: JSON.stringify(i.decision ? { assessment: i.decision.situationAssessment, intent: i.decision.privateIntent, orders: { ...i.decision.orders, diplomacy: i.decision.orders.diplomacy.map((d) => (d.kind === 'LETTER' ? { kind: d.kind, target: d.target, subject: d.subject, tone: d.tone } : d)) } } : null), events: events.join('\n') }),
     schemaName: 'AgentMemory', jsonSchema: z.toJSONSchema(Out, { io: 'input' }) as Record<string, unknown>, meta: { memory: i.memory, decision: i.decision, events, turn },
   }, OutLenient);
   const base = r.value ?? { ...i.memory, rollingSummary: `${i.memory.rollingSummary} T${turn}: ${i.decision?.privateIntent ?? 'nessuna decisione'}.`.trim() };

@@ -89,4 +89,9 @@ describe('schema portabile per response_format', () => {
     // un campo che si chiama «format» resta
     expect(portableSchema({ type: 'object', properties: { format: { type: 'string', maxLength: 5 } } })).toEqual({ type: 'object', properties: { format: { type: 'string' } } });
   });
+
+  it('per le lettere tiene maxLength (i modelli locali si fermano prima), toglie il resto', () => {
+    const s = { type: 'object', properties: { subject: { type: 'string', minLength: 1, maxLength: 120 }, list: { type: 'array', items: { type: 'string', maxLength: 300 }, maxItems: 2 } } };
+    expect(portableSchema(s, false, ['maxLength'])).toEqual({ type: 'object', properties: { subject: { type: 'string', maxLength: 120 }, list: { type: 'array', items: { type: 'string', maxLength: 300 }, maxItems: 2 } } });
+  });
 });

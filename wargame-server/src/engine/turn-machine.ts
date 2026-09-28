@@ -1,5 +1,6 @@
-import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
-import { FactionOrders as FactionOrdersSchema } from '../schemas/index.js';
+import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
+import { FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
+import { leaderOf } from './diplomacy.js';
 import type { JsonStore } from '../store/json-store.js';
 import { adjudicate } from './adjudication.js';
 import { applyAttrition } from './attrition.js';
@@ -20,6 +21,16 @@ import { doctrineDecision } from '../agents/faction-agent.js';
 import { quickMemory } from '../agents/reflection.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
+/** Una lettera da scrivere (una chiamata al ruolo diplomat): il motore sceglie chi scrive a chi, l'LLM solo testo e tono. */
+export interface LetterJob {
+  campaign: Campaign; factionId: string; to: string; kind: 'reply' | 'initiative' | 'draft';
+  knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string;
+  fromTitle: string; toTitle: string; date: string;
+  /** fiducia/tensione del mittente verso il destinatario (la sua riga della matrice) */
+  relation: { trust: number; tension: number } | null;
+  intent?: string; replyTo?: DiploLetter; gist?: string; tone?: LetterTone;
+}
+export interface LetterResult { subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
 export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario }
 /** Porta verso gli agenti: il motore non conosce LLM, solo questo contratto. */
 export interface AgentsPort {
@@ -28,6 +39,10 @@ export interface AgentsPort {
   debrief(i: { campaign: Campaign; facts: Fact[]; publicEvents: GameEvent[] }): Promise<{ debriefing: NonNullable<TurnNarrative['debriefing']>; news: NewsItem[] }>;
   reflect(i: { campaign: Campaign; factionId: string; decision: AgentDecision | null; visibleEvents: GameEvent[]; memory: AgentMemory }): Promise<AgentMemory>;
   parseOrders(i: { campaign: Campaign; text: string; knowledge: FactionKnowledge }): Promise<{ orders: OrdersBody; ambiguities: string[] }>;
+  /** Scrive le lettere IA del turno, nello stesso ordine dei job (in replay: le rilegge dalle decisioni salvate). */
+  writeLetters(jobs: LetterJob[], onProgress: (factionId: string, status: string) => void): Promise<LetterResult[]>;
+  /** Bozza di lettera per il giocatore (non cambia lo stato). */
+  draftLetter(job: LetterJob): Promise<LetterResult>;
   drainLlmCalls(): LlmCall[];
 }
 
@@ -200,10 +215,61 @@ export class Engine {
       return doctrineDecision(i, `Turno senza IA (cadenza 1 ogni ${cad.minorEvery || '∞'}): ordini di dottrina.`);
     });
     const decisions = [...skipped, ...await this.agents.decideAll(inputs.filter((i) => withLlm(i.factionId)), (factionId, status) => progress({ agent: factionId, status }))];
+    await this.letters(ctx, c, decisions, inputs, progress);
     for (const d of decisions.sort((a, b) => a.factionId.localeCompare(b.factionId))) {
       await this.store.saveDecision(c.id, d);
       await this.store.saveOrders(c.id, d.orders);
     }
+  }
+
+  private letterJob(c: Campaign, s: WorldState, i: { factionId: string; knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string }, to: string, kind: LetterJob['kind'], extra: Partial<LetterJob> = {}): LetterJob {
+    const rel = s.relations[i.factionId]?.[to];
+    return {
+      campaign: c, factionId: i.factionId, to, kind, knowledge: i.knowledge, memory: i.memory, profile: i.profile,
+      fromTitle: leaderOf(s, i.factionId).title, toTitle: leaderOf(s, to).title, date: s.date,
+      relation: rel ? { trust: rel.trust, tension: rel.tension } : null, ...extra,
+    };
+  }
+
+  /**
+   * Lettere IA del turno, scelte in modo deterministico e poi scritte dal ruolo diplomat:
+   * 1) risposte alle lettere del giocatore del turno precedente (sempre, al massimo una per fazione, anche nei turni «senza IA»);
+   * 2) iniziative dai letterIntents delle decisioni IA (max 1 per le minori, 2 per le maggiori), al massimo lettersPerTurn,
+   *    prima le maggiori e poi per id. Diventano azioni LETTER negli ordini: stesso validatore ed effetti del giocatore.
+   */
+  private async letters(ctx: TurnCtx, c: Campaign, decisions: AgentDecision[], inputs: DecideInput[], progress: (m: Record<string, unknown>) => void) {
+    const s = ctx.state; const player = c.playerFaction;
+    const byF = new Map(decisions.map((d) => [d.factionId, d]));
+    for (const d of decisions) { d.orders.diplomacy = d.orders.diplomacy.filter((x) => x.kind !== 'LETTER'); d.letters = []; }
+    type Choice = { factionId: string; to: string; kind: 'reply' | 'initiative'; replyTo?: DiploLetter; gist?: string; tone?: LetterTone };
+    const picks: Choice[] = [];
+    const replying = new Set<string>();
+    for (const l of ctx.turn > 1 ? await this.store.getLetters(c.id, ctx.turn - 1) : []) {
+      if (l.from !== player || !byF.has(l.to) || replying.has(l.to)) continue;
+      replying.add(l.to);
+      picks.push({ factionId: l.to, to: player, kind: 'reply', replyTo: l });
+    }
+    const major = (f: string) => s.factions[f]?.agentRole === 'faction_major';
+    const initiatives = decisions.filter((d) => d.model !== 'dottrina').flatMap((d) => {
+      const seen = new Set<string>();
+      return d.letterIntents.slice(0, major(d.factionId) ? 2 : 1).filter((li) => li.to !== d.factionId && s.factions[li.to] && s.factions[li.to]!.kind !== 'bloc'
+        && !(li.to === player && replying.has(d.factionId)) && !seen.has(li.to) && !!seen.add(li.to))
+        .map((li): Choice => ({ factionId: d.factionId, to: li.to, kind: 'initiative', gist: li.gist.slice(0, LETTER_LIMITS.gist), tone: li.tone }));
+    }).sort((a, b) => Number(major(b.factionId)) - Number(major(a.factionId)) || a.factionId.localeCompare(b.factionId));
+    picks.push(...initiatives.slice(0, cadenceOf(c).lettersPerTurn));
+    if (!picks.length) return;
+    const input = new Map(inputs.map((i) => [i.factionId, i]));
+    const jobs = picks.map((p) => {
+      const d = byF.get(p.factionId)!;
+      return this.letterJob(c, s, input.get(p.factionId)!, p.to, p.kind, { replyTo: p.replyTo, gist: p.gist, tone: p.tone, intent: d.privateIntent });
+    });
+    const results = await this.agents.writeLetters(jobs, (factionId, status) => progress({ agent: factionId, status }));
+    picks.forEach((p, i) => {
+      const d = byF.get(p.factionId)!; const r = results[i]!;
+      const action: LetterAction = { id: `${p.factionId}-${ctx.turn}-L${d.letters.length + 1}`, kind: 'LETTER', target: p.to, subject: r.subject, body: r.body, tone: r.tone, visibility: 'private', ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), model: r.model };
+      d.orders.diplomacy.push(action);
+      d.letters.push({ actionId: action.id, to: p.to, kind: p.kind, ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), source: r.source, model: r.model, errors: r.errors });
+    });
   }
 
   private async debrief(ctx: TurnCtx, c: Campaign) {
@@ -260,6 +326,21 @@ export class Engine {
     const r = await this.agents.parseOrders({ campaign: c, text, knowledge: await this.knowledge(id) });
     await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
     return { ...r, validation: await this.validate(id, r.orders) };
+  }
+
+  /** Bozza di lettera del giocatore scritta dal ruolo diplomat a nome dell'Italia: il giocatore la rivede e la invia come ordine LETTER. */
+  async draftLetter(id: string, b: { target: string; gist: string; tone: LetterTone; inReplyTo?: string }) {
+    const c = await this.store.getCampaign(id);
+    const s = await this.store.getState(id);
+    const t = s.factions[b.target];
+    if (!t || b.target === c.playerFaction || t.kind === 'bloc') throw new GameError('VALIDATION', `destinatario non valido: ${b.target}`);
+    const k = await this.knowledge(id);
+    const replyTo = b.inReplyTo ? k.letters.find((l) => l.id === b.inReplyTo && l.to === c.playerFaction) : undefined;
+    const job = this.letterJob(c, s, { factionId: c.playerFaction, knowledge: k, memory: null, profile: loadScenario(c.scenarioId).profiles[c.playerFaction] ?? '' }, b.target, 'draft',
+      { gist: b.gist.slice(0, LETTER_LIMITS.gist), tone: b.tone, replyTo });
+    const r = await this.agents.draftLetter(job);
+    await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
+    return { target: b.target, ...(replyTo ? { inReplyTo: replyTo.id } : {}), ...r };
   }
 
   submitAar(id: string, engagementId: string, body: { autoResolve: true } | AfterActionReport) {

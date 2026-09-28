@@ -31,6 +31,8 @@ export function situation(k: FactionKnowledge) {
     accordi: k.knownAgreements.map((a) => ({ id: a.id, type: a.type, parties: a.parties, status: a.status })),
     stimeAltrui: k.beliefs, inbox: k.inbox.map((m) => ({ from: m.from, text: m.text, channel: m.channel })),
     notizie: k.publicNews.slice(0, 6).map((n) => `${n.outlet}: ${n.headline}`),
+    // lettere ricevute nell'ultimo turno (il testo intero lo vede il consigliere che risponde)
+    lettere: k.letters.filter((l) => l.to === k.factionId && l.turn >= k.turn - 1).map((l) => ({ da: l.from, oggetto: l.subject, tono: l.tone })),
   };
 }
 

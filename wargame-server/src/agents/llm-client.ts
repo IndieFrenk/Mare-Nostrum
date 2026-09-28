@@ -5,6 +5,8 @@ export interface LlmRequest {
   system: string; user: string; schemaName: string; jsonSchema: Record<string, unknown>;
   /** input strutturati: ignorati dai modelli reali, usati dal MockLLMProvider */
   meta: Record<string, unknown>;
+  /** tiene maxLength nello schema inviato (lettere): i modelli locali si fermano prima; se il provider lo rifiuta si toglie */
+  keepLengths?: boolean;
 }
 export interface LlmResponse { text: string; usage: { promptTokens: number; completionTokens: number }; latencyMs: number; model: string }
 export interface LlmProvider { name: string; complete(req: LlmRequest): Promise<LlmResponse> }
@@ -30,12 +32,12 @@ export function extractJson(text: string): unknown {
  */
 // minItems/maxItems restano: fermano i modelli locali che ripetono gli elementi di una lista
 const UNSUPPORTED = new Set(['minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
-export function portableSchema(s: unknown, names = false): unknown {
-  if (Array.isArray(s)) return s.map((x) => portableSchema(x));
+export function portableSchema(s: unknown, names = false, keep: readonly string[] = []): unknown {
+  if (Array.isArray(s)) return s.map((x) => portableSchema(x, false, keep));
   if (!s || typeof s !== 'object') return s;
   // dentro `properties`/`$defs` le chiavi sono nomi di campi (anche «format»): si tengono tutte
-  return Object.fromEntries(Object.entries(s).filter(([k]) => names || !UNSUPPORTED.has(k))
-    .map(([k, v]) => [k, portableSchema(v, !names && (k === 'properties' || k === '$defs' || k === 'definitions'))]));
+  return Object.fromEntries(Object.entries(s).filter(([k]) => names || !UNSUPPORTED.has(k) || keep.includes(k))
+    .map(([k, v]) => [k, portableSchema(v, !names && (k === 'properties' || k === '$defs' || k === 'definitions'), keep)]));
 }
 
 /** Errore HTTP che non ha senso ripetere (modello inesistente, richiesta rifiutata). */
@@ -49,6 +51,8 @@ class FatalHttpError extends Error {}
 export class OpenAiCompatProvider implements LlmProvider {
   name = 'openai-compat';
   private jsonSchemaUnsupported = new Set<string>();
+  /** modelli (o combo) che rifiutano maxLength nello schema: si manda senza */
+  private lengthsUnsupported = new Set<string>();
   /** LLM_EXTRA_BODY: campi aggiunti a ogni richiesta, in JSON (es. {"reasoning_effort":"none"} per spegnere il ragionamento). */
   private extra: Record<string, unknown> = (() => { try { return JSON.parse(process.env.LLM_EXTRA_BODY || '{}'); } catch { return {}; } })();
   /** LLM_RESPONSE_FORMAT=json_object salta del tutto json_schema (utile se i provider principali non lo accettano). */
@@ -62,6 +66,7 @@ export class OpenAiCompatProvider implements LlmProvider {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), req.timeoutMs);
       const plainJson = this.responseFormat === 'json_object' || this.jsonSchemaUnsupported.has(req.model);
+      const lengths = !!req.keepLengths && !this.lengthsUnsupported.has(req.model);
       try {
         const res = await fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST', signal: ctl.signal,
@@ -69,13 +74,17 @@ export class OpenAiCompatProvider implements LlmProvider {
           body: JSON.stringify({
             ...this.extra, model: req.model, temperature: req.temperature, max_tokens: req.maxTokens,
             messages: [{ role: 'system', content: req.system }, { role: 'user', content: req.user }],
-            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema), strict: false } },
+            response_format: plainJson ? { type: 'json_object' } : { type: 'json_schema', json_schema: { name: req.schemaName, schema: portableSchema(req.jsonSchema, false, lengths ? ['maxLength'] : []), strict: false } },
           }),
         });
         if (!res.ok) {
           const body = (await res.text()).slice(0, 300);
           // 400 diretto o 502 di una combo che ha provato un provider incompatibile (es. Cohere: niente record/minLength)
-          if ((res.status === 400 || res.status === 502) && !plainJson && /response_format|json_schema/i.test(body)) { this.jsonSchemaUnsupported.add(req.model); attempt--; continue; }
+          if ((res.status === 400 || res.status === 502) && !plainJson && /response_format|json_schema|maxLength/i.test(body)) {
+            // prima si prova senza maxLength, poi (se ancora rifiutato) si passa a json_object
+            if (lengths) this.lengthsUnsupported.add(req.model); else this.jsonSchemaUnsupported.add(req.model);
+            attempt--; continue;
+          }
           const msg = `LLM HTTP ${res.status}: ${body}`;
           if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) throw new FatalHttpError(msg);
           throw new Error(msg);

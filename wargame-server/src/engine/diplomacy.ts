@@ -32,7 +32,7 @@ export function letterRecord(ctx: TurnCtx, actor: string, a: LetterAction): Dipl
   const from = leaderOf(ctx.state, actor); const to = leaderOf(ctx.state, a.target);
   const source = actor === ctx.campaign.playerFaction ? 'human' : a.model === 'template' ? 'template' : 'ai';
   return {
-    id: `LT${ctx.turn}-${actor}-${a.id}`, turn: ctx.turn, date: ctx.state.date, from: actor, to: a.target,
+    id: `LT${ctx.turn}-${actor}-${a.id.replace(`${actor}-${ctx.turn}-`, '')}`, turn: ctx.turn, date: ctx.state.date, from: actor, to: a.target,
     fromTitle: from.title, toTitle: to.title, place: from.capital, subject: a.subject.trim(), body: a.body.trim(), tone: a.tone, visibility: a.visibility,
     ...(a.inReplyTo ? { inReplyTo: a.inReplyTo } : {}), source, ...(source !== 'human' && a.model ? { model: a.model } : {}),
   };

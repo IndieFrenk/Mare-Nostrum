@@ -1,5 +1,5 @@
 import type { AgentMemory } from '../schemas/index.js';
-import type { AgentsPort } from '../engine/turn-machine.js';
+import type { AgentsPort, LetterJob, LetterResult } from '../engine/turn-machine.js';
 import type { JsonStore } from '../store/json-store.js';
 
 /** Rilegge decisioni, narrativa e memoria salvate: nessuna chiamata LLM. */
@@ -31,6 +31,21 @@ export class ReplayAgents implements AgentsPort {
     const f = this.store.dir(this.sourceId, 'memory', 'history', `${factionId}-turn-${String(campaign.currentTurn).padStart(4, '0')}.json`);
     return readFile(f, 'utf8').then(JSON.parse).catch(() => memory);
   }
+
+  /** Le lettere IA sono negli ordini delle decisioni salvate (azioni LETTER, nell'ordine in cui il motore le ha chieste). */
+  async writeLetters(jobs: LetterJob[]): Promise<LetterResult[]> {
+    const used = new Map<string, number>();
+    return Promise.all(jobs.map(async (j) => {
+      const n = used.get(j.factionId) ?? 0; used.set(j.factionId, n + 1);
+      const d = await this.store.getDecision(this.sourceId, j.knowledge.turn, j.factionId);
+      const a = d?.orders.diplomacy.filter((x) => x.kind === 'LETTER')[n];
+      if (!a || a.kind !== 'LETTER') throw new Error(`lettera mancante ${j.factionId} → ${j.to} T${j.knowledge.turn}`);
+      const info = d!.letters.find((l) => l.actionId === a.id);
+      return { subject: a.subject, body: a.body, tone: a.tone, source: info?.source ?? (a.model === 'template' ? 'template' : 'ai'), model: a.model ?? 'replay', errors: info?.errors ?? [] };
+    }));
+  }
+
+  async draftLetter(): Promise<never> { throw new Error('bozze non disponibili in replay'); }
 
   async parseOrders(): Promise<never> { throw new Error('parse non disponibile in replay'); }
 }

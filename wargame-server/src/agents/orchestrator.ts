@@ -1,9 +1,10 @@
 import type { AgentDecision, LlmCall } from '../schemas/index.js';
-import type { AgentsPort, DecideInput } from '../engine/turn-machine.js';
+import type { AgentsPort, DecideInput, LetterJob, LetterResult } from '../engine/turn-machine.js';
 import { loadScenario } from '../engine/scenario.js';
 import { decide } from './faction-agent.js';
 import { writeBriefing, writeDebriefing, writeNews } from './gm-narrator.js';
 import { analyze } from './intel-analyst.js';
+import { writeLetter } from './letter-writer.js';
 import type { LlmProvider } from './llm-client.js';
 import { parseOrders } from './order-parser.js';
 import { reflect } from './reflection.js';
@@ -43,6 +44,19 @@ export class LlmAgents implements AgentsPort {
     const [debriefing, news] = await Promise.all([writeDebriefing(this.provider, this.log, campaign, campaign.currentTurn, facts), writeNews(this.provider, this.log, campaign, campaign.currentTurn, publicEvents)]);
     return { debriefing, news };
   }
+
+  /** Una chiamata diplomat per lettera, in parallelo entro maxConcurrentAgents; risultati nell'ordine dei job. */
+  async writeLetters(jobs: LetterJob[], onProgress: (f: string, s: string) => void): Promise<LetterResult[]> {
+    const limit = jobs[0]?.campaign.config.maxConcurrentAgents ?? 2;
+    return pool(jobs, limit, async (j) => {
+      onProgress(j.factionId, `lettera a ${j.to}`);
+      const r = await writeLetter(this.provider, this.log, j);
+      onProgress(j.factionId, r.source === 'template' ? `lettera a ${j.to}: lettera-modello` : `lettera a ${j.to} scritta`);
+      return r;
+    });
+  }
+
+  draftLetter(job: LetterJob) { return writeLetter(this.provider, this.log, job); }
 
   reflect(i: Parameters<AgentsPort['reflect']>[0]) { return reflect(this.provider, this.log, i.campaign, i); }
 

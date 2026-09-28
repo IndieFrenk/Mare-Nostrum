@@ -31,6 +31,7 @@ function generate(role: string, m: M): unknown {
     case 'intel_analyst': return { reports: (m.contacts as M[]).slice(0, 3).map((c) => ({ title: `${c.classification} in ${c.zoneId}`, body: `Traccia attribuita con riserva a ${c.estFaction}; fonti: ${c.sources.join(', ')}.`, relatedContacts: [c.id] })) };
     case 'order_parser': return parser(m);
     case 'reflection': return reflection(m);
+    case 'diplomat': return letter(m);
     default: return {};
   }
 }
@@ -52,7 +53,11 @@ function faction(m: M) {
   for (const ag of legal.pendingAgreements as string[]) diplomacy.push({ id: `r-${ag}`, kind: 'RESPOND_AGREEMENT', agreementId: ag, response: h % 2 ? 'accept' : 'reject' });
   const lot = (legal.procurement as M[]).find((i) => i.id.startsWith('LOT_'));
   const procurement = lot && legal.ownBases.length && legal.budgetMEur > 300 && h % 3 === 1 ? [{ id: 'p1', itemId: lot.id, qty: 1, destinationBaseId: legal.ownBases[0] }] : [];
+  // lettere di iniziativa: una fazione su tre, verso il bersaglio diplomatico del turno (deterministico)
+  const tones = ['cordial', 'formal', 'firm', 'conciliatory'] as const;
+  const letterIntents = target && h % 3 === 2 ? [{ to: target, gist: `La posizione del nostro Governo su ${crises[0]?.title ?? 'le crisi aperte'} resta invariata e proponiamo un canale di dialogo diretto.`, tone: tones[h % tones.length] }] : [];
   return {
+    letterIntents,
     situationAssessment: `Crisi prioritaria: ${crises[0]?.title ?? 'nessuna'}. Postura invariata, preferenza per presenza e diplomazia.`,
     threats: target ? [{ factionId: target, level: 1 + (h % 3), rationale: 'Attività nelle zone di interesse.' }] : [],
     optionsConsidered: [{ label: 'Presenza', summary: `Pattugliamento in ${zone}`, expectedGain: 0.4, risk: 0.2, chosen: true }, { label: 'Attesa', summary: 'Nessuna azione', expectedGain: 0.1, risk: 0.1, chosen: false }],
@@ -91,4 +96,17 @@ function reflection(m: M) {
   const mem = m.memory as M;
   const lesson = m.decision ? `T${m.turn}: ${m.decision.privateIntent}` : null;
   return { ...mem, lessons: lesson ? [...mem.lessons, lesson] : mem.lessons, rollingSummary: `${mem.rollingSummary} ${lesson ?? ''}`.trim() };
+}
+
+/** Lettera plausibile, senza cifre (i numeri li controlla il validatore) e deterministica. */
+function letter(m: M) {
+  const h = hashString(`${m.seed}:${m.factionId}:${m.to}:${m.turn}:${m.kind}`);
+  const tone = m.tone ?? (['formal', 'cordial', 'firm', 'conciliatory'] as const)[h % 4];
+  const title = String(m.toTitle).replace(/^(Il|La) /, '').split(/ (?:del|della|dell'|degli|dei) ?/)[0];
+  const open = [`Signor ${title},`, `Egregio Signor ${title},`][h % 2];
+  const core = m.replySubject
+    ? `ho letto con attenzione la Sua lettera. ${tone === 'firm' ? 'Il mio Governo non può condividerne alcuni passaggi, ma' : 'Il mio Governo ne condivide lo spirito e'} resta disponibile a un confronto franco sulle questioni sollevate.`
+    : `desidero farLe conoscere il pensiero del mio Governo. ${m.gist ?? 'La situazione nel Mediterraneo richiede prudenza da parte di tutti.'} Confido che i nostri Governi sapranno mantenere aperto il dialogo.`;
+  const subject = m.replySubject ? `Risposta: ${String(m.replySubject)}`.slice(0, 120) : ['Dialogo sulle questioni di comune interesse', 'Sicurezza del Mediterraneo', 'Cooperazione e stabilità regionale'][h % 3];
+  return { subject, body: `${open}\n${core}\nVoglia accogliere i sensi della mia più alta considerazione.`, tone };
 }

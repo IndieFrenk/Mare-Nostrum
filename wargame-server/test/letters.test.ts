@@ -7,6 +7,7 @@ import { Rng } from '../src/engine/rng.js';
 import { loadScenario } from '../src/engine/scenario.js';
 import { validateOrders } from '../src/engine/validators.js';
 import { runSim } from '../src/cli/sim.js';
+import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import { makeEngine } from './helpers.js';
 
 const letter = (p: Partial<LetterAction> = {}): LetterAction => ({
@@ -84,4 +85,94 @@ describe('lettere: effetti deterministici del tono', () => {
     expect((await e.store.getKnowledge(c.id, 'LBY_LNA', 2))!.letters.some((l) => l.from === 'ITA')).toBe(true);
     expect((await e.store.getKnowledge(c.id, 'FRA', 2))!.letters.some((l) => l.from === 'ITA')).toBe(false);
   }, 30_000);
+});
+
+describe('lettere: agenti', () => {
+  it('la fazione risponde nel turno dopo alla lettera del giocatore, anche in un turno «senza IA»', async () => {
+    const e = makeEngine();
+    // LBY_GNU è minore: con minorEvery 2 in uno dei due turni decide per dottrina, ma alle lettere del giocatore risponde sempre
+    let c = await e.createCampaign({ scenarioId: 'med-2026', name: 'risposta', seed: 'risposta', config: { agentCadence: { minorEvery: 2, lettersPerTurn: 0 } } });
+    await e.submitOrders(c.id, body(letter({ id: 'a', target: 'LBY_GNU', subject: 'Cooperazione sulla migrazione' }), letter({ id: 'b', target: 'TUR', tone: 'firm' })));
+    c = (await runSim(e, c, 1)).campaign;
+    await e.submitOrders(c.id, body(letter({ id: 'a', target: 'LBY_GNU', subject: 'Cooperazione sulla migrazione' }), letter({ id: 'b', target: 'TUR', tone: 'firm' })));
+    c = (await runSim(e, c, 2)).campaign;
+    const sent = await e.store.getLetters(c.id, 1);
+    const replies = (await e.store.getLetters(c.id, 2)).filter((l) => l.to === 'ITA');
+    for (const l of sent.filter((x) => x.from === 'ITA')) expect(replies.find((r) => r.inReplyTo === l.id), `risposta di ${l.to}`).toMatchObject({ from: l.to, source: 'ai' });
+    const gnu = (await e.store.getDecision(c.id, 2, 'LBY_GNU'))!;
+    expect([gnu.model, (await e.store.getDecision(c.id, 1, 'LBY_GNU'))!.model]).toContain('dottrina');
+    expect(gnu.letters).toMatchObject([{ kind: 'reply', to: 'ITA', source: 'ai' }]);
+    // una sola risposta per fazione per turno, e nessuna iniziativa (lettersPerTurn 0)
+    expect(replies.filter((r) => r.from === 'TUR')).toHaveLength(1);
+    expect((await e.store.getLetters(c.id, 2)).filter((l) => l.from !== 'ITA' && !l.inReplyTo)).toHaveLength(0);
+    // il giocatore vede la risposta nella sua knowledge del turno successivo
+    expect((await e.store.getKnowledge(c.id, 'ITA', 3))!.letters.some((l) => l.from === 'TUR' && l.to === 'ITA')).toBe(true);
+  }, 60_000);
+
+  it('replay identico con lettere del giocatore, risposte e iniziative IA (nessuna chiamata LLM)', async () => {
+    const { ReplayAgents } = await import('../src/agents/replay.js');
+    const { Engine } = await import('../src/engine/turn-machine.js');
+    const e = makeEngine();
+    const src = await e.createCampaign({ scenarioId: 'med-2026', name: 'src', seed: 'replay-lettere' });
+    const r1 = await runSim(e, src, 4, async (t) => { if (t % 2 === 1) await e.submitOrders(src.id, body(letter({ id: `x${t}`, target: t === 1 ? 'TUR' : 'EGY' }))); });
+    const all = (await Promise.all([1, 2, 3, 4].map((t) => e.store.getLetters(src.id, t)))).flat();
+    expect(all.filter((l) => l.inReplyTo).length).toBeGreaterThanOrEqual(2);
+    expect(all.filter((l) => l.from !== 'ITA' && !l.inReplyTo).length).toBeGreaterThan(0);
+    const replay = new Engine(e.store, new ReplayAgents(e.store, src.id));
+    const rc = await replay.createCampaign({ scenarioId: 'med-2026', name: 'rep', seed: src.seed, config: src.config });
+    const r = await runSim(replay, rc, 4, async (t) => { const o = await e.store.getOrders(src.id, t, 'ITA'); if (o) await e.store.saveOrders(rc.id, o); });
+    for (let t = 1; t <= 4; t++) {
+      expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(r1.campaign.id, t));
+      expect((await e.store.getLetters(r.campaign.id, t)).map((l) => [l.id, l.body])).toEqual((await e.store.getLetters(src.id, t)).map((l) => [l.id, l.body]));
+    }
+  }, 60_000);
+
+  it('corpo con numeri inventati → 1 repair → lettera-modello breve e cortese', async () => {
+    const mock = new MockLLMProvider();
+    const roles: string[] = [];
+    const provider = { name: 'inventa', complete: async (r: Parameters<MockLLMProvider['complete']>[0]) => {
+      roles.push(r.role === 'repair' ? `repair:${r.meta.repairOf}` : r.role);
+      const res = await mock.complete(r);
+      if (r.role !== 'diplomat' && r.meta.repairOf !== 'diplomat') return res;
+      const d = JSON.parse(res.text);
+      return { ...res, text: JSON.stringify({ ...d, body: `${d.body} Abbiamo schierato 47 navi e 312 aerei.` }) };
+    } };
+    const e = makeEngine(provider as never);
+    let c = await e.createCampaign({ scenarioId: 'med-2026', name: 'numeri', seed: 'numeri', config: { agentCadence: { lettersPerTurn: 0 } } });
+    await e.submitOrders(c.id, body(letter({ target: 'TUR' })));
+    c = (await runSim(e, c, 2)).campaign;
+    const reply = (await e.store.getLetters(c.id, 2)).find((l) => l.from === 'TUR' && l.to === 'ITA')!;
+    expect(reply).toMatchObject({ source: 'template', model: 'template', tone: 'formal', inReplyTo: 'LT1-ITA-l1' });
+    expect(reply.body).not.toMatch(/\d/);
+    expect(reply.body).toMatch(/^Signor Presidente,/);
+    expect(reply.subject).toBe(`Risposta: ${letter().subject}`);
+    const d = (await e.store.getDecision(c.id, 2, 'TUR'))!;
+    expect(d.letters[0]!.errors.join()).toContain('47');
+    expect(roles.filter((x) => x === 'diplomat')).toHaveLength(1);
+    expect(roles.filter((x) => x === 'repair:diplomat')).toHaveLength(1);
+    const log = await import('node:fs/promises').then((fs) => fs.readFile(e.store.dir(c.id, 'llm-log', 'turn-0002.jsonl'), 'utf8'));
+    expect(log).toContain('numeri non presenti nella situazione del mittente');
+  }, 60_000);
+
+  it('tetto lettersPerTurn: prima le maggiori, poi per id; le lettere messe dal modello negli ordini vengono tolte', async () => {
+    const mock = new MockLLMProvider();
+    const provider = { name: 'epistolare', complete: async (r: Parameters<MockLLMProvider['complete']>[0]) => {
+      const res = await mock.complete(r);
+      if (r.role !== 'faction_major' && r.role !== 'faction_minor') return res;
+      const d = JSON.parse(res.text);
+      const f = String(r.meta.factionId);
+      d.letterIntents = [{ to: f === 'GRC' ? 'EGY' : 'GRC', gist: 'Proposta di dialogo.', tone: 'cordial' }, { to: 'ITA', gist: 'Saluti.', tone: 'formal' }, { to: 'EGY', gist: 'Terza.', tone: 'formal' }];
+      d.orders.diplomacy.push({ id: 'z', kind: 'LETTER', target: 'ITA', subject: 'abusiva', body: 'non dovrebbe passare', tone: 'cordial', visibility: 'public' });
+      return { ...res, text: JSON.stringify(d) };
+    } };
+    const e = makeEngine(provider as never);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'tetto', seed: 'tetto', config: { agentCadence: { lettersPerTurn: 3 } } });
+    await e.advance(c.id);
+    const letters = await e.store.getLetters(c.id, 1);
+    expect(letters.map((l) => `${l.from}>${l.to}`)).toEqual(['CHN>GRC', 'CHN>ITA', 'FRA>GRC']);
+    expect(letters.some((l) => l.subject === 'abusiva')).toBe(false);
+    const fra = (await e.store.getDecision(c.id, 1, 'FRA'))!;
+    expect(fra.orders.diplomacy.filter((x) => x.kind === 'LETTER')).toHaveLength(1);
+    expect((await e.store.getDecision(c.id, 1, 'USA'))!.letters).toEqual([]);
+  }, 60_000);
 });
