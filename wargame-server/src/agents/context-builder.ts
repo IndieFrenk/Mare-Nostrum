@@ -1,5 +1,6 @@
 import type { AgentMemory, FactionKnowledge } from '../schemas/index.js';
 import type { Scenario } from '../engine/scenario.js';
+import { stanceForces } from '../engine/stances.js';
 
 /** Azioni lecite per una fazione, derivate SOLO dalla sua Knowledge e dal catalogo pubblico. */
 export function legalActions(k: FactionKnowledge, sc: Scenario) {
@@ -9,6 +10,8 @@ export function legalActions(k: FactionKnowledge, sc: Scenario) {
     units: k.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => ({ id: u.id, name: u.name, type: u.type, zoneId: u.zoneId, status: u.status, readiness: u.readiness, count: u.count, loadout: u.loadout })),
     isrAssets: f.isrAssets.map((a) => ({ id: a.id, type: a.type, coverage: a.coverage })),
     seaZones: Object.values(sc.world.zones).filter((z) => z.terrain === 'sea').map((z) => z.id),
+    // per zoneStances: quante unità il motore può mandare in ogni zona di mare (conteggi, non id: li sceglie il motore)
+    unitsPerSeaZone: stanceForces(k.ownUnits, sc.world.zones),
     landZones: Object.values(sc.world.zones).filter((z) => z.terrain === 'land').map((z) => z.id),
     ownBases: Object.values(sc.world.bases).filter((b) => b.factionId === f.id).map((b) => b.id),
     strikeTargets: { contacts: k.contacts.map((c) => c.id), infrastructure: Object.keys(sc.world.infrastructure) },

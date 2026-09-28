@@ -95,12 +95,12 @@ export const DecisionOutput = z.object({
   threats: z.array(z.object({ factionId: FactionId, level: z.number(), rationale: z.string() })).default([]),
   optionsConsidered: z.array(z.object({ label: z.string(), summary: z.string(), expectedGain: z.number(), risk: z.number(), chosen: z.boolean() })).default([]),
   privateIntent: z.string(),
+  /** posture per zona (modo principale per le IA di usare le forze): il motore le traduce in ordini militari (engine/stances.ts) */
+  zoneStances: z.array(ZoneStance).default([]),
   orders: OrdersBody,
   confidence: z.number().min(0).max(1),
   /** lettere che la fazione vuole scrivere (max 1 per le minori, 2 per le maggiori): il testo lo scrive poi il ruolo diplomat */
   letterIntents: z.array(z.object({ to: FactionId, gist: z.string(), tone: LetterTone })).default([]),
-  /** posture per zona (modo principale per le IA di usare le forze): il motore le traduce in ordini militari */
-  zoneStances: z.array(ZoneStance).default([]),
 });
 export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   schemaVersion: z.literal(1), id: z.string(), factionId: FactionId, turn: Turn,

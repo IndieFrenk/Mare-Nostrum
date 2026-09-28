@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Unit } from '../src/schemas/index.js';
+import type { LlmProvider } from '../src/agents/llm-client.js';
+import { MockLLMProvider } from '../src/agents/mock-provider.js';
 import { loadScenario } from '../src/engine/scenario.js';
 import { stanceForces, translateStances } from '../src/engine/stances.js';
+import { makeEngine } from './helpers.js';
 
 const sc = loadScenario('med-2026');
 const zones = sc.world.zones;
@@ -102,4 +105,37 @@ describe('posture per zona → ordini (traduttore deterministico)', () => {
     expect(f.CANALE_SICILIA).toBe(2);
     expect(f.LIBIA_TERRA).toBeUndefined();
   });
+});
+
+describe('posture per zona in una decisione IA', () => {
+  it('le posture diventano ordini validati, registrati con la loro origine ed eseguiti dal motore', async () => {
+    const mock = new MockLLMProvider();
+    // TUR risponde come un modello piccolo: posture + un ordine preciso a TUR-FF2 + una postura in una zona inventata
+    const provider: LlmProvider = { name: 'fisso', complete: async (req) => {
+      if (req.role !== 'faction_major' || req.meta.factionId !== 'TUR') return mock.complete(req);
+      const text = JSON.stringify({
+        situationAssessment: 'Egeo teso.', privateIntent: 'Mostrare i muscoli senza sparare.',
+        zoneStances: [{ zoneId: 'EGEO', stance: 'show_of_force', intensity: 2 }, { zoneId: 'ATLANTIDE', stance: 'patrol', intensity: 1 }, { zoneId: 'EGEO', stance: 'dance', intensity: 1 }],
+        orders: { military: [{ id: 'x', kind: 'PATROL', unitIds: ['TUR-FF2'], zoneId: 'EGEO', roe: 'WEAPONS_TIGHT' }] }, confidence: 0.5,
+      });
+      return { text, usage: { promptTokens: 1, completionTokens: 1 }, latencyMs: 0, model: 'fisso' };
+    } };
+    const e = makeEngine(provider);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 's', seed: 'stances' });
+    await e.advance(c.id);
+    const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
+    expect(d.validation).toMatchObject({ valid: true, fallbackUsed: false });
+    expect(d.zoneStances).toEqual([{ zoneId: 'EGEO', stance: 'show_of_force', intensity: 2 }, { zoneId: 'ATLANTIDE', stance: 'patrol', intensity: 1 }]);
+    const [explicit, sof] = d.orders.military;
+    expect(explicit).toMatchObject({ kind: 'PATROL', unitIds: ['TUR-FF2'] });
+    expect(sof).toMatchObject({ kind: 'SHOW_OF_FORCE', zoneId: 'EGEO', roe: 'WEAPONS_TIGHT' });
+    const ids = (sof as { unitIds: string[] }).unitIds;
+    expect(ids).toHaveLength(3);
+    expect(ids).not.toContain('TUR-FF2');
+    expect(d.stanceOrders).toEqual([{ orderId: sof!.id, stance: 'show_of_force', zoneId: 'EGEO' }]);
+    expect(d.validation.errors).toContain('postura — postura patrol in ATLANTIDE: zona sconosciuta');
+    // il motore le ha eseguite come ordini normali
+    const s = await e.store.getState(c.id, 1);
+    for (const id of ids) expect(s.units[id]!.currentTask).toMatchObject({ kind: 'SHOW_OF_FORCE', zoneId: 'EGEO' });
+  }, 30_000);
 });
