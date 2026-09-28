@@ -13,6 +13,8 @@ export const config = {
   dataDir: process.env.WARGAME_DATA_DIR ?? path.join(root, 'data', 'campaigns'),
   corsOrigin: process.env.WARGAME_CORS_ORIGIN ?? 'http://localhost:5173',
   mock: process.env.WARGAME_MOCK === '1',
+  /** WARGAME_ALLOW_OFFLINE=1: ▶ anche con i modelli irraggiungibili (turni con gli ordini di dottrina) */
+  allowOffline: process.env.WARGAME_ALLOW_OFFLINE === '1',
 };
 
 /**
