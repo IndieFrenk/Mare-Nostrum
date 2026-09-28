@@ -28,7 +28,8 @@ export function extractJson(text: string): unknown {
  * Toglie dallo schema i vincoli che diversi provider rifiutano in response_format (es. Cohere: «non-supported
  * constraint minLength»). La risposta viene comunque validata con Zod, quindi i vincoli non si perdono.
  */
-const UNSUPPORTED = new Set(['minLength', 'maxLength', 'pattern', 'format', 'minItems', 'maxItems', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
+// minItems/maxItems restano: fermano i modelli locali che ripetono gli elementi di una lista
+const UNSUPPORTED = new Set(['minLength', 'maxLength', 'pattern', 'format', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', '$schema']);
 export function portableSchema(s: unknown, names = false): unknown {
   if (Array.isArray(s)) return s.map((x) => portableSchema(x));
   if (!s || typeof s !== 'object') return s;

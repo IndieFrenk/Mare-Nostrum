@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { AgentDecision, DecisionOutput as DecisionOutputT, FactionOrders, OrdersBody } from '../schemas/index.js';
-import { DecisionOutput } from '../schemas/index.js';
+import { DecisionOutput, DiploAction, Order, ProcurementOrder, PublicStatement } from '../schemas/index.js';
 import type { DecideInput } from '../engine/turn-machine.js';
 import { validateOrders } from '../engine/validators.js';
 import { legalActions, memoryText, situation } from './context-builder.js';
@@ -9,7 +9,26 @@ import type { LlmProvider } from './llm-client.js';
 import { template } from './prompts.js';
 import { callStructured } from './repair.js';
 
-const DECISION_SCHEMA = z.toJSONSchema(DecisionOutput, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
+/** Tetti per turno: i modelli piccoli a volte ripetono ordini all'infinito finché finiscono i token (JSON troncato). */
+export const ORDER_CAPS = { military: 8, diplomacy: 4, procurement: 3, statements: 2, threats: 5, options: 4 } as const;
+// schema inviato al modello: maxItems ferma la generazione (grammatica di Ollama/llama.cpp)
+const DecisionForModel = DecisionOutput.extend({
+  threats: DecisionOutput.shape.threats.unwrap().max(ORDER_CAPS.threats).default([]),
+  optionsConsidered: DecisionOutput.shape.optionsConsidered.unwrap().max(ORDER_CAPS.options).default([]),
+  orders: z.object({
+    military: z.array(Order).max(ORDER_CAPS.military).default([]), diplomacy: z.array(DiploAction).max(ORDER_CAPS.diplomacy).default([]),
+    procurement: z.array(ProcurementOrder).max(ORDER_CAPS.procurement).default([]), statements: z.array(PublicStatement).max(ORDER_CAPS.statements).default([]),
+  }),
+});
+const DECISION_SCHEMA = z.toJSONSchema(DecisionForModel, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
+/** in lettura si tagliano le liste troppo lunghe invece di scartare la risposta (provider senza grammatica) */
+const cap = (n: number) => (v: unknown) => (Array.isArray(v) ? v.slice(0, n) : v);
+const DecisionLenient = z.preprocess((raw) => {
+  if (!raw || typeof raw !== 'object') return raw;
+  const d = raw as Record<string, unknown>; const o = (d.orders ?? {}) as Record<string, unknown>;
+  return { ...d, threats: cap(ORDER_CAPS.threats)(d.threats), optionsConsidered: cap(ORDER_CAPS.options)(d.optionsConsidered),
+    orders: { ...o, military: cap(ORDER_CAPS.military)(o.military), diplomacy: cap(ORDER_CAPS.diplomacy)(o.diplomacy), procurement: cap(ORDER_CAPS.procurement)(o.procurement), statements: cap(ORDER_CAPS.statements)(o.statements) } };
+}, DecisionOutput);
 
 /** Id univoci e prefissati: gli LLM spesso ripetono "o1". */
 function normalize(o: OrdersBody, factionId: string, turn: number): OrdersBody {
@@ -83,7 +102,7 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
     user: template('faction-user', { turn: String(k.turn), date: i.campaign.date, situation: JSON.stringify(situation(k)), memory: memoryText(i.memory), legal: JSON.stringify(legal) }),
     schemaName: 'AgentDecision', jsonSchema: DECISION_SCHEMA,
     meta: { factionId: i.factionId, turn: k.turn, seed: i.campaign.seed, legal, situation: situation(k), posture: f.posture },
-  }, DecisionOutput, check);
+  }, DecisionLenient, check);
   const out = r.value;
   const orders: FactionOrders = { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: out ? 'ai' : 'fallback_doctrine', ...(out ? normalize(out.orders, i.factionId, k.turn) : doctrineOrders(i)) };
   return {

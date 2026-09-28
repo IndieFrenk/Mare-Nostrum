@@ -85,7 +85,7 @@ describe('client OpenAI-compatible: errori 400 che non riguardano lo schema', ()
 describe('schema portabile per response_format', () => {
   it('toglie i vincoli che Cohere & co. rifiutano, lascia struttura e tipi', () => {
     const s = { $schema: 'x', type: 'object', properties: { factionId: { type: 'string', minLength: 2 }, list: { type: 'array', items: { type: 'number', minimum: 0 }, maxItems: 3 } }, required: ['factionId'] };
-    expect(portableSchema(s)).toEqual({ type: 'object', properties: { factionId: { type: 'string' }, list: { type: 'array', items: { type: 'number' } } }, required: ['factionId'] });
+    expect(portableSchema(s)).toEqual({ type: 'object', properties: { factionId: { type: 'string' }, list: { type: 'array', items: { type: 'number' }, maxItems: 3 } }, required: ['factionId'] });
     // un campo che si chiama «format» resta
     expect(portableSchema({ type: 'object', properties: { format: { type: 'string', maxLength: 5 } } })).toEqual({ type: 'object', properties: { format: { type: 'string' } } });
   });

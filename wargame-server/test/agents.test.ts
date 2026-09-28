@@ -131,3 +131,23 @@ describe('ordini impossibili scartati invece di buttare la decisione', () => {
     expect(trimFormat(s, ['ISR', 'SOF_OP', 'PATROL'])).toBe(s);
   });
 });
+
+describe('tetti agli ordini per turno', () => {
+  it('liste troppo lunghe vengono tagliate invece di scartare la decisione', async () => {
+    const { ORDER_CAPS } = await import('../src/agents/faction-agent.js');
+    const mock = new MockLLMProvider();
+    const provider = { name: 'logorroico', complete: async (r: Parameters<MockLLMProvider['complete']>[0]) => {
+      const res = await mock.complete(r);
+      if (r.role !== 'faction_major' || r.meta.factionId !== 'TUR') return res;
+      const d = JSON.parse(res.text);
+      d.orders.statements = Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, audience: 'opinione pubblica', text: `Dichiarazione ${i}`, tone: 'firm' }));
+      return { ...res, text: JSON.stringify(d) };
+    } };
+    const e = makeEngine(provider as never);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cap', seed: 'cap' });
+    await e.advance(c.id);
+    const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
+    expect(d.validation.fallbackUsed).toBe(false);
+    expect(d.orders.statements).toHaveLength(ORDER_CAPS.statements);
+  }, 30_000);
+});
