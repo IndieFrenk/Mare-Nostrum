@@ -2,7 +2,7 @@
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
 import { api } from './api-client';
-import { configure, createCampaign, leaveCampaign, openCampaign, rememberedCampaign, runTurn, selectUnit } from './actions';
+import { configure, createCampaign, leaveCampaign, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
 import { WarMap } from './layers/map';
 import { countryCard, orderToZone, selectionCard } from './panels/hud';
@@ -10,7 +10,7 @@ import { set, state, subscribe, type UiState } from './state/store';
 import { WARGAME_VARIANT } from './variant';
 
 const root = document.getElementById('wg-app')!;
-const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
+const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', letters: '✉', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
 let map: WarMap | null = null;
 const mapEl = h('div', { id: 'wg-map' });
 const hud = h('div', { id: 'wg-hud' });
@@ -37,6 +37,8 @@ function alerts(s: UiState) {
   if (s.cmo.length) items.push(['cmo', `${s.cmo.length} ingaggi per CMO`, 'crit']);
   for (const c of s.knowledge?.knownCrises ?? []) if (c.escalation >= 7) items.push(['crises', `${c.title}: ${c.escalation}/10`, 'crit']);
   if (s.knowledge?.inbox.length) items.push(['diplomacy', `${s.knowledge.inbox.length} messaggi diplomatici`, 'info']);
+  const unread = unreadLetters().length;
+  if (unread) items.push(['letters', unread === 1 ? '1 lettera nuova' : `${unread} lettere nuove`, 'info']);
   const pending = s.draft.military.length + s.draft.diplomacy.length + s.draft.procurement.length;
   if (s.campaign?.phase === 'PLAYER_ORDERS' && pending && !s.submitted) items.push(['orders', `${pending} ordini in bozza`, 'info']);
   if (s.overview?.pendingDeliveries.length) items.push(['procurement', `${s.overview.pendingDeliveries.length} consegne in arrivo`, 'info']);

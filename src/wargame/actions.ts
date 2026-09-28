@@ -1,4 +1,4 @@
-import { api, ApiError } from './api-client';
+import { api, ApiError, type LetterAction, type LetterTone } from './api-client';
 import { emptyDraft, set, state } from './state/store';
 
 const LAYERS = ['units', 'contacts', 'crises', 'infrastructure', 'lanes', 'zones', 'control'];
@@ -27,7 +27,7 @@ export const openCampaign = (id: string) => guarded(async () => {
     const line = m.agent ? `${m.agent}: ${m.status}` : m.phase ? `Turno ${m.turn} · ${m.phase}` : null;
     if (line) set({ progress: [...state.progress.slice(-30), line] });
   });
-  set({ campaignId: id, draft: emptyDraft(), validation: null, submitted: false, progress: [], running: null });
+  set({ campaignId: id, draft: emptyDraft(), validation: null, submitted: false, progress: [], running: null, lettersSeen: seenLetters(id) });
   await refresh();
   await checkRunning();
 });
@@ -58,16 +58,16 @@ export async function refresh() {
   if (!id) return;
   const campaign = await api.campaign(id);
   const t = campaign.currentTurn;
-  const [knowledge, overview, narrative, previous, ledger, catalog, events, cmo, ...layers] = await Promise.all([
+  const [knowledge, overview, narrative, previous, ledger, catalog, events, cmo, letters, ...layers] = await Promise.all([
     api.knowledge(id), api.overview(id), api.narrative(id, t), t > 1 ? api.narrative(id, t - 1) : Promise.resolve(null), api.ledger(id), api.catalog(id),
-    api.events(id, Math.max(1, t - 1)), api.cmo(id), ...LAYERS.map((l) => api.layer(id, l)),
+    api.events(id, Math.max(1, t - 1)), api.cmo(id), api.letters(id), ...LAYERS.map((l) => api.layer(id, l)),
   ]);
   const layerMap = Object.fromEntries(LAYERS.map((l, i) => [l, layers[i]!]));
   const alive = new Set(knowledge.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => u.id));
   state.selection = state.selection.filter((x) => alive.has(x));
   state.selectedUnitId = state.selection[0] ?? null;
   if (state.selectedUnitId) layerMap.ranges = await api.layer(id, 'ranges', state.selectedUnitId);
-  set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, layers: layerMap });
+  set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, letters, layers: layerMap });
 }
 
 export const createCampaign = (name: string, seed: string, opts: { debugGodView: boolean; cmoOnRequest: boolean; turnLength: 'week' | 'month' }) => guarded(async () => {
@@ -124,3 +124,30 @@ export const endCampaign = () => guarded(async () => { await api.end(state.campa
 export const leaveCampaign = () => { remember(null); closeStream?.(); set({ campaignId: null, campaign: null }); };
 
 export const configure = (patch: { turnLength?: 'week' | 'month'; cmoOnRequest?: boolean }) => guarded(async () => { set({ campaign: await api.configure(state.campaignId!, patch) }); });
+
+// ——— lettere ———
+
+function seenLetters(id: string): string[] {
+  try { return JSON.parse(localStorage.getItem(`wg-letters-seen-${id}`) ?? '[]') as string[]; } catch { return []; }
+}
+/** Segna come lette le lettere ricevute (solo in questo browser). */
+export function markLettersSeen(ids: string[]) {
+  const id = state.campaignId;
+  if (!id || ids.every((x) => state.lettersSeen.includes(x))) return;
+  const lettersSeen = [...new Set([...state.lettersSeen, ...ids])];
+  try { localStorage.setItem(`wg-letters-seen-${id}`, JSON.stringify(lettersSeen)); } catch { /* storage non disponibile */ }
+  set({ lettersSeen });
+}
+export const unreadLetters = () => state.letters.filter((l) => l.to === state.campaign?.playerFaction && !state.lettersSeen.includes(l.id));
+
+/** Bozza scritta dall'LLM a nome dell'Italia (non cambia lo stato): torna al chiamante per la revisione. */
+export async function draftLetter(b: { target: string; gist: string; tone: LetterTone; inReplyTo?: string }) {
+  let out: Awaited<ReturnType<typeof api.draftLetter>> | null = null;
+  await guarded(async () => { out = await api.draftLetter(state.campaignId!, b); });
+  return out as Awaited<ReturnType<typeof api.draftLetter>> | null;
+}
+
+/** La lettera entra nella bozza degli ordini e parte col turno (validatore: al massimo 2 per turno). */
+export function queueLetter(l: LetterAction) {
+  set({ draft: { ...state.draft, diplomacy: [...state.draft.diplomacy, l] }, validation: null, submitted: false });
+}

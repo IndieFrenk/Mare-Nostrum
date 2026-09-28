@@ -107,6 +107,6 @@ function letter(m: M) {
   const core = m.replySubject
     ? `ho letto con attenzione la Sua lettera. ${tone === 'firm' ? 'Il mio Governo non può condividerne alcuni passaggi, ma' : 'Il mio Governo ne condivide lo spirito e'} resta disponibile a un confronto franco sulle questioni sollevate.`
     : `desidero farLe conoscere il pensiero del mio Governo. ${m.gist ?? 'La situazione nel Mediterraneo richiede prudenza da parte di tutti.'} Confido che i nostri Governi sapranno mantenere aperto il dialogo.`;
-  const subject = m.replySubject ? `Risposta: ${String(m.replySubject)}`.slice(0, 120) : ['Dialogo sulle questioni di comune interesse', 'Sicurezza del Mediterraneo', 'Cooperazione e stabilità regionale'][h % 3];
+  const subject = m.replySubject ? `Risposta: ${String(m.replySubject).replace(/^(Risposta:\s*)+/i, '')}`.slice(0, 120) : ['Dialogo sulle questioni di comune interesse', 'Sicurezza del Mediterraneo', 'Cooperazione e stabilità regionale'][h % 3];
   return { subject, body: `${open}\n${core}\nVoglia accogliere i sensi della mia più alta considerazione.`, tone };
 }

@@ -1,4 +1,4 @@
-import type { Campaign, CatalogView, FactionKnowledge, FC, GameEvent, LedgerEntry, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
+import type { Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
 
 export interface UiState {
   campaignId: string | null;
@@ -11,6 +11,10 @@ export interface UiState {
   catalog: CatalogView | null;
   events: GameEvent[];
   cmo: PendingCmo[];
+  /** lettere visibili al giocatore, tutti i turni */
+  letters: DiploLetter[];
+  /** id delle lettere ricevute già lette (per campagna, in localStorage) */
+  lettersSeen: string[];
   layers: Record<string, FC>;
   selectedUnitId: string | null;
   /** selezione multipla (stile grand strategy); selectedUnitId è la prima */
@@ -37,7 +41,7 @@ type Listener = (s: UiState) => void;
 const listeners = new Set<Listener>();
 
 export const state: UiState = {
-  campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [],
+  campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [], letters: [], lettersSeen: [],
   layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null,
 };
 

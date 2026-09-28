@@ -1,4 +1,5 @@
 import { h, pct } from '../dom';
+import { NAMES } from '../layers/factions';
 import type { UiState } from '../state/store';
 
 const doc = (d: { title: string; sections: { heading: string; body: string }[] } | undefined | null) =>
@@ -20,9 +21,15 @@ export function intelPanel(s: UiState) {
 
 export function newsPanel(s: UiState) {
   const news = [...(s.previous?.news ?? []), ...(s.knowledge?.publicNews ?? [])].filter((n, i, a) => a.findIndex((x) => x.id === n.id) === i);
-  return h('div', {}, news.length ? news.map((n) => h('article', { class: 'wg-card' },
+  // le lettere pubbliche sono anche notizie: le ultime due settimane di gioco
+  const turn = s.campaign?.currentTurn ?? 0;
+  const open = s.letters.filter((l) => l.visibility === 'public' && l.turn >= turn - 2).reverse();
+  return h('div', {}, open.map((l) => h('article', { class: 'wg-card' },
+    h('div', { class: 'wg-row' }, h('strong', {}, '✉ Lettera aperta'), h('span', { class: 'wg-dim' }, `${NAMES[l.from] ?? l.from} → ${NAMES[l.to] ?? l.to} · T${l.turn}`)),
+    h('h4', {}, l.subject), h('p', {}, l.body.length > 280 ? `${l.body.slice(0, 280)}…` : l.body))),
+  news.length ? news.map((n) => h('article', { class: 'wg-card' },
     h('div', { class: 'wg-row' }, h('strong', {}, n.outlet), h('span', { class: 'wg-dim' }, `${n.outletFaction} · bias ${n.bias > 0 ? '+' : ''}${n.bias} · T${n.turn}`)),
-    h('h4', {}, n.headline), h('p', {}, n.body))) : h('p', { class: 'wg-dim' }, 'Nessuna notizia.'));
+    h('h4', {}, n.headline), h('p', {}, n.body))) : open.length ? null : h('p', { class: 'wg-dim' }, 'Nessuna notizia.'));
 }
 
 export function crisesPanel(s: UiState) {

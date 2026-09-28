@@ -36,7 +36,7 @@ function buildDiplo(f: HTMLFormElement): DiploAction {
   return { id, kind: kind as 'DEMARCHE', target, message, visibility: 'public' };
 }
 
-const describe = (o: { kind: string } & Record<string, unknown>) => `${o.kind} ${['unitIds', 'assetIds'].map((k) => (o[k] as string[] | undefined)?.join(',')).filter(Boolean).join(' ')} ${o.zoneId ?? o.to ?? o.targetRef ?? o.target ?? o.itemId ?? ''} ${o.roe ?? ''}`;
+const describe = (o: { kind: string } & Record<string, unknown>) => o.kind === 'LETTER' ? `✉ LETTERA a ${o.target} «${o.subject}» (${o.visibility === 'public' ? 'pubblica' : 'riservata'})` : `${o.kind} ${['unitIds', 'assetIds'].map((k) => (o[k] as string[] | undefined)?.join(',')).filter(Boolean).join(' ')} ${o.zoneId ?? o.to ?? o.targetRef ?? o.target ?? o.itemId ?? ''} ${o.roe ?? ''}`;
 
 export function ordersPanel(s: UiState) {
   const k = s.knowledge;
@@ -64,11 +64,12 @@ export function ordersPanel(s: UiState) {
       select('asset', k.ownFaction.isrAssets.map((a) => [a.id, `${a.id} (${a.type})`] as [string, string])), select('faction', factions), select('effect', ['espionage', 'disruption', 'defense_hardening']),
       h('input', { name: 'text', placeholder: 'Obiettivo SOF' }), h('button', { type: 'submit' }, 'Aggiungi')),
     h('h4', {}, 'Azione diplomatica'),
+    h('p', { class: 'wg-dim' }, 'Le lettere ai capi di Stato si scrivono nel pannello ✉ Lettere ed entrano qui nella bozza.'),
     h('form', { onsubmit: addDiplo, class: 'wg-form' }, select('dkind', DIPLO), select('dtarget', factions), h('input', { name: 'dtext', placeholder: 'Messaggio / oggetto' }), h('input', { name: 'damount', type: 'number', placeholder: 'M€ (aiuti)' }), h('button', { type: 'submit' }, 'Aggiungi')),
     h('h4', {}, 'Bozza'),
     h('ul', { class: 'wg-draft' },
       d.military.map((o) => h('li', {}, describe(o as never), h('button', { onclick: () => remove('military', o.id) }, '×'))),
-      d.diplomacy.map((o) => h('li', {}, describe(o as never), h('button', { onclick: () => remove('diplomacy', o.id) }, '×'))),
+      d.diplomacy.map((o) => h('li', {}, describe(o as never), o.kind === 'LETTER' ? h('button', { title: 'Apri nel pannello Lettere', onclick: () => set({ drawer: 'letters' }) }, '✉') : null, h('button', { onclick: () => remove('diplomacy', o.id) }, '×'))),
       d.procurement.map((o) => h('li', {}, `ACQUISTO ${o.qty}× ${o.itemId}`, h('button', { onclick: () => remove('procurement', o.id) }, '×')))),
     h('div', { class: 'wg-row' }, h('button', { onclick: validateDraft }, 'Valida'), h('button', { onclick: submitDraft, disabled: !phaseOk }, s.submitted ? 'Inviati ✓' : 'Invia ordini')),
     s.validation ? h('div', { class: 'wg-card' },

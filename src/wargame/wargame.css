@@ -83,3 +83,22 @@ textarea { width: 100%; }
 #wg-lobby { position: relative; max-width: 720px; margin: 10vh auto; padding: 20px; background: var(--panel-bg); border: 1px solid var(--border); }
 #wg-lobby h1 { color: var(--gold); letter-spacing: .3em; font-family: Georgia, serif; }
 @media (max-width: 800px) { .wg-res:nth-of-type(n+4) { display: none; } .wg-drawer { width: calc(100vw - 68px); } .wg-country { top: auto; bottom: 56px; right: 10px; } }
+
+/* Lettere: elenco per interlocutore e foglio di carta chiara dentro il tema scuro */
+.wg-threads, .wg-thread-list { list-style: none; margin: 0; padding: 0; }
+.wg-threads > li { border-bottom: 1px solid var(--line); } .wg-threads > li.on { background: rgba(217,184,98,.06); }
+.wg-thread { width: 100%; display: flex; gap: 8px; align-items: center; background: none; border: none; text-align: left; padding: 6px 4px; }
+.wg-thread span { flex: 1; } .wg-unread { background: var(--gold); color: #1a1408; border-radius: 9px; padding: 0 7px; font-size: 11px; }
+.wg-thread-list { padding: 0 8px 6px 16px; } .wg-thread-list a { color: var(--text); text-decoration: none; display: block; padding: 2px 0; } .wg-thread-list a.unread { color: var(--gold); font-weight: 700; }
+.wg-compose label { display: flex; justify-content: space-between; margin-top: 6px; color: var(--dim); font-size: 12px; }
+.wg-compose input, .wg-compose textarea { width: 100%; box-sizing: border-box; } .wg-compose .wg-row input { flex: 1; }
+.wg-letter { --paper: #f4ecd8; --ink: #2a241a; --ink-dim: #6b5e45; margin: 8px 0; padding: 18px 20px 14px; background: linear-gradient(#f7f0de, var(--paper)); color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif; font-size: 13.5px; line-height: 1.5; border: 1px solid #c9b88a; box-shadow: 0 3px 14px rgba(0,0,0,.55); border-radius: 2px; }
+.wg-letter p { margin: 6px 0; }
+.wg-letter-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-bottom: 1px solid #c9b88a; padding-bottom: 6px; }
+.wg-letter-from { font-variant: small-caps; letter-spacing: .04em; font-weight: 700; } .wg-letter-date { color: var(--ink-dim); font-style: italic; white-space: nowrap; }
+.wg-letter-tags { display: flex; gap: 6px; margin: 6px 0; } .wg-letter-tag { font: 600 10px/1.6 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .08em; padding: 0 6px; border: 1px solid #b9a877; color: var(--ink-dim); border-radius: 2px; }
+.wg-letter-tag.private { border-color: #8a3a2a; color: #8a3a2a; } .wg-letter-tag.public { border-color: #2f5f3a; color: #2f5f3a; }
+.wg-letter-to { color: var(--ink-dim); } .wg-letter-subject { margin: 8px 0 10px !important; }
+.wg-letter-body p { text-indent: 1.2em; } .wg-letter-body p:first-child { text-indent: 0; }
+.wg-letter-sign { text-align: right; font-style: italic; margin-top: 14px !important; }

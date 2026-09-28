@@ -40,6 +40,9 @@ const memoryFor = (m: AgentMemory | null, to: string) => m ? JSON.stringify({
 
 const profileShort = (p: string) => p.split('\n').filter((l) => /^(Interessi|Dottrina|Linee rosse|Stile):/.test(l)).join('\n') || p.slice(0, 600);
 
+/** «Risposta: …» senza raddoppiare il prefisso nelle catene di risposte. */
+export const replySubject = (subject: string) => `Risposta: ${subject.replace(/^(Risposta:\s*)+/i, '')}`.slice(0, LETTER_LIMITS.subject);
+
 /** Lettera-modello breve e cortese, senza numeri: usata se il modello fallisce o inventa numeri. */
 export function templateLetter(job: Pick<LetterJob, 'toTitle' | 'replyTo'>): { subject: string; body: string; tone: 'formal' } {
   // «Il Presidente della Repubblica di Turchia» → «Signor Presidente»
@@ -47,7 +50,7 @@ export function templateLetter(job: Pick<LetterJob, 'toTitle' | 'replyTo'>): { s
   const body = job.replyTo
     ? `${salutation},\nho ricevuto la Sua lettera e La ringrazio per averla voluta indirizzare direttamente a me. Il mio Governo ne sta esaminando i contenuti con la massima attenzione e resta disponibile a proseguire il dialogo per le vie diplomatiche.\nVoglia accogliere i sensi della mia più alta considerazione.`
     : `${salutation},\ndesidero confermarLe la disponibilità del mio Governo a mantenere aperto un canale di dialogo diretto sulle questioni di comune interesse nel Mediterraneo.\nVoglia accogliere i sensi della mia più alta considerazione.`;
-  const subject = job.replyTo ? `Risposta: ${job.replyTo.subject}`.slice(0, LETTER_LIMITS.subject) : 'Dialogo sulle questioni di comune interesse';
+  const subject = job.replyTo ? replySubject(job.replyTo.subject) : 'Dialogo sulle questioni di comune interesse';
   return { subject, body, tone: 'formal' };
 }
 
