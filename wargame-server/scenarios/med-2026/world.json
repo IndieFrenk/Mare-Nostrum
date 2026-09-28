@@ -2299,7 +2299,23 @@
     "NATO"
    ],
    "leaderTitle": "Il Presidente degli Stati Uniti d'America",
-   "capital": "Washington"
+   "capital": "Washington",
+   "policy": {
+    "_nota": "Prudente ma deciso, sanzioni e diplomazia prima della forza (aggr. 0,5 = soglia della risposta di forza); rischio medio; obiettivi Mar Rosso e presenza navale; 6ª Flotta tra Ionio e Mediterraneo orientale.",
+    "aggressiveness": 0.5,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.4,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "MAR_ROSSO": 1,
+     "GOLFO": 0.9,
+     "MEDITERRANEO_ORIENTALE": 0.8,
+     "IONIO": 0.6,
+     "EGEO": 0.4,
+     "MAR_NERO": 0.3
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "FRA",
@@ -2366,7 +2382,23 @@
     "EU"
    ],
    "leaderTitle": "Il Presidente della Repubblica francese",
-   "capital": "Parigi"
+   "capital": "Parigi",
+   "policy": {
+    "_nota": "Assertivo e orientato al prestigio, rischio medio; obiettivi Sahel e Mediterraneo occidentale (Tolone), influenza in Libia.",
+    "aggressiveness": 0.55,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.3,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "MED_OCCIDENTALE": 1,
+     "SAHEL": 0.7,
+     "TIRRENO": 0.6,
+     "MAR_LIBICO": 0.6,
+     "MEDITERRANEO_ORIENTALE": 0.5,
+     "MAR_ROSSO": 0.4
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "TUR",
@@ -2429,7 +2461,22 @@
     "NATO"
    ],
    "leaderTitle": "Il Presidente della Repubblica di Turchia",
-   "capital": "Ankara"
+   "capital": "Ankara",
+   "policy": {
+    "_nota": "Opportunista, diplomazia coercitiva e fatti compiuti, rischio medio-alto; Mavi Vatan (Egeo, Mediterraneo orientale), presenza in Libia (Al-Watiya).",
+    "aggressiveness": 0.7,
+    "riskTolerance": 0.7,
+    "cyberPropensity": 0.4,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "EGEO": 1,
+     "MEDITERRANEO_ORIENTALE": 0.9,
+     "MAR_LIBICO": 0.7,
+     "LIBIA_TERRA": 0.5,
+     "MAR_NERO": 0.5
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "RUS",
@@ -2512,7 +2559,23 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Federazione Russa",
-   "capital": "Mosca"
+   "capital": "Mosca",
+   "policy": {
+    "_nota": "Cinico, strumenti ibridi (cyber alto), evita lo scontro diretto con la NATO (rischio medio); Tartus, Cirenaica/Africa Corps, Mar Nero.",
+    "aggressiveness": 0.6,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.9,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1,
+     "LIBIA_TERRA": 0.9,
+     "MAR_NERO": 0.8,
+     "MAR_LIBICO": 0.6,
+     "SAHEL": 0.5,
+     "IONIO": 0.3
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "CHN",
@@ -2569,7 +2632,20 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Repubblica Popolare Cinese",
-   "capital": "Pechino"
+   "capital": "Pechino",
+   "policy": {
+    "_nota": "Paziente, basso profilo, rischio basso; rotte commerciali (Suez, Bab el-Mandeb) dalla base di Gibuti; spionaggio cyber.",
+    "aggressiveness": 0.2,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.6,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MAR_ROSSO": 1,
+     "GOLFO": 0.5,
+     "MEDITERRANEO_ORIENTALE": 0.3
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "GBR",
@@ -2605,7 +2681,20 @@
     "NATO"
    ],
    "leaderTitle": "Il Primo Ministro del Regno Unito",
-   "capital": "Londra"
+   "capital": "Londra",
+   "policy": {
+    "_nota": "Pragmatico, contributi limitati alle coalizioni, rischio basso; Akrotiri e libertà di navigazione (Suez).",
+    "aggressiveness": 0.35,
+    "riskTolerance": 0.3,
+    "cyberPropensity": 0.3,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1,
+     "MAR_ROSSO": 0.6,
+     "EGEO": 0.2
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "GRC",
@@ -2642,7 +2731,20 @@
     "EU"
    ],
    "leaderTitle": "Il Primo Ministro della Repubblica Ellenica",
-   "capital": "Atene"
+   "capital": "Atene",
+   "policy": {
+    "_nota": "Presenza navale difensiva, rischio medio; sovranità nell'Egeo e contenimento turco.",
+    "aggressiveness": 0.45,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "EGEO": 1,
+     "MEDITERRANEO_ORIENTALE": 0.6,
+     "IONIO": 0.3
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "EGY",
@@ -2676,7 +2778,21 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Repubblica Araba d'Egitto",
-   "capital": "Il Cairo"
+   "capital": "Il Cairo",
+   "policy": {
+    "_nota": "Prudenza, rischio basso; introiti di Suez (Mar Rosso), Zohr, Libia orientale.",
+    "aggressiveness": 0.3,
+    "riskTolerance": 0.25,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MAR_ROSSO": 1,
+     "MEDITERRANEO_ORIENTALE": 0.8,
+     "MAR_LIBICO": 0.4,
+     "LIBIA_TERRA": 0.3
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "ISR",
@@ -2730,7 +2846,20 @@
    },
    "alliances": [],
    "leaderTitle": "Il Primo Ministro dello Stato di Israele",
-   "capital": "Gerusalemme"
+   "capital": "Gerusalemme",
+   "policy": {
+    "_nota": "Azione preventiva e superiorità d'intelligence (cyber alto), rischio alto; giacimenti offshore e contenimento dell'Iran.",
+    "aggressiveness": 0.8,
+    "riskTolerance": 0.8,
+    "cyberPropensity": 0.8,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1,
+     "MAR_ROSSO": 0.8,
+     "GOLFO": 0.4
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "ALG",
@@ -2764,7 +2893,20 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Repubblica Algerina Democratica e Popolare",
-   "capital": "Algeri"
+   "capital": "Algeri",
+   "policy": {
+    "_nota": "Sovranità e non allineamento, rischio basso; Mers el-Kébir, TransMed, Sahel.",
+    "aggressiveness": 0.3,
+    "riskTolerance": 0.25,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MED_OCCIDENTALE": 1,
+     "SAHEL": 0.6,
+     "CANALE_SICILIA": 0.5
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "TUN",
@@ -2798,7 +2940,19 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Repubblica Tunisina",
-   "capital": "Tunisi"
+   "capital": "Tunisi",
+   "policy": {
+    "_nota": "Rischio basso, cerca aiuti e usa la migrazione come leva negoziale: diplomazia conciliante; Biserta e Canale di Sicilia.",
+    "aggressiveness": 0.1,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.05,
+    "diplomacyStyle": "conciliatory",
+    "zoneInterests": {
+     "CANALE_SICILIA": 1,
+     "MAR_LIBICO": 0.4
+    },
+    "maxStancesPerTurn": 1
+   }
   },
   {
    "id": "LBY_GNU",
@@ -2832,7 +2986,20 @@
    },
    "alliances": [],
    "leaderTitle": "Il Primo Ministro del Governo di Unità Nazionale di Libia",
-   "capital": "Tripoli"
+   "capital": "Tripoli",
+   "policy": {
+    "_nota": "Sopravvivenza politica, rischio medio, leva sulle partenze; Tripoli e acque libiche.",
+    "aggressiveness": 0.4,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.05,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MAR_LIBICO": 1,
+     "LIBIA_TERRA": 0.9,
+     "CANALE_SICILIA": 0.4
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "LBY_LNA",
@@ -2866,7 +3033,19 @@
    },
    "alliances": [],
    "leaderTitle": "Il Comandante generale dell'Esercito Nazionale Libico",
-   "capital": "Bengasi"
+   "capital": "Bengasi",
+   "policy": {
+    "_nota": "Controllo della Cirenaica e dei terminali, può bloccare la produzione come leva: rischio medio-alto.",
+    "aggressiveness": 0.65,
+    "riskTolerance": 0.65,
+    "cyberPropensity": 0.05,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "LIBIA_TERRA": 1,
+     "MAR_LIBICO": 0.8
+    },
+    "maxStancesPerTurn": 2
+   }
   },
   {
    "id": "IRN",
@@ -2907,7 +3086,20 @@
    },
    "alliances": [],
    "leaderTitle": "Il Presidente della Repubblica Islamica dell'Iran",
-   "capital": "Teheran"
+   "capital": "Teheran",
+   "policy": {
+    "_nota": "Guerra asimmetrica e negazione plausibile (cyber alto), rischio medio-alto; proxy nel Mar Rosso e leva su Hormuz.",
+    "aggressiveness": 0.7,
+    "riskTolerance": 0.65,
+    "cyberPropensity": 0.8,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "MAR_ROSSO": 1,
+     "GOLFO": 1,
+     "MEDITERRANEO_ORIENTALE": 0.4
+    },
+    "maxStancesPerTurn": 3
+   }
   },
   {
    "id": "NATO",
