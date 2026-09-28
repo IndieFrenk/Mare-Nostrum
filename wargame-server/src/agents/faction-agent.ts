@@ -82,7 +82,7 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
   const dropped: string[] = [];
   const check = (d: DecisionOutputT) => {
     const errorsOf = () => validateOrders(i.state, i.scenario.catalog, i.factionId, normalize(d.orders, i.factionId, k.turn), refs, i.campaign.turnLength).errors;
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < 25; pass++) {
       const errs = errorsOf();
       if (!errs.length) return [];
       const norm = normalize(d.orders, i.factionId, k.turn);
@@ -90,7 +90,18 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
       const keep = <T>(list: T[], ids: { id: string }[]) => list.filter((_, j) => !bad.has(ids[j]!.id));
       const next = { military: keep(d.orders.military, norm.military), diplomacy: keep(d.orders.diplomacy, norm.diplomacy), procurement: keep(d.orders.procurement, norm.procurement), statements: keep(d.orders.statements, norm.statements) };
       const removed = Object.values(d.orders).flat().length - Object.values(next).flat().length;
-      if (!removed) return errs; // errori non legati a un ordine (es. budget): serve il repair
+      if (!removed) {
+        // unico errore non legato a un ordine: budget superato → si tolgono prima gli acquisti, poi gli aiuti, poi gli ordini militari
+        if (!errs.every((e) => e.startsWith('costo stimato'))) return errs; // altri errori globali: serve il repair
+        const o = d.orders;
+        const aid = o.diplomacy.map((x) => x.kind).lastIndexOf('AID');
+        if (o.procurement.length) o.procurement = o.procurement.slice(0, -1);
+        else if (aid >= 0) o.diplomacy = o.diplomacy.filter((_, j) => j !== aid);
+        else if (o.military.length) o.military = o.military.slice(0, -1);
+        else return errs;
+        dropped.push(`${errs[0]} (tolto un ordine)`);
+        continue;
+      }
       dropped.push(...errs.filter((e) => bad.has(e.split(':')[0]!)));
       d.orders = next;
     }

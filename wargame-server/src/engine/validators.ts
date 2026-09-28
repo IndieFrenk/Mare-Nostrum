@@ -11,6 +11,8 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
   if (!f) return { valid: false, errors: [`fazione sconosciuta ${factionId}`], risks, estCost: 0 };
   let cost = 0;
   const used = new Set<string>();
+  const usedAssets = new Set<string>();
+  let cyberOps = 0;
   const zoneOk = (z: string) => !!s.zones[z] || (errors.push(`zona sconosciuta: ${z}`), false);
   const mult = PARAMS.opCostMultiplier[turnLength];
   for (const ord of o.military) {
@@ -45,10 +47,14 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
         break;
       }
       case 'ISR':
-        for (const a of ord.assetIds) if (!f.isrAssets.some((x) => x.id === a)) errors.push(`${ord.id}: asset ISR ${a} non disponibile`);
+        for (const a of ord.assetIds) {
+          if (!f.isrAssets.some((x) => x.id === a)) errors.push(`${ord.id}: asset ISR ${a} non disponibile`);
+          else if (usedAssets.has(a)) errors.push(`${ord.id}: asset ISR ${a} già impiegato in questo turno`);
+          usedAssets.add(a);
+        }
         zoneOk(ord.zoneId); cost += PARAMS.sortieCost.ISR * ord.assetIds.length; break;
       case 'SOF_OP': zoneOk(ord.zoneId); cost += PARAMS.sortieCost.SOF_OP; if (ord.unitIds.some((id) => s.units[id]?.type !== 'sof_team')) errors.push(`${ord.id}: SOF_OP richiede unità sof_team`); break;
-      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: fazione ${ord.target} sconosciuta`); cost += PARAMS.sortieCost.CYBER_OP; break;
+      case 'CYBER_OP': if (!s.factions[ord.target]) errors.push(`${ord.id}: fazione ${ord.target} sconosciuta`); if (++cyberOps > PARAMS.maxCyberOpsPerTurn) errors.push(`${ord.id}: al massimo ${PARAMS.maxCyberOpsPerTurn} operazioni cyber per turno`); cost += PARAMS.sortieCost.CYBER_OP; break;
       case 'ESCORT': if (!s.units[ord.protect] && !s.infrastructure[ord.protect] && !/^convoglio/i.test(ord.protect)) errors.push(`${ord.id}: oggetto da scortare sconosciuto`); break;
       default: break;
     }

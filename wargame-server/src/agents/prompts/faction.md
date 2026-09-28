@@ -40,5 +40,5 @@ diplomacy:
 procurement: {"id","itemId":"articolo del catalogo","qty":intero>=1,"destinationBaseId":"tua base"}
 statements: {"id","audience":"a chi è rivolta","text":"...","tone":"conciliatory"|"firm"|"threatening"}
 Usa solo i tipi elencati in orderKinds e solo id presenti nelle AZIONI LECITE (unità, asset, zone, basi, articoli): mai inventarne.
-Al massimo 8 ordini militari, 4 azioni diplomatiche, 3 acquisti e 2 dichiarazioni per turno.
+Al massimo 8 ordini militari (di cui al massimo 2 CYBER_OP), 4 azioni diplomatiche, 3 acquisti e 2 dichiarazioni per turno. Ogni asset ISR una sola volta. Resta nel budget (budgetMEur): acquisti e aiuti costano.
 Meglio pochi ordini corretti che molti sbagliati: un ordine con campi mancanti fa scartare la risposta.
