@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, Turn, Unit, Visibility, ZoneId } from './world.js';
-import { FactionOrders, OrdersBody } from './orders.js';
+import { FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
 
 export const TurnPhase = z.enum(['OPEN', 'INTEL', 'BRIEFING', 'PLAYER_ORDERS', 'AI_DECISIONS', 'ADJUDICATION', 'CMO_PENDING', 'DEBRIEF', 'CLOSED']);
 export const LlmRoleConfig = z.object({ model: z.string(), temperature: z.number(), maxTokens: z.number(), timeoutMs: z.number() });
@@ -99,12 +99,16 @@ export const DecisionOutput = z.object({
   confidence: z.number().min(0).max(1),
   /** lettere che la fazione vuole scrivere (max 1 per le minori, 2 per le maggiori): il testo lo scrive poi il ruolo diplomat */
   letterIntents: z.array(z.object({ to: FactionId, gist: z.string(), tone: LetterTone })).default([]),
+  /** posture per zona (modo principale per le IA di usare le forze): il motore le traduce in ordini militari */
+  zoneStances: z.array(ZoneStance).default([]),
 });
 export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   schemaVersion: z.literal(1), id: z.string(), factionId: FactionId, turn: Turn,
   model: z.string(), role: AgentRole, promptHash: z.string(), knowledgeRef: z.string(), memoryRef: z.string(),
   orders: FactionOrders,
   validation: z.object({ valid: z.boolean(), errors: z.array(z.string()), repairAttempts: z.number(), fallbackUsed: z.boolean() }),
+  /** da dove viene ogni ordine militare generato dal motore: una postura per zona o il rientro delle unità logorate ('worn') */
+  stanceOrders: z.array(z.object({ orderId: z.string(), stance: z.enum([...STANCES, 'worn']), zoneId: ZoneId.nullable() })).default([]),
   usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
   /** lettere scritte nel turno (risposte e iniziative): il testo è negli ordini (azioni LETTER), qui l'esito della scrittura */
   letters: z.array(z.object({

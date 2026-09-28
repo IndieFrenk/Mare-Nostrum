@@ -70,7 +70,7 @@ export function doctrineDecision(i: DecideInput, reason: string): AgentDecision 
     situationAssessment: reason, threats: [], optionsConsidered: [], privateIntent: 'mantenere la postura',
     orders: { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: 'fallback_doctrine', ...doctrineOrders(i) }, confidence: 0.3,
     validation: { valid: true, errors: [], repairAttempts: 0, fallbackUsed: false },
-    usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, letterIntents: [], letters: [],
+    usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, letterIntents: [], letters: [], zoneStances: [], stanceOrders: [],
   };
 }
 
@@ -125,7 +125,7 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
     knowledgeRef: `knowledge/${i.factionId}/turn-${String(k.turn).padStart(4, '0')}.json`, memoryRef: `memory/${i.factionId}.json@${i.memory.updatedTurn}`,
     situationAssessment: out?.situationAssessment ?? 'Fallback dottrinale: nessuna decisione valida dal modello.',
     threats: out?.threats ?? [], optionsConsidered: out?.optionsConsidered ?? [], privateIntent: out?.privateIntent ?? 'mantenere la postura',
-    orders, confidence: out?.confidence ?? 0.2, letterIntents: out?.letterIntents ?? [], letters: [],
+    orders, confidence: out?.confidence ?? 0.2, letterIntents: out?.letterIntents ?? [], letters: [], zoneStances: out?.zoneStances ?? [], stanceOrders: [],
     validation: { valid: !!out, errors: [...dropped.map((e) => `scartato — ${e}`), ...r.errors], repairAttempts: r.repairAttempts, fallbackUsed: !out },
     usage: r.usage,
   };

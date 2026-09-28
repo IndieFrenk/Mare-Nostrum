@@ -133,6 +133,7 @@ export type Roe = z.infer<typeof Roe>;
 export type AgentRole = z.infer<typeof AgentRole>;
 export type Faction = z.infer<typeof Faction>;
 export type Unit = z.infer<typeof Unit>;
+export type UnitType = z.infer<typeof UnitType>;
 export type Base = z.infer<typeof Base>;
 export type Infrastructure = z.infer<typeof Infrastructure>;
 export type Zone = z.infer<typeof Zone>;

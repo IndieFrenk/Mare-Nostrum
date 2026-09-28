@@ -50,7 +50,9 @@ function posture(ctx: TurnCtx, f: string, m: Order) {
       break;
     }
     case 'ESCORT': {
-      const zone = s.units[m.protect]?.zoneId ?? s.infrastructure[m.protect]?.zoneId ?? units[0]?.zoneId;
+      // «convoglio EGEO» (anche dalle posture escort_shipping): scorta al traffico mercantile in quella zona
+      const convoy = /^convoglio\s+(\S+)/i.exec(m.protect)?.[1];
+      const zone = s.units[m.protect]?.zoneId ?? s.infrastructure[m.protect]?.zoneId ?? (convoy && s.zones[convoy] ? convoy : units[0]?.zoneId);
       units.forEach((u) => moveUnit(ctx, u, zone, 'cruise', m.id)); setTask(); break;
     }
     default: {

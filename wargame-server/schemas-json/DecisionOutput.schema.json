@@ -942,6 +942,40 @@
      "tone"
     ]
    }
+  },
+  "zoneStances": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "zoneId": {
+      "type": "string"
+     },
+     "stance": {
+      "type": "string",
+      "enum": [
+       "patrol",
+       "presence",
+       "show_of_force",
+       "escort_shipping",
+       "blockade",
+       "air_defense",
+       "withdraw"
+      ]
+     },
+     "intensity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+     }
+    },
+    "required": [
+     "zoneId",
+     "stance",
+     "intensity"
+    ]
+   }
   }
  },
  "required": [

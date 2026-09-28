@@ -53,7 +53,17 @@ export const FactionOrders = OrdersBody.extend({
   source: z.enum(['human', 'ai', 'fallback_doctrine', 'replay']),
 });
 
+/**
+ * Postura per zona: l'IA dice DOVE e COME impiegare le forze (scelte chiuse), il motore sceglie QUALI unità
+ * (engine/stances.ts) e le traduce in ordini `Order` normali, validati come quelli del giocatore.
+ */
+export const STANCES = ['patrol', 'presence', 'show_of_force', 'escort_shipping', 'blockade', 'air_defense', 'withdraw'] as const;
+export const Stance = z.enum(STANCES);
+export const ZoneStance = z.object({ zoneId: ZoneId, stance: Stance, intensity: z.number().int().min(1).max(3) });
+
 export type Order = z.infer<typeof Order>;
+export type Stance = z.infer<typeof Stance>;
+export type ZoneStance = z.infer<typeof ZoneStance>;
 export type DiploAction = z.infer<typeof DiploAction>;
 export type LetterAction = z.infer<typeof LetterAction>;
 export type ProcurementOrder = z.infer<typeof ProcurementOrder>;

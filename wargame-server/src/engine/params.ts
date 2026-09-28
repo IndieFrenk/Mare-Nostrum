@@ -25,4 +25,6 @@ export const PARAMS = {
   energy: { ttfPerLostShare: 120, stabilityPerLostShare: 25, penaltyPerLostShare: 60 },
   aarPlausibility: { victory: 0.75, draw: 0.55, defeat: 0.35 },
   autoResolveUncertainty: 0.3,
+  /** posture per zona (engine/stances.ts): unità per livello di intensità (indice 1–3), prontezza minima, soglia di logoramento */
+  stances: { unitsByIntensity: [0, 1, 3, 5], minReadiness: 50, wornReadiness: 35 },
 } as const;
