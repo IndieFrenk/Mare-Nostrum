@@ -17,6 +17,8 @@ import { crisisCoolChance, detenteActions } from '../src/engine/crises.js';
 import { resolveDiplomacy } from '../src/engine/diplomacy.js';
 import { migrationTarget } from '../src/engine/economy.js';
 import { PARAMS } from '../src/engine/params.js';
+import { leaderOf } from '../src/engine/diplomacy.js';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /** Modello finto: risponde sempre con lo stesso testo e conta le chiamate. */
 const fixed = (payload: unknown): LlmProvider & { calls: LlmRequest[] } => {
@@ -215,5 +217,31 @@ describe('bilanciamento delle crisi', () => {
     expect(migrationTarget(ctx)).toBeLessThan(100);
     ctx.state.agreements['AG-X'] = { id: 'AG-X', type: 'migration', parties: ['ITA', 'LBY_GNU'], terms: 'rimpatri', startTurn: 1, endTurn: null, visibility: 'public', status: 'active' };
     expect(migrationTarget(ctx)).toBe(PARAMS.migration.base + 10 * PARAMS.migration.perLevel - PARAMS.migration.perAgreement);
+  }, 30_000);
+});
+
+describe('campagne vecchie senza cariche dei leader', () => {
+  it('in lettura leaderTitle e capital mancanti vengono dallo scenario, senza riscrivere i file salvati', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'vecchia', seed: 'vecchia' });
+    // stato come nelle campagne create prima delle lettere: niente leaderTitle né capital
+    for (const f of [e.store.dir(c.id, 'state', 'current.json'), e.store.dir(c.id, 'state', 'turn-0000.json')]) {
+      const raw = JSON.parse(readFileSync(f, 'utf8'));
+      for (const x of Object.values(raw.factions) as Record<string, unknown>[]) { delete x.leaderTitle; delete x.capital; }
+      writeFileSync(f, JSON.stringify(raw));
+    }
+    const file = e.store.dir(c.id, 'state', 'current.json');
+    const before = readFileSync(file, 'utf8');
+    const s = await e.store.getState(c.id);
+    const tur = loadScenario('med-2026').world.factions.TUR!;
+    expect(leaderOf(s, 'TUR')).toEqual({ title: tur.leaderTitle, capital: tur.capital });
+    expect(leaderOf(s, 'TUR').title).not.toContain('Capo di Stato');
+    expect((await e.store.getState(c.id, 0)).factions.ITA!.capital).toBe(loadScenario('med-2026').world.factions.ITA!.capital);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    // una lettera scritta in un turno della campagna vecchia porta la carica vera
+    const k = await e.knowledge(c.id);
+    const d = await e.draftLetter(c.id, { target: 'TUR', gist: 'Dialogo diretto.', tone: 'cordial' });
+    expect(d.body).not.toContain('Capo di Stato');
+    expect(k.turn).toBe(1);
   }, 30_000);
 });
