@@ -62,6 +62,18 @@ export const DiploLetter = z.object({
 });
 export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()) });
 
+/**
+ * Atto ostile o di pressione che la fazione ha visto nel turno precedente (eventi a lei visibili): minacce, sanzioni, blocchi,
+ * scontri, strike, cyber e SOF attribuiti, dimostrazioni di forza, linee rosse superate. Lo usa il decisore a regole.
+ */
+export const INCIDENT_KINDS = ['threat', 'sanction', 'blockade', 'engagement', 'strike', 'cyber', 'sof', 'show_of_force', 'red_line'] as const;
+export const Incident = z.object({
+  turn: Turn, kind: z.enum(INCIDENT_KINDS), from: FactionId, to: FactionId,
+  zoneId: ZoneId.optional(),
+  /** id della linea rossa (red_line) o dell'ordine che ha causato l'atto */
+  ref: z.string().optional(),
+});
+
 export const FactionKnowledge = z.object({
   schemaVersion: z.literal(1), factionId: FactionId, turn: Turn,
   ownUnits: z.array(Unit), ownFaction: Faction,
@@ -72,6 +84,10 @@ export const FactionKnowledge = z.object({
   inbox: z.array(DiploMessage), publicNews: z.array(NewsItem),
   /** lettere ricevute e inviate negli ultimi 3 turni (solo quelle visibili alla fazione) */
   letters: z.array(DiploLetter).default([]),
+  /** atti ostili o di pressione visti nel turno precedente (prima quelli che riguardano la fazione) */
+  incidents: z.array(Incident).default([]),
+  /** fiducia e tensione della fazione verso le altre (la sua riga della matrice delle relazioni: il suo atteggiamento) */
+  ownRelations: z.record(FactionId, z.object({ trust: z.number(), tension: z.number() })).default({}),
 });
 
 export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED', 'CONTACT_LOST', 'ENGAGEMENT_OPENED', 'ENGAGEMENT_RESOLVED',
@@ -90,6 +106,10 @@ export const DiceRoll = z.object({
   raw: z.array(z.number()), total: z.number(), threshold: z.number().optional(), outcome: z.string(),
 });
 
+/** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
+export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'cyber', 'agreement', 'routine'] as const;
+export const Rationale = z.object({ rule: z.enum(POLICY_RULES), text: z.string() });
+
 export const DecisionOutput = z.object({
   situationAssessment: z.string(),
   threats: z.array(z.object({ factionId: FactionId, level: z.number(), rationale: z.string() })).default([]),
@@ -101,6 +121,8 @@ export const DecisionOutput = z.object({
   confidence: z.number().min(0).max(1),
   /** lettere che la fazione vuole scrivere (max 1 per le minori, 2 per le maggiori): il testo lo scrive poi il ruolo diplomat */
   letterIntents: z.array(z.object({ to: FactionId, gist: z.string(), tone: LetterTone })).default([]),
+  /** motivazioni brevi in italiano del decisore a regole, una per scelta (costruite da modelli di frase, senza LLM); vuoto per l'LLM */
+  rationale: z.array(Rationale).default([]),
 });
 export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   schemaVersion: z.literal(1), id: z.string(), factionId: FactionId, turn: Turn,
@@ -156,6 +178,9 @@ export type EventType = z.infer<typeof EventType>;
 export type GameEvent = z.infer<typeof GameEvent>;
 export type DiceRoll = z.infer<typeof DiceRoll>;
 export type DecisionOutput = z.infer<typeof DecisionOutput>;
+export type Incident = z.infer<typeof Incident>;
+export type Rationale = z.infer<typeof Rationale>;
+export type PolicyRule = (typeof POLICY_RULES)[number];
 export type AgentDecision = z.infer<typeof AgentDecision>;
 export type AgentMemory = z.infer<typeof AgentMemory>;
 export type LlmCall = z.infer<typeof LlmCall>;

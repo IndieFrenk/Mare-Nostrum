@@ -170,7 +170,7 @@ export class Engine {
     const inbox = prevEvents.filter((e) => e.type === 'DIPLO_MESSAGE').map((e) => (e.payload as { message: DiploMessage }).message);
     const news = (await this.store.getNarrative(c.id, ctx.turn - 1))?.news ?? [];
     const letters = (await Promise.all([3, 2, 1].filter((d) => ctx.turn - d >= 1).map((d) => this.store.getLetters(c.id, ctx.turn - d)))).flat();
-    return { inbox, news, letters };
+    return { inbox, news, letters, prevEvents };
   }
 
   private async intel(ctx: TurnCtx, c: Campaign) {
