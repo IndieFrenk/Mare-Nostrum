@@ -1,0 +1,29 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "rule": {
+   "type": "string",
+   "enum": [
+    "worn",
+    "red_line",
+    "threat",
+    "crisis",
+    "detente",
+    "objective",
+    "ally",
+    "cyber",
+    "agreement",
+    "routine",
+    "withdraw"
+   ]
+  },
+  "text": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "rule",
+  "text"
+ ]
+}

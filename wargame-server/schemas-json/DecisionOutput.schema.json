@@ -976,6 +976,38 @@
      "tone"
     ]
    }
+  },
+  "rationale": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "rule": {
+      "type": "string",
+      "enum": [
+       "worn",
+       "red_line",
+       "threat",
+       "crisis",
+       "detente",
+       "objective",
+       "ally",
+       "cyber",
+       "agreement",
+       "routine",
+       "withdraw"
+      ]
+     },
+     "text": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "rule",
+     "text"
+    ]
+   }
   }
  },
  "required": [
