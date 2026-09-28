@@ -60,6 +60,22 @@ describe('console ordini: nomi riconosciuti prima dell\'LLM', () => {
     expect(req.system).toContain('CAMPI DI OGNI ORDINE');
     expect(req.system).toMatch(/CYBER_OP SOLO se/);
   });
+
+  it('il prompt del parser mette in evidenza: unità tra parentesi quadre → ordine con quell\'id, posture solo senza unità', async () => {
+    const p = new ScriptedParser({ orders: empty, ambiguities: [] });
+    const e = makeEngine(p);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'regola', seed: 'regola' });
+    await e.parseOrders(c.id, FRASE_1);
+    const sys = p.requests[0]!.system;
+    const rule = sys.indexOf('REGOLA PRINCIPALE — UNITÀ NOMINATE');
+    // prima di tutte le altre regole, con l'esempio minimo: ordine con l'id, zoneStances vuoto
+    expect(rule).toBeGreaterThan(0);
+    expect(rule).toBeLessThan(sys.indexOf('REGOLE\n'));
+    expect(sys).toContain('dai un ordine in orders.military con quell\'id in "unitIds". Usa zoneStances SOLO se la direttiva non nomina unità');
+    expect(sys).toContain('"military":[{"id":"m1","kind":"PRESENCE","unitIds":["ITA-F590"],"zoneId":"IONIO","roe":"WEAPONS_HOLD"}],"zoneStances":[]');
+    // prompt corto per i modelli da 4B
+    expect(sys.length).toBeLessThan(6000);
+  });
 });
 
 describe('console ordini: posture per zona dal parser', () => {
