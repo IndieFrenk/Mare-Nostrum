@@ -151,3 +151,42 @@ describe('tetti agli ordini per turno', () => {
     expect(d.orders.statements).toHaveLength(ORDER_CAPS.statements);
   }, 30_000);
 });
+
+describe('limiti realistici agli ordini IA', () => {
+  it('troppe operazioni cyber, asset ISR ripetuti e budget superato: si tolgono gli ordini in eccesso', async () => {
+    const mock = new MockLLMProvider();
+    const provider = { name: 'esagerato', complete: async (r: Parameters<MockLLMProvider['complete']>[0]) => {
+      const res = await mock.complete(r);
+      if (!String(r.role).startsWith('faction') || !['TUR', 'LBY_LNA'].includes(String(r.meta.factionId))) return res;
+      const d = JSON.parse(res.text);
+      if (r.meta.factionId === 'TUR') {
+        d.orders.military = [
+          ...Array.from({ length: 4 }, (_, i) => ({ id: `c${i}`, kind: 'CYBER_OP', target: 'GRC', targetRef: 'rete elettrica', effect: 'espionage' })),
+          { id: 'i1', kind: 'ISR', assetIds: ['TUR-GOKTURK'], zoneId: 'EGEO' }, { id: 'i2', kind: 'ISR', assetIds: ['TUR-GOKTURK'], zoneId: 'MEDITERRANEO_ORIENTALE' },
+        ];
+      } else d.orders.diplomacy = [{ id: 'a1', kind: 'AID', target: 'TUR', amount: 5000, type: 'economic' }];
+      return { ...res, text: JSON.stringify(d) };
+    } };
+    const e = makeEngine(provider as never);
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'limiti', seed: 'limiti' });
+    await e.advance(c.id);
+    const tur = (await e.store.getDecision(c.id, 1, 'TUR'))!;
+    expect(tur.validation.fallbackUsed).toBe(false);
+    expect(tur.orders.military.filter((o) => o.kind === 'CYBER_OP')).toHaveLength(2);
+    expect(tur.orders.military.filter((o) => o.kind === 'ISR')).toHaveLength(1);
+    const lna = (await e.store.getDecision(c.id, 1, 'LBY_LNA'))!;
+    expect(lna.validation.fallbackUsed).toBe(false);
+    expect(lna.orders.diplomacy.some((o) => o.kind === 'AID')).toBe(false);
+    expect(lna.validation.errors.some((x) => x.includes('oltre il budget'))).toBe(true);
+  }, 30_000);
+});
+
+describe('errori del validatore legati all\'ordine', () => {
+  it('una zona inventata porta l\'id dell\'ordine (così l\'ordine si può scartare da solo)', async () => {
+    const { validateOrders } = await import('../src/engine/validators.js');
+    const { loadScenario } = await import('../src/engine/scenario.js');
+    const sc = loadScenario('med-2026');
+    const v = validateOrders(sc.world, sc.catalog, 'ITA', { military: [{ id: 'z1', kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'EGEO_MEDITERRANEO_ORT', roe: 'WEAPONS_TIGHT' }], diplomacy: [], procurement: [], statements: [] });
+    expect(v.errors).toContain('z1: zona sconosciuta: EGEO_MEDITERRANEO_ORT');
+  });
+});
