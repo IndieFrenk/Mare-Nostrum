@@ -50,6 +50,8 @@ describe('revisione di fine turno', () => {
     expect(c.phase).toBe('CMO_PENDING'); // 2 vettori: sotto soglia, ma CMO richiesto dal giocatore
     const eng = Object.values((await e.store.getState(c.id)).engagements)[0]!;
     await e.submitAar(c.id, eng.id, { submittedAt: 'x', ownLosses: [], munitionsExpended: {}, enemyClaims: [{ classification: 'motovedette', result: 'destroyed' }], outcome: 'victory', notes: '' });
+    // altri ingaggi dello stesso turno con unità italiane (anche CMO su richiesta): risoluzione automatica
+    for (const x of Object.values((await e.store.getState(c.id)).engagements).filter((x) => x.status === 'pending_cmo')) await e.submitAar(c.id, x.id, { autoResolve: true });
     c = await e.advance(c.id);
     expect(c.date).toBe('2026-04-08'); // turno 1 al 9 marzo + 30 giorni
     const s = await e.store.getState(c.id);

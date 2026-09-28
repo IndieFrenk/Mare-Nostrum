@@ -113,7 +113,7 @@ export const DiceRoll = z.object({
 });
 
 /** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
-export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'cyber', 'agreement', 'routine'] as const;
+export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
 export const Rationale = z.object({ rule: z.enum(POLICY_RULES), text: z.string() });
 
 export const DecisionOutput = z.object({

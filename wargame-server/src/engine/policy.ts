@@ -1,6 +1,7 @@
 import type { Base, DecisionOutput, DiploAction, FactionKnowledge, FactionPolicy, Incident, Infrastructure, LetterTone, Order, PolicyRule, Rationale, RedLine, Stance, Zone, ZoneStance } from '../schemas/index.js';
 import { LETTER_LIMITS, POLICY_RULES } from '../schemas/index.js';
 import { PARAMS } from './params.js';
+import { taskZone } from './movement.js';
 import type { Rng } from './rng.js';
 
 /**
@@ -162,11 +163,12 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     if (!zones.length) continue;
     const involved = c.involved.includes(me);
     const detente = involved && p.aggressiveness < P.detenteBelow && c.escalation >= P.detenteFrom + p.riskTolerance * P.detenteSpan;
+    const coerce = involved && aggressive && c.escalation >= P.coerceFrom;
     for (const z of zones) {
       const w = interest(z);
       if (detente) { addStance({ zoneId: z, stance: 'patrol', intensity: 1, score: P.score.detente, rule: 'detente', text: `Crisi ${c.id} a ${c.escalation}/10 in ${z}: distensione, solo pattugliamento leggero` }); continue; }
       const intensity = clamp3(Math.ceil((c.escalation / 10) * w * 3));
-      const stance = involved ? 'presence' : 'patrol';
+      const stance = coerce ? 'show_of_force' : involved ? 'presence' : 'patrol';
       addStance({ zoneId: z, stance, intensity, score: P.score.crisis + Math.round(20 * (c.escalation / 10) * w), rule: 'crisis', text: `Crisi ${c.id} a ${c.escalation}/10 in ${z} (interesse ${w}): ${STANCE_IT[stance]}, intensità ${intensity}` });
     }
     if (!detente) continue;
@@ -266,11 +268,21 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   const chosenLetters = [...letters].sort((a, b) => b.score - a.score || a.to.localeCompare(b.to))
     .filter((l, j, all) => all.findIndex((x) => x.to === l.to) === j).slice(0, 2);
 
-  const zoneStances: ZoneStance[] = chosenStances.map((c) => ({ zoneId: c.zoneId, stance: c.stance, intensity: c.intensity }));
+  // ritiro: zone dove la fazione ha forze impegnate che nessuna regola chiede più (prima quelle di minore interesse)
+  const wanted = new Set(rankedStances.map((c) => c.zoneId));
+  const deployedIn = [...new Set(live.filter((u) => u.status === 'deployed' || u.status === 'transit').map((u) => taskZone({ zones: i.geo.zones, units: {}, infrastructure: i.geo.infrastructure }, u.currentTask) ?? (u.currentTask ? u.zoneId : null)).filter((z): z is string => !!z && !!i.geo.zones[z]))];
+  const withdrawals = canDeploy ? deployedIn.filter((z) => !wanted.has(z)).sort((a, b) => interest(a) - interest(b) || a.localeCompare(b)).slice(0, P.maxWithdrawals) : [];
+  const zoneStances: ZoneStance[] = [
+    ...chosenStances.map((c) => ({ zoneId: c.zoneId, stance: c.stance, intensity: c.intensity })),
+    ...withdrawals.map((z) => ({ zoneId: z, stance: 'withdraw' as const, intensity: 1 as const })),
+  ];
+  extra.push(...withdrawals.map((z) => ({ rule: 'withdraw' as const, text: `Ritiro da ${z}: nessuna crisi, obiettivo o minaccia che chieda di restarci` })));
   const diplomacy: DiploAction[] = [...chosenDiplo.map((c) => diploAction(c.kind, c.target)), ...responses.map((r) => r.action)];
   const rationale: Rationale[] = [
     ...chosenStances, ...joined, ...chosenDiplo, ...extra, ...responses.map((r) => ({ rule: 'agreement' as const, text: r.text })),
   ].map((c) => ({ rule: c.rule, text: c.text })).sort((a, b) => ruleRank(a.rule) - ruleRank(b.rule));
+  // ogni decisione ha almeno una motivazione, anche quando non c'è niente da fare
+  if (!rationale.length) rationale.push({ rule: 'routine', text: 'Nessuna azione: nessuna minaccia, crisi, obiettivo o accordo che chieda di agire' });
   const optionsConsidered = [
     ...rankedStances.map((c, j) => ({ label: `${c.rule}: ${STANCE_IT[c.stance]} in ${c.zoneId}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.stance] ?? 0.2, chosen: j < p.maxStancesPerTurn })),
     ...rankedDiplo.map((c, j) => ({ label: `${c.rule}: ${DIPLO_IT[c.kind]} a ${c.target}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.kind] ?? 0.2, chosen: j < P.maxDiplomacy })),

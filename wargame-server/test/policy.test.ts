@@ -74,10 +74,10 @@ describe('decisore a regole', () => {
 
   it('atto ostile con una zona → il profilo aggressivo risponde con una dimostrazione di forza (o, se il tiro fallisce, con la diplomazia)', () => {
     const k = knowledgeOf('IRN', { events: [rel('USA', 'IRN', 'BLOCKADE in GOLFO')] });
-    const force = decide(k, seedWhere(k, (d) => d.zoneStances.some((z) => z.stance === 'show_of_force')));
+    const force = decide(k, seedWhere(k, (d) => d.zoneStances.some((z) => z.zoneId === 'GOLFO' && z.stance === 'show_of_force')));
     expect(force.zoneStances).toContainEqual({ zoneId: 'GOLFO', stance: 'show_of_force', intensity: 2 });
     expect(force.rationale).toContainEqual({ rule: 'threat', text: 'Risposta al blocco navale di USA in GOLFO: dimostrazione di forza' });
-    const calm = decide(k, seedWhere(k, (d) => !d.zoneStances.some((z) => z.stance === 'show_of_force')));
+    const calm = decide(k, seedWhere(k, (d) => !d.zoneStances.some((z) => z.zoneId === 'GOLFO' && z.stance === 'show_of_force')));
     expect(calm.orders.diplomacy.some((x) => 'target' in x && x.target === 'USA')).toBe(true);
     for (const d of [force, calm]) expect(d.letterIntents).toContainEqual(expect.objectContaining({ to: 'USA', tone: 'firm' }));
   });
@@ -99,9 +99,10 @@ describe('decisore a regole', () => {
     const d = decide(k);
     expect(d.zoneStances).toContainEqual({ zoneId: 'EGEO', stance: 'presence', intensity: 2 });
     expect(d.rationale).toContainEqual({ rule: 'crisis', text: 'Crisi EAST_MED a 5/10 in EGEO (interesse 1): presenza, intensità 2' });
-    // più alta l'escalation, più forze (TUR è aggressiva: niente distensione)
+    // più alta l'escalation, più forze; sopra soglia un profilo aggressivo coinvolto (TUR) passa alla dimostrazione di forza
     const hot = decide(knowledgeOf('TUR', { mutate: (s) => { s.crises.EAST_MED!.escalation = 9; s.crises.EAST_MED!.status = 'active'; } }));
-    expect(hot.zoneStances).toContainEqual({ zoneId: 'EGEO', stance: 'presence', intensity: 3 });
+    expect(hot.zoneStances).toContainEqual({ zoneId: 'EGEO', stance: 'show_of_force', intensity: 3 });
+    expect(hot.rationale).toContainEqual({ rule: 'crisis', text: 'Crisi EAST_MED a 9/10 in EGEO (interesse 1): dimostrazione di forza, intensità 3' });
   });
 
   it('sopra la soglia i profili poco aggressivi scelgono la distensione invece di più forze', () => {
@@ -114,6 +115,17 @@ describe('decisore a regole', () => {
     expect(at(8).orders.diplomacy).toContainEqual(expect.objectContaining({ kind: 'PROPOSE_AGREEMENT', target: ['IRN'] }));
     // a escalation più bassa niente distensione: presenza
     expect(at(5).zoneStances).toContainEqual({ zoneId: 'MAR_ROSSO', stance: 'presence', intensity: 2 });
+  });
+
+  it('ritiro dalle zone dove la fazione ha forze ma nessuna regola le chiede più', () => {
+    const k = knowledgeOf('GRC', {
+      mutate: (s) => { const u = s.units['GRC-MEKO1']!; Object.assign(u, { status: 'deployed', zoneId: 'ADRIATICO', currentTask: { id: 'x', kind: 'PATROL', unitIds: [u.id], zoneId: 'ADRIATICO', roe: 'WEAPONS_TIGHT' } }); },
+    });
+    const d = decide(k);
+    expect(d.zoneStances).toContainEqual({ zoneId: 'ADRIATICO', stance: 'withdraw', intensity: 1 });
+    expect(d.rationale).toContainEqual({ rule: 'withdraw', text: 'Ritiro da ADRIATICO: nessuna crisi, obiettivo o minaccia che chieda di restarci' });
+    // la fregata già nell'Egeo resta: lì c'è ancora una ragione
+    expect(d.zoneStances.some((z) => z.zoneId === 'EGEO' && z.stance === 'withdraw')).toBe(false);
   });
 
   it('mai operazioni cyber verso alleati, anche ostili; sì verso gli avversari', () => {
