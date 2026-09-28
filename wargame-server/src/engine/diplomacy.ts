@@ -44,7 +44,7 @@ function resolveLetter(ctx: TurnCtx, actor: string, a: LetterAction) {
   const cause = { causedBy: { orderId: a.id } };
   ctx.emit('LETTER_SENT', actor, { letter }, { targets: [a.target], visibility, ...cause });
   const fx = LETTER_TONE_EFFECTS[a.tone];
-  ctx.relate(actor, a.target, fx.trust, fx.tension, `lettera (${a.tone}): ${letter.subject}`, { propagate: a.tone === 'threatening', visibility });
+  ctx.relate(actor, a.target, fx.trust, fx.tension, `lettera (${a.tone}): ${letter.subject}`, { propagate: a.tone === 'threatening', visibility, detente: a.tone === 'cordial' || a.tone === 'conciliatory' });
   if (a.tone === 'threatening') ctx.emit('FACTION_CHANGED', actor, { factionId: actor, delta: { credibility: 1 }, pendingThreat: { target: a.target, turn: ctx.turn } }, { visibility, ...cause });
   if (a.visibility === 'public') ctx.emit('STATEMENT', actor, { text: letter.subject, tone: a.tone, audience: a.target, letterId: letter.id }, cause);
 }
@@ -59,8 +59,8 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       ctx.relate(actor, a.target, -6, 10, `minaccia: ${a.message}`);
       ctx.emit('FACTION_CHANGED', actor, { factionId: actor, delta: { credibility: 1 }, pendingThreat: { target: a.target, turn: ctx.turn } }, cause);
       message(ctx, actor, a.target, a.message, 'official', a.id); break;
-    case 'REASSURANCE': ctx.relate(actor, a.target, 3, -5, 'rassicurazione', { propagate: false }); message(ctx, actor, a.target, a.message, 'official', a.id); break;
-    case 'BACKCHANNEL': ctx.relate(actor, a.target, 2, -2, 'canale riservato', { propagate: false, visibility: [actor, a.target] }); message(ctx, actor, a.target, a.message, 'backchannel', a.id); break;
+    case 'REASSURANCE': ctx.relate(actor, a.target, 3, -5, 'rassicurazione', { propagate: false, detente: true }); message(ctx, actor, a.target, a.message, 'official', a.id); break;
+    case 'BACKCHANNEL': ctx.relate(actor, a.target, 2, -2, 'canale riservato', { propagate: false, visibility: [actor, a.target], detente: true }); message(ctx, actor, a.target, a.message, 'backchannel', a.id); break;
     case 'PROPOSE_AGREEMENT': {
       const agreement = { ...a.agreement, id: `AG-${ctx.turn}-${actor}-${a.id}`, parties: [...new Set([actor, ...a.target, ...a.agreement.parties])], startTurn: ctx.turn, status: 'proposed' as const };
       ctx.emit('AGREEMENT_CHANGED', actor, { agreement }, { targets: a.target, visibility: agreement.visibility === 'public' ? 'public' : agreement.parties, ...cause });
@@ -72,7 +72,7 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       if (!ag || !ag.parties.includes(actor) || ag.status !== 'proposed') break;
       const status = a.response === 'accept' ? 'active' : a.response === 'reject' ? 'expired' : 'proposed';
       ctx.emit('AGREEMENT_CHANGED', actor, { agreement: { ...ag, status, terms: a.counterTerms ?? ag.terms } }, { targets: ag.parties, visibility: ag.visibility, ...cause });
-      for (const p of ag.parties) if (p !== actor) ctx.relate(actor, p, a.response === 'accept' ? 8 : a.response === 'reject' ? -4 : 0, a.response === 'accept' ? -5 : 2, `risposta ad accordo ${ag.id}: ${a.response}`, { propagate: false });
+      for (const p of ag.parties) if (p !== actor) ctx.relate(actor, p, a.response === 'accept' ? 8 : a.response === 'reject' ? -4 : 0, a.response === 'accept' ? -5 : 2, `risposta ad accordo ${ag.id}: ${a.response}`, { propagate: false, detente: a.response === 'accept' });
       if (status === 'active') deescalateByAgreement(ctx, ag);
       break;
     }

@@ -1,4 +1,5 @@
 import type { Campaign, Contact, EventType, GameEvent, LedgerEntry, TurnPhase, Visibility, WorldState } from '../schemas/index.js';
+import { PARAMS } from './params.js';
 import { applyEvent } from './reducer.js';
 import { Rng } from './rng.js';
 import type { Scenario } from './scenario.js';
@@ -48,17 +49,32 @@ export class TurnCtx {
     this.ledger.push({ turn: this.turn, factionId, category, amount: delta, balanceAfter: this.state.factions[factionId].budget.discretionary, ref, note });
   }
 
-  relate(a: string, b: string, trust: number, tension: number, note: string, opts: { incident?: boolean; propagate?: boolean; visibility?: Visibility } = {}) {
+  /** detente: azione distensiva (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato) che raffredda le crisi comuni */
+  relate(a: string, b: string, trust: number, tension: number, note: string, opts: { incident?: boolean; propagate?: boolean; visibility?: Visibility; detente?: boolean } = {}) {
     if (a === b || !this.state.relations[a]?.[b]) return;
-    this.emit('RELATION_CHANGED', a, { a, b, trust, tension, note, incident: opts.incident ?? false }, { targets: [b], visibility: opts.visibility ?? 'public' });
+    this.emit('RELATION_CHANGED', a, { a, b, trust, tension, note, incident: opts.incident ?? false, ...(opts.detente ? { detente: true } : {}) }, { targets: [b], visibility: opts.visibility ?? 'public' });
     if (opts.propagate === false) return;
     const k = 0.3;
     for (const ally of alliesOf(this.state, b)) if (ally !== a) this.emit('RELATION_CHANGED', a, { a, b: ally, trust: +(trust * k).toFixed(1), tension: +(tension * k).toFixed(1), note: `propagazione: ${note}` }, { targets: [ally], visibility: opts.visibility ?? 'public' });
   }
 
-  escalate(crisisId: string, delta: number, cause: string) {
+  /** escalation già dovuta agli ordini in questo turno, per crisi (tetto PARAMS.crisisOrderCapPerTurn) */
+  private byOrders = new Map<string, number>();
+
+  /**
+   * Variazione di una crisi. Con `byOrders` (blocchi, strike, ingaggi) la salita dovuta agli ordini è limitata a
+   * PARAMS.crisisOrderCapPerTurn per crisi e per turno: le singole azioni continuano a pesare su tensioni e relazioni.
+   */
+  escalate(crisisId: string, delta: number, cause: string, opts: { byOrders?: boolean } = {}) {
     if (!this.state.crises[crisisId] || !delta) return;
-    this.emit('CRISIS_CHANGED', 'world', { crisisId, delta, cause }, { targets: [crisisId] });
+    if (opts.byOrders && delta > 0) {
+      const key = `${this.turn}:${crisisId}`;
+      const used = this.byOrders.get(key) ?? 0;
+      delta = Math.min(delta, PARAMS.crisisOrderCapPerTurn - used);
+      if (delta <= 0) return;
+      this.byOrders.set(key, used + delta);
+    }
+    this.emit('CRISIS_CHANGED', 'world', { crisisId, delta, cause, ...(opts.byOrders ? { byOrders: true } : {}) }, { targets: [crisisId] });
   }
 
   isVisibleTo(e: GameEvent, factionId: string) {

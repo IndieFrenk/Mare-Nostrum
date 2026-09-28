@@ -12,6 +12,11 @@ import { translateStances } from '../src/engine/stances.js';
 import { TurnCtx } from '../src/engine/context.js';
 import { Rng } from '../src/engine/rng.js';
 import { continueTransit } from '../src/engine/movement.js';
+import { adjudicate } from '../src/engine/adjudication.js';
+import { crisisCoolChance, detenteActions } from '../src/engine/crises.js';
+import { resolveDiplomacy } from '../src/engine/diplomacy.js';
+import { migrationTarget } from '../src/engine/economy.js';
+import { PARAMS } from '../src/engine/params.js';
 
 /** Modello finto: risponde sempre con lo stesso testo e conta le chiamate. */
 const fixed = (payload: unknown): LlmProvider & { calls: LlmRequest[] } => {
@@ -148,4 +153,67 @@ describe('unità impegnate tra un turno e l\'altro', () => {
     expect(ctx.state.units[u.id]).toMatchObject({ status: 'deployed', zoneId: 'MAR_ROSSO' });
     expect(ctx.events.map((x) => x.type)).toEqual(['UNIT_MOVED']);
   });
+});
+
+describe('bilanciamento delle crisi', () => {
+  const ctxOf = async (seed: string) => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
+    const state = await e.store.getState(c.id);
+    return new TurnCtx(state, c, loadScenario('med-2026'), new Rng(c.seed, c.rngCursor, 2), 0);
+  };
+
+  it('al massimo +1 di escalation per crisi per turno dagli ordini; le singole azioni pesano ancora sulle relazioni', async () => {
+    const ctx = await ctxOf('tetto');
+    const s = ctx.state;
+    const before = s.crises.RED_SEA!.escalation;
+    const ship = (f: string) => Object.values(s.units).find((u) => u.factionId === f && ['destroyer', 'frigate'].includes(u.type) && u.status === 'ready')!;
+    // un'unità iraniana nella zona: i due blocchi colpiscono le relazioni con l'Iran
+    const irn = Object.values(s.units).find((u) => u.factionId === 'IRN' && u.domain === 'sea')!;
+    Object.assign(irn, { zoneId: 'MAR_ROSSO', status: 'deployed', location: s.zones.MAR_ROSSO!.center });
+    const tensionBefore = { USA: s.relations.USA!.IRN!.tension, FRA: s.relations.FRA!.IRN!.tension };
+    const blockade = (f: string): FactionOrders => ({ schemaVersion: 1, factionId: f, turn: ctx.turn, source: 'ai', diplomacy: [], procurement: [], statements: [],
+      military: [{ id: `${f}-b`, kind: 'BLOCKADE', unitIds: [ship(f).id], zoneId: 'MAR_ROSSO', roe: 'WEAPONS_HOLD' }] });
+    ctx.phase = 'ADJUDICATION';
+    adjudicate(ctx, [blockade('USA'), blockade('FRA')]);
+    const fromOrders = ctx.events.filter((x) => x.type === 'CRISIS_CHANGED' && x.payload.crisisId === 'RED_SEA' && x.payload.byOrders);
+    expect(fromOrders.reduce((a, x) => a + Number(x.payload.delta), 0)).toBe(1);
+    expect(s.crises.RED_SEA!.escalation - before).toBe(1);
+    expect(s.relations.USA!.IRN!.tension).toBeGreaterThan(tensionBefore.USA);
+    expect(s.relations.FRA!.IRN!.tension).toBeGreaterThan(tensionBefore.FRA);
+    // gli effetti che non vengono dagli ordini (eventi, deriva) non sono limitati
+    ctx.escalate('RED_SEA', 1, 'evento');
+    expect(s.crises.RED_SEA!.escalation - before).toBe(2);
+    // il tetto vale per crisi: un'altra crisi può ancora salire di 1 per gli ordini
+    const east = s.crises.EAST_MED!.escalation;
+    ctx.escalate('EAST_MED', 2, 'strike', { byOrders: true });
+    expect(s.crises.EAST_MED!.escalation - east).toBe(PARAMS.crisisOrderCapPerTurn);
+  }, 30_000);
+
+  it('le azioni distensive tra le parti di una crisi aumentano la probabilità di raffreddamento nel turno dopo', async () => {
+    const ctx = await ctxOf('distensione');
+    resolveDiplomacy(ctx, 'ITA', { id: 'r', kind: 'REASSURANCE', target: 'LBY_GNU', message: 'ok', visibility: 'public' });
+    resolveDiplomacy(ctx, 'ITA', { id: 'b', kind: 'BACKCHANNEL', target: 'TUN', message: 'ok' });
+    resolveDiplomacy(ctx, 'ITA', { id: 'l', kind: 'LETTER', target: 'ALG', subject: 'Dialogo', body: 'Signor Presidente, parliamone.', tone: 'conciliatory', visibility: 'private' });
+    resolveDiplomacy(ctx, 'ITA', { id: 'l2', kind: 'LETTER', target: 'ALG', subject: 'Dialogo', body: 'Signor Presidente.', tone: 'firm', visibility: 'private' });
+    resolveDiplomacy(ctx, 'ITA', { id: 'd', kind: 'DEMARCHE', target: 'TUN', message: 'no', visibility: 'public' });
+    const sahel = ctx.state.crises.SAHEL_MIG!.involved; // ITA, TUN, LBY_GNU, ALG, RUS
+    expect(detenteActions(ctx.events, sahel)).toBe(3);
+    expect(detenteActions(ctx.events, ctx.state.crises.EAST_MED!.involved)).toBe(0);
+    // dopo un turno agitato senza diplomazia non si raffredda; con la diplomazia sì, e di più se le azioni sono di più
+    expect(crisisCoolChance(false, 0.5, 0)).toBe(0);
+    expect(crisisCoolChance(false, 0.5, 1)).toBeCloseTo(PARAMS.detenteCoolBonus);
+    expect(crisisCoolChance(true, 0.5, 2)).toBeGreaterThan(crisisCoolChance(true, 0.5, 0));
+    expect(crisisCoolChance(true, 1, 10)).toBeLessThanOrEqual(0.9);
+  }, 30_000);
+
+  it('la pressione migratoria non resta fissa a 100: massimo di regime 75, meno con un accordo migratorio', async () => {
+    const ctx = await ctxOf('migrazione');
+    ctx.state.crises.SAHEL_MIG!.escalation = 10;
+    for (const a of Object.values(ctx.state.agreements)) if (a.type === 'migration') a.status = 'expired';
+    expect(migrationTarget(ctx)).toBe(PARAMS.migration.base + 10 * PARAMS.migration.perLevel);
+    expect(migrationTarget(ctx)).toBeLessThan(100);
+    ctx.state.agreements['AG-X'] = { id: 'AG-X', type: 'migration', parties: ['ITA', 'LBY_GNU'], terms: 'rimpatri', startTurn: 1, endTurn: null, visibility: 'public', status: 'active' };
+    expect(migrationTarget(ctx)).toBe(PARAMS.migration.base + 10 * PARAMS.migration.perLevel - PARAMS.migration.perAgreement);
+  }, 30_000);
 });

@@ -129,7 +129,8 @@ export class Engine {
             ctx.startTurn(ctx.state.turn + 1, addDays(ctx.state.date, c.turnLength === 'week' ? 7 : 30));
             break;
           case 'OPEN':
-            deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); continueTransit(ctx); recoverInfrastructure(ctx); evolveCrises(ctx);
+            deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); continueTransit(ctx); recoverInfrastructure(ctx);
+            evolveCrises(ctx, ctx.turn > 1 ? await this.store.getEvents(id, ctx.turn - 1) : []);
             ctx.phase = 'INTEL'; break;
           case 'INTEL': await this.intel(ctx, c); ctx.phase = 'BRIEFING'; break;
           case 'BRIEFING': await this.briefing(ctx, c); ctx.phase = 'PLAYER_ORDERS'; await this.flush(ctx, c); return c;

@@ -45,6 +45,13 @@ Un modello piccolo (es. `qwen3.5:4b`) non riesce a scrivere ordini con gli id di
 - **Tra un turno e l'altro** un'unità con un compito (PATROL, PRESENCE, SHOW_OF_FORCE, ESCORT, BLOCKADE, AIR_DEFENSE, MOVE) **continua quel compito** finché un ordine non la richiama: resta `deployed` nella zona con `currentTask`, paga la quota operativa (`chargeOperations`), perde 4 punti di prontezza a turno (`applyAttrition`) e, sotto 35, il traduttore la fa rientrare comunque (`worn`); le avarie per usura la mandano in riparazione. Se un'unità non arriva in un turno resta `transit` e **prosegue da sola** verso la zona del compito all'apertura del turno dopo (`continueTransit` in `engine/movement.ts`). Per le posture: un'unità fuori base impegnata in un'altra zona (anche se ancora in viaggio) non viene distolta (`busyElsewhere`); una postura nella zona del suo compito la **conferma** (è la prima scelta, costo zero) e `withdraw` richiama anche chi ci sta ancora andando. Per questo gli ordini alle unità calano nei primi turni: molte unità restano impegnate nel compito del turno prima e le nuove posture in altre zone trovano meno unità libere (nel playtest: «unità IA impegnate» e «posture emesse / tradotte / senza unità»).
 - Nel prompt le AZIONI LECITE includono `unitsPerSeaZone` (quante unità la fazione può impiegare in ogni zona di mare). Parametri in `PARAMS.stances`.
 
+## Crisi: escalation e distensione
+Le crisi (0–10) salgono per deriva casuale (2d6), eventi casuali della zona e ordini (blocchi, strike, ingaggi) e scendono con la calma, gli accordi e la diplomazia (`engine/crises.ts`, parametri in `engine/params.ts`).
+- **Tetto dagli ordini**: al massimo +1 per crisi per turno dovuto agli ordini (`crisisOrderCapPerTurn`), qualunque sia il numero di blocchi, strike e ingaggi; le singole azioni continuano a spostare fiducia e tensione.
+- **Saturazione degli eventi casuali**: un incidente alza la crisi con probabilità 1 − escalation/12 (`randomEventSaturation`); l'evento resta nelle notizie e negli indicatori.
+- **Distensione**: ogni REASSURANCE, BACKCHANNEL, lettera cordiale o conciliante e accordo accettato tra due fazioni coinvolte in una crisi aggiunge +15% (fino a 3 azioni, `detenteCoolBonus`) alla probabilità che la crisi scenda di 1 nel turno dopo, anche se nel turno precedente era salita.
+- **Pressione migratoria**: tende a 15 + 6 × escalation di SAHEL_MIG, −10 per ogni accordo migratorio attivo (`PARAMS.migration`); le ondate casuali la spingono su per un turno e poi rientra.
+
 ## Lettere tra capi di Stato
 Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), lettere impaginate come lettere vere (carica del mittente, «Roma, 9 marzo 2026», oggetto, testo, firma con la carica, riservata/pubblica) e **Rispondi**.
 - **Scrivere**: destinatario, tono (cordiale, formale, conciliante, ferma, minacciosa), oggetto (≤ 120 caratteri), testo (≤ 1.800), riservata o pubblica. *Fai scrivere una bozza* chiede al consigliere (ruolo `DIPLOMAT`) un testo da rivedere. La lettera entra negli ordini del turno (al massimo 2 per turno) e parte con ▶.
@@ -68,6 +75,7 @@ Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), l
 | `npm run test:e2e:wargame` | e2e Playwright di un turno (mock) |
 | `npm --prefix wargame-server run schemas:export` | JSON Schema in `wargame-server/schemas-json/` |
 | `npm --prefix wargame-server run playtest -- --turns 6` | partita automatica via API (con lettere ogni 2 turni) e report dei problemi, degli ordini IA alle unità (quanti dalle posture) e degli ingaggi |
+| `npm --prefix wargame-server run balance -- --seeds 10 --turns 20` | statistica di bilanciamento delle crisi su N seed (IA mock, giocatore moderato del playtest): escalation finale per crisi, turno medio del primo 10/10, pressione migratoria media |
 | `npm --prefix wargame-server run bench:models -- <cartella-campagna> <modello>…` | banco dei modelli: fazioni (con ordini militari per tipo e quanti dalle posture), narratore, riflessione e lettera |
 
 Il database è in `wargame-server/data/campaigns/{id}/` (JSON/JSONL leggibili, vedi SPEC §5).
