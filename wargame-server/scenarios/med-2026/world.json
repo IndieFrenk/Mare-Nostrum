@@ -1,0 +1,2931 @@
+{
+ "zones": [
+  {
+   "id": "TIRRENO",
+   "name": "Mar Tirreno",
+   "polygonRef": "geo/zones.geojson#TIRRENO",
+   "center": {
+    "lat": 40.0,
+    "lon": 11.8
+   },
+   "seaState": 3,
+   "weatherSeed": 13,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "ADRIATICO",
+   "name": "Mar Adriatico",
+   "polygonRef": "geo/zones.geojson#ADRIATICO",
+   "center": {
+    "lat": 43.0,
+    "lon": 15.2
+   },
+   "seaState": 3,
+   "weatherSeed": 110,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "IONIO",
+   "name": "Mar Ionio",
+   "polygonRef": "geo/zones.geojson#IONIO",
+   "center": {
+    "lat": 37.8,
+    "lon": 18.5
+   },
+   "seaState": 3,
+   "weatherSeed": 207,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "CANALE_SICILIA",
+   "name": "Canale di Sicilia",
+   "polygonRef": "geo/zones.geojson#CANALE_SICILIA",
+   "center": {
+    "lat": 36.6,
+    "lon": 12.3
+   },
+   "seaState": 3,
+   "weatherSeed": 304,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "MAR_LIBICO",
+   "name": "Mar Libico",
+   "polygonRef": "geo/zones.geojson#MAR_LIBICO",
+   "center": {
+    "lat": 33.5,
+    "lon": 16.0
+   },
+   "seaState": 3,
+   "weatherSeed": 401,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "LIBIA_TERRA",
+   "name": "Libia (entroterra)",
+   "polygonRef": "geo/zones.geojson#LIBIA_TERRA",
+   "center": {
+    "lat": 29.0,
+    "lon": 17.0
+   },
+   "seaState": 0,
+   "weatherSeed": 498,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "land"
+  },
+  {
+   "id": "MED_OCCIDENTALE",
+   "name": "Mediterraneo occidentale",
+   "polygonRef": "geo/zones.geojson#MED_OCCIDENTALE",
+   "center": {
+    "lat": 39.0,
+    "lon": 4.5
+   },
+   "seaState": 3,
+   "weatherSeed": 595,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "EGEO",
+   "name": "Mar Egeo",
+   "polygonRef": "geo/zones.geojson#EGEO",
+   "center": {
+    "lat": 38.3,
+    "lon": 25.0
+   },
+   "seaState": 3,
+   "weatherSeed": 692,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "MEDITERRANEO_ORIENTALE",
+   "name": "Mediterraneo orientale",
+   "polygonRef": "geo/zones.geojson#MEDITERRANEO_ORIENTALE",
+   "center": {
+    "lat": 33.8,
+    "lon": 31.5
+   },
+   "seaState": 3,
+   "weatherSeed": 789,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "MAR_ROSSO",
+   "name": "Mar Rosso",
+   "polygonRef": "geo/zones.geojson#MAR_ROSSO",
+   "center": {
+    "lat": 20.0,
+    "lon": 38.5
+   },
+   "seaState": 3,
+   "weatherSeed": 886,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "MAR_NERO",
+   "name": "Mar Nero",
+   "polygonRef": "geo/zones.geojson#MAR_NERO",
+   "center": {
+    "lat": 43.3,
+    "lon": 34.5
+   },
+   "seaState": 3,
+   "weatherSeed": 983,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "GOLFO",
+   "name": "Golfo Persico e Hormuz",
+   "polygonRef": "geo/zones.geojson#GOLFO",
+   "center": {
+    "lat": 26.5,
+    "lon": 53.0
+   },
+   "seaState": 3,
+   "weatherSeed": 1080,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "sea"
+  },
+  {
+   "id": "SAHEL",
+   "name": "Sahel",
+   "polygonRef": "geo/zones.geojson#SAHEL",
+   "center": {
+    "lat": 16.0,
+    "lon": 4.0
+   },
+   "seaState": 0,
+   "weatherSeed": 1177,
+   "controlledBy": null,
+   "tension": 20,
+   "terrain": "land"
+  }
+ ],
+ "bases": [
+  {
+   "id": "TARANTO",
+   "name": "Base navale di Taranto",
+   "factionId": "ITA",
+   "location": {
+    "lat": 40.47,
+    "lon": 17.23
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "IONIO"
+  },
+  {
+   "id": "LA_SPEZIA",
+   "name": "Base navale della Spezia",
+   "factionId": "ITA",
+   "location": {
+    "lat": 44.1,
+    "lon": 9.83
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "TIRRENO"
+  },
+  {
+   "id": "AUGUSTA",
+   "name": "Base navale di Augusta",
+   "factionId": "ITA",
+   "location": {
+    "lat": 37.22,
+    "lon": 15.22
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "IONIO"
+  },
+  {
+   "id": "BRINDISI",
+   "name": "Brindisi",
+   "factionId": "ITA",
+   "location": {
+    "lat": 40.64,
+    "lon": 17.95
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "ADRIATICO"
+  },
+  {
+   "id": "TRAPANI",
+   "name": "Trapani-Birgi",
+   "factionId": "ITA",
+   "location": {
+    "lat": 37.91,
+    "lon": 12.49
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "CANALE_SICILIA"
+  },
+  {
+   "id": "GROSSETO",
+   "name": "Grosseto",
+   "factionId": "ITA",
+   "location": {
+    "lat": 42.76,
+    "lon": 11.07
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "TIRRENO"
+  },
+  {
+   "id": "GIOIA_DEL_COLLE",
+   "name": "Gioia del Colle",
+   "factionId": "ITA",
+   "location": {
+    "lat": 40.77,
+    "lon": 16.93
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "IONIO"
+  },
+  {
+   "id": "ISTRANA",
+   "name": "Istrana",
+   "factionId": "ITA",
+   "location": {
+    "lat": 45.68,
+    "lon": 12.1
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "ADRIATICO"
+  },
+  {
+   "id": "AMENDOLA",
+   "name": "Amendola",
+   "factionId": "ITA",
+   "location": {
+    "lat": 41.54,
+    "lon": 15.72
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "ADRIATICO"
+  },
+  {
+   "id": "GHEDI",
+   "name": "Ghedi",
+   "factionId": "ITA",
+   "location": {
+    "lat": 45.43,
+    "lon": 10.27
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "ADRIATICO"
+  },
+  {
+   "id": "PRATICA_DI_MARE",
+   "name": "Pratica di Mare",
+   "factionId": "ITA",
+   "location": {
+    "lat": 41.66,
+    "lon": 12.45
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "TIRRENO"
+  },
+  {
+   "id": "SIGONELLA",
+   "name": "Sigonella",
+   "factionId": "ITA",
+   "location": {
+    "lat": 37.4,
+    "lon": 14.92
+   },
+   "type": "joint",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "IONIO"
+  },
+  {
+   "id": "TOULON",
+   "name": "Tolone",
+   "factionId": "FRA",
+   "location": {
+    "lat": 43.11,
+    "lon": 5.93
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "SOLENZARA",
+   "name": "Solenzara",
+   "factionId": "FRA",
+   "location": {
+    "lat": 41.92,
+    "lon": 9.4
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "TIRRENO"
+  },
+  {
+   "id": "NAPLES_NSA",
+   "name": "NSA Napoli",
+   "factionId": "USA",
+   "location": {
+    "lat": 40.83,
+    "lon": 14.25
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "TIRRENO"
+  },
+  {
+   "id": "SOUDA",
+   "name": "Souda Bay",
+   "factionId": "USA",
+   "location": {
+    "lat": 35.49,
+    "lon": 24.07
+   },
+   "type": "joint",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "EGEO"
+  },
+  {
+   "id": "AVIANO",
+   "name": "Aviano",
+   "factionId": "USA",
+   "location": {
+    "lat": 46.03,
+    "lon": 12.6
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "ADRIATICO"
+  },
+  {
+   "id": "AKROTIRI",
+   "name": "RAF Akrotiri",
+   "factionId": "GBR",
+   "location": {
+    "lat": 34.59,
+    "lon": 32.99
+   },
+   "type": "joint",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
+  },
+  {
+   "id": "AKSAZ",
+   "name": "Aksaz",
+   "factionId": "TUR",
+   "location": {
+    "lat": 36.94,
+    "lon": 28.35
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "EGEO"
+  },
+  {
+   "id": "INCIRLIK",
+   "name": "Incirlik",
+   "factionId": "TUR",
+   "location": {
+    "lat": 37.0,
+    "lon": 35.43
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
+  },
+  {
+   "id": "AL_WATIYA",
+   "name": "Al-Watiya",
+   "factionId": "TUR",
+   "location": {
+    "lat": 32.48,
+    "lon": 11.9
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_LIBICO"
+  },
+  {
+   "id": "TARTUS",
+   "name": "Tartus",
+   "factionId": "RUS",
+   "location": {
+    "lat": 34.91,
+    "lon": 35.87
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
+  },
+  {
+   "id": "SEVASTOPOL",
+   "name": "Sebastopoli",
+   "factionId": "RUS",
+   "location": {
+    "lat": 44.62,
+    "lon": 33.53
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_NERO"
+  },
+  {
+   "id": "AL_KHADIM",
+   "name": "Al-Khadim",
+   "factionId": "RUS",
+   "location": {
+    "lat": 31.99,
+    "lon": 21.18
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "LIBIA_TERRA"
+  },
+  {
+   "id": "DJIBOUTI_PLA",
+   "name": "Base PLA Gibuti",
+   "factionId": "CHN",
+   "location": {
+    "lat": 11.59,
+    "lon": 43.08
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_ROSSO"
+  },
+  {
+   "id": "SALAMINA",
+   "name": "Salamina",
+   "factionId": "GRC",
+   "location": {
+    "lat": 37.95,
+    "lon": 23.5
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "EGEO"
+  },
+  {
+   "id": "ALESSANDRIA",
+   "name": "Alessandria",
+   "factionId": "EGY",
+   "location": {
+    "lat": 31.2,
+    "lon": 29.88
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
+  },
+  {
+   "id": "BERENICE",
+   "name": "Berenice",
+   "factionId": "EGY",
+   "location": {
+    "lat": 23.9,
+    "lon": 35.47
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_ROSSO"
+  },
+  {
+   "id": "HAIFA",
+   "name": "Haifa",
+   "factionId": "ISR",
+   "location": {
+    "lat": 32.82,
+    "lon": 35.0
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
+  },
+  {
+   "id": "MERS_EL_KEBIR",
+   "name": "Mers el-Kébir",
+   "factionId": "ALG",
+   "location": {
+    "lat": 35.73,
+    "lon": -0.7
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "BIZERTE",
+   "name": "Biserta",
+   "factionId": "TUN",
+   "location": {
+    "lat": 37.27,
+    "lon": 9.87
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "CANALE_SICILIA"
+  },
+  {
+   "id": "TRIPOLI",
+   "name": "Tripoli",
+   "factionId": "LBY_GNU",
+   "location": {
+    "lat": 32.89,
+    "lon": 13.19
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_LIBICO"
+  },
+  {
+   "id": "BENGASI",
+   "name": "Bengasi",
+   "factionId": "LBY_LNA",
+   "location": {
+    "lat": 32.12,
+    "lon": 20.07
+   },
+   "type": "joint",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_LIBICO"
+  },
+  {
+   "id": "BANDAR_ABBAS",
+   "name": "Bandar Abbas",
+   "factionId": "IRN",
+   "location": {
+    "lat": 27.14,
+    "lon": 56.21
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "GOLFO"
+  },
+  {
+   "id": "HODEIDAH",
+   "name": "Hodeidah (proxy)",
+   "factionId": "IRN",
+   "location": {
+    "lat": 14.8,
+    "lon": 42.95
+   },
+   "type": "joint",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_ROSSO"
+  }
+ ],
+ "infrastructure": [
+  {
+   "id": "TRANSMED",
+   "name": "Gasdotto TransMed (Enrico Mattei)",
+   "type": "pipeline",
+   "owners": [
+    "ALG",
+    "TUN",
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#TRANSMED",
+   "zoneId": "CANALE_SICILIA",
+   "status": "operational",
+   "strategicValue": 9,
+   "flowShareIta": 0.3
+  },
+  {
+   "id": "GREENSTREAM",
+   "name": "Gasdotto Greenstream",
+   "type": "pipeline",
+   "owners": [
+    "LBY_GNU",
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#GREENSTREAM",
+   "zoneId": "MAR_LIBICO",
+   "status": "operational",
+   "strategicValue": 7,
+   "flowShareIta": 0.05
+  },
+  {
+   "id": "TAP",
+   "name": "Gasdotto TAP",
+   "type": "pipeline",
+   "owners": [
+    "GRC",
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#TAP",
+   "zoneId": "ADRIATICO",
+   "status": "operational",
+   "strategicValue": 8,
+   "flowShareIta": 0.15
+  },
+  {
+   "id": "MELLITAH",
+   "name": "Complesso Mellitah / Bahr Essalam (ENI)",
+   "type": "gas_field",
+   "owners": [
+    "LBY_GNU",
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#MELLITAH",
+   "zoneId": "MAR_LIBICO",
+   "status": "operational",
+   "strategicValue": 8,
+   "flowShareIta": 0.05
+  },
+  {
+   "id": "ZOHR",
+   "name": "Giacimento Zohr (ENI)",
+   "type": "gas_field",
+   "owners": [
+    "EGY",
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#ZOHR",
+   "zoneId": "MEDITERRANEO_ORIENTALE",
+   "status": "operational",
+   "strategicValue": 7,
+   "flowShareIta": 0.03
+  },
+  {
+   "id": "CAVI_MAZARA",
+   "name": "Hub cavi sottomarini Sicilia (Mazara/Catania)",
+   "type": "subsea_cable",
+   "owners": [
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#CAVI_MAZARA",
+   "zoneId": "CANALE_SICILIA",
+   "status": "operational",
+   "strategicValue": 8
+  },
+  {
+   "id": "CAVI_BLUEMED",
+   "name": "Cavo BlueMed/2Africa",
+   "type": "subsea_cable",
+   "owners": [
+    "ITA",
+    "GRC",
+    "EGY"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#CAVI_BLUEMED",
+   "zoneId": "IONIO",
+   "status": "operational",
+   "strategicValue": 6
+  },
+  {
+   "id": "OLT_LIVORNO",
+   "name": "Terminale GNL OLT Livorno",
+   "type": "lng_terminal",
+   "owners": [
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#OLT_LIVORNO",
+   "zoneId": "TIRRENO",
+   "status": "operational",
+   "strategicValue": 6,
+   "flowShareIta": 0.08
+  },
+  {
+   "id": "RAVENNA_FSRU",
+   "name": "FSRU Ravenna",
+   "type": "lng_terminal",
+   "owners": [
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#RAVENNA_FSRU",
+   "zoneId": "ADRIATICO",
+   "status": "operational",
+   "strategicValue": 5,
+   "flowShareIta": 0.06
+  },
+  {
+   "id": "GIOIA_TAURO",
+   "name": "Porto di Gioia Tauro",
+   "type": "port",
+   "owners": [
+    "ITA"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#GIOIA_TAURO",
+   "zoneId": "TIRRENO",
+   "status": "operational",
+   "strategicValue": 6
+  },
+  {
+   "id": "SUEZ",
+   "name": "Canale di Suez",
+   "type": "chokepoint",
+   "owners": [
+    "EGY"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#SUEZ",
+   "zoneId": "MAR_ROSSO",
+   "status": "operational",
+   "strategicValue": 10
+  },
+  {
+   "id": "BAB_EL_MANDEB",
+   "name": "Bab el-Mandeb",
+   "type": "chokepoint",
+   "owners": [],
+   "geometryRef": "geo/infrastructure.geojson#BAB_EL_MANDEB",
+   "zoneId": "MAR_ROSSO",
+   "status": "operational",
+   "strategicValue": 9
+  },
+  {
+   "id": "CANALE_SICILIA_CP",
+   "name": "Stretto di Sicilia",
+   "type": "chokepoint",
+   "owners": [],
+   "geometryRef": "geo/infrastructure.geojson#CANALE_SICILIA_CP",
+   "zoneId": "CANALE_SICILIA",
+   "status": "operational",
+   "strategicValue": 7
+  },
+  {
+   "id": "HORMUZ",
+   "name": "Stretto di Hormuz",
+   "type": "chokepoint",
+   "owners": [
+    "IRN"
+   ],
+   "geometryRef": "geo/infrastructure.geojson#HORMUZ",
+   "zoneId": "GOLFO",
+   "status": "operational",
+   "strategicValue": 10
+  }
+ ],
+ "units": [
+  {
+   "id": "ITA-CAVOUR",
+   "factionId": "ITA",
+   "name": "Cavour (C 550)",
+   "classId": "CAVOUR",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-TRIESTE",
+   "factionId": "ITA",
+   "name": "Trieste (L 9890)",
+   "classId": "TRIESTE",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-F590",
+   "factionId": "ITA",
+   "name": "Carlo Bergamini (F 590)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-F591",
+   "factionId": "ITA",
+   "name": "Virginio Fasan (F 591)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-F592",
+   "factionId": "ITA",
+   "name": "Carlo Margottini (F 592)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-F593",
+   "factionId": "ITA",
+   "name": "Carabiniere (F 593)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "AUGUSTA"
+  },
+  {
+   "id": "ITA-F594",
+   "factionId": "ITA",
+   "name": "Alpino (F 594)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-F595",
+   "factionId": "ITA",
+   "name": "Luigi Rizzo (F 595)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "TARANTO",
+   "zoneId": "MAR_ROSSO",
+   "status": "deployed"
+  },
+  {
+   "id": "ITA-F596",
+   "factionId": "ITA",
+   "name": "Federico Martinengo (F 596)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "AUGUSTA"
+  },
+  {
+   "id": "ITA-F597",
+   "factionId": "ITA",
+   "name": "Antonio Marceglia (F 597)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-P430",
+   "factionId": "ITA",
+   "name": "Paolo Thaon di Revel (P 430)",
+   "classId": "PPA_THAON",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-P431",
+   "factionId": "ITA",
+   "name": "Francesco Morosini (P 431)",
+   "classId": "PPA_THAON",
+   "count": 1,
+   "homeBaseId": "TARANTO",
+   "zoneId": "MAR_LIBICO",
+   "status": "deployed"
+  },
+  {
+   "id": "ITA-P432",
+   "factionId": "ITA",
+   "name": "Raimondo Montecuccoli (P 432)",
+   "classId": "PPA_THAON",
+   "count": 1,
+   "homeBaseId": "AUGUSTA"
+  },
+  {
+   "id": "ITA-D553",
+   "factionId": "ITA",
+   "name": "Andrea Doria (D 553)",
+   "classId": "ORIZZONTE",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-D554",
+   "factionId": "ITA",
+   "name": "Caio Duilio (D 554)",
+   "classId": "ORIZZONTE",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-S526",
+   "factionId": "ITA",
+   "name": "Salvatore Todaro (S 526)",
+   "classId": "U212A",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-S527",
+   "factionId": "ITA",
+   "name": "Scirè (S 527)",
+   "classId": "U212A",
+   "count": 1,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-S528",
+   "factionId": "ITA",
+   "name": "Pietro Venuti (S 528)",
+   "classId": "U212A",
+   "count": 1,
+   "homeBaseId": "AUGUSTA"
+  },
+  {
+   "id": "ITA-S529",
+   "factionId": "ITA",
+   "name": "Romeo Romei (S 529)",
+   "classId": "U212A",
+   "count": 1,
+   "homeBaseId": "AUGUSTA"
+  },
+  {
+   "id": "ITA-SANMARCO",
+   "factionId": "ITA",
+   "name": "Reggimento San Marco",
+   "classId": "SAN_MARCO",
+   "count": 1,
+   "homeBaseId": "BRINDISI"
+  },
+  {
+   "id": "ITA-37ST",
+   "factionId": "ITA",
+   "name": "37° Stormo (EF2000)",
+   "classId": "EF2000",
+   "count": 14,
+   "homeBaseId": "TRAPANI"
+  },
+  {
+   "id": "ITA-4ST",
+   "factionId": "ITA",
+   "name": "4° Stormo (EF2000)",
+   "classId": "EF2000",
+   "count": 16,
+   "homeBaseId": "GROSSETO"
+  },
+  {
+   "id": "ITA-36ST",
+   "factionId": "ITA",
+   "name": "36° Stormo (EF2000)",
+   "classId": "EF2000",
+   "count": 16,
+   "homeBaseId": "GIOIA_DEL_COLLE"
+  },
+  {
+   "id": "ITA-51ST",
+   "factionId": "ITA",
+   "name": "51° Stormo (EF2000)",
+   "classId": "EF2000",
+   "count": 14,
+   "homeBaseId": "ISTRANA"
+  },
+  {
+   "id": "ITA-32ST",
+   "factionId": "ITA",
+   "name": "32° Stormo (F-35A)",
+   "classId": "F35A",
+   "count": 14,
+   "homeBaseId": "AMENDOLA"
+  },
+  {
+   "id": "ITA-6ST",
+   "factionId": "ITA",
+   "name": "6° Stormo (F-35A)",
+   "classId": "F35A",
+   "count": 10,
+   "homeBaseId": "GHEDI"
+  },
+  {
+   "id": "ITA-GRUPAER",
+   "factionId": "ITA",
+   "name": "Gruppo aerei imbarcati (F-35B/AV-8B+)",
+   "classId": "F35B",
+   "count": 10,
+   "homeBaseId": "TARANTO"
+  },
+  {
+   "id": "ITA-TORNADO",
+   "factionId": "ITA",
+   "name": "6° Stormo (Tornado IDS/ECR)",
+   "classId": "TORNADO",
+   "count": 12,
+   "homeBaseId": "GHEDI",
+   "readiness": 55
+  },
+  {
+   "id": "ITA-CAEW",
+   "factionId": "ITA",
+   "name": "14° Stormo (G550 CAEW)",
+   "classId": "G550_CAEW",
+   "count": 2,
+   "homeBaseId": "PRATICA_DI_MARE"
+  },
+  {
+   "id": "ITA-MQ9",
+   "factionId": "ITA",
+   "name": "32° Stormo / 28° Gruppo (MQ-9)",
+   "classId": "MQ9",
+   "count": 6,
+   "homeBaseId": "SIGONELLA"
+  },
+  {
+   "id": "ITA-SAMPT1",
+   "factionId": "ITA",
+   "name": "SAMP/T 1ª batteria",
+   "classId": "SAMPT",
+   "count": 1,
+   "homeBaseId": "SIGONELLA"
+  },
+  {
+   "id": "ITA-SAMPT2",
+   "factionId": "ITA",
+   "name": "SAMP/T 2ª batteria",
+   "classId": "SAMPT",
+   "count": 1,
+   "homeBaseId": "GIOIA_DEL_COLLE"
+  },
+  {
+   "id": "ITA-9COL",
+   "factionId": "ITA",
+   "name": "9° Rgt Col Moschin",
+   "classId": "COFS",
+   "count": 1,
+   "homeBaseId": "PRATICA_DI_MARE"
+  },
+  {
+   "id": "ITA-GOI",
+   "factionId": "ITA",
+   "name": "GOI (Comsubin)",
+   "classId": "COFS",
+   "count": 1,
+   "homeBaseId": "LA_SPEZIA"
+  },
+  {
+   "id": "ITA-17ST",
+   "factionId": "ITA",
+   "name": "17° Stormo Incursori",
+   "classId": "COFS",
+   "count": 1,
+   "homeBaseId": "PRATICA_DI_MARE"
+  },
+  {
+   "id": "USA-CVN",
+   "factionId": "USA",
+   "name": "CVN Gruppo d'attacco",
+   "classId": "CVN",
+   "count": 1,
+   "homeBaseId": "NAPLES_NSA",
+   "estimated": true,
+   "zoneId": "IONIO",
+   "status": "deployed"
+  },
+  {
+   "id": "USA-DDG1",
+   "factionId": "USA",
+   "name": "DDG 6ª Flotta A",
+   "classId": "DDG_ARLEIGH",
+   "count": 1,
+   "homeBaseId": "NAPLES_NSA",
+   "estimated": true
+  },
+  {
+   "id": "USA-DDG2",
+   "factionId": "USA",
+   "name": "DDG 6ª Flotta B",
+   "classId": "DDG_ARLEIGH",
+   "count": 1,
+   "homeBaseId": "SOUDA",
+   "estimated": true,
+   "zoneId": "MEDITERRANEO_ORIENTALE",
+   "status": "deployed"
+  },
+  {
+   "id": "USA-DDG3",
+   "factionId": "USA",
+   "name": "DDG 6ª Flotta C",
+   "classId": "DDG_ARLEIGH",
+   "count": 1,
+   "homeBaseId": "SOUDA",
+   "estimated": true
+  },
+  {
+   "id": "USA-SSN",
+   "factionId": "USA",
+   "name": "SSN 6ª Flotta",
+   "classId": "SSN",
+   "count": 1,
+   "homeBaseId": "NAPLES_NSA",
+   "estimated": true
+  },
+  {
+   "id": "USA-31FW",
+   "factionId": "USA",
+   "name": "31st Fighter Wing",
+   "classId": "F16",
+   "count": 20,
+   "homeBaseId": "AVIANO",
+   "estimated": true
+  },
+  {
+   "id": "USA-P8",
+   "factionId": "USA",
+   "name": "VP P-8A",
+   "classId": "P8",
+   "count": 4,
+   "homeBaseId": "SOUDA",
+   "estimated": true
+  },
+  {
+   "id": "FRA-CDG",
+   "factionId": "FRA",
+   "name": "Charles de Gaulle (R91)",
+   "classId": "CDG",
+   "count": 1,
+   "homeBaseId": "TOULON",
+   "estimated": true
+  },
+  {
+   "id": "FRA-FREMM1",
+   "factionId": "FRA",
+   "name": "FREMM Aquitaine",
+   "classId": "FREMM_FR",
+   "count": 1,
+   "homeBaseId": "TOULON",
+   "estimated": true
+  },
+  {
+   "id": "FRA-FREMM2",
+   "factionId": "FRA",
+   "name": "FREMM Provence",
+   "classId": "FREMM_FR",
+   "count": 1,
+   "homeBaseId": "TOULON",
+   "estimated": true
+  },
+  {
+   "id": "FRA-SSN",
+   "factionId": "FRA",
+   "name": "SNA classe Suffren",
+   "classId": "SSN",
+   "count": 1,
+   "homeBaseId": "TOULON",
+   "estimated": true
+  },
+  {
+   "id": "FRA-RAFALE",
+   "factionId": "FRA",
+   "name": "Rafale (Solenzara)",
+   "classId": "RAFALE",
+   "count": 12,
+   "homeBaseId": "SOLENZARA",
+   "estimated": true
+  },
+  {
+   "id": "GBR-T45",
+   "factionId": "GBR",
+   "name": "Type 45",
+   "classId": "T45",
+   "count": 1,
+   "homeBaseId": "AKROTIRI",
+   "estimated": true
+  },
+  {
+   "id": "GBR-TYPHOON",
+   "factionId": "GBR",
+   "name": "Typhoon Akrotiri",
+   "classId": "EF2000",
+   "count": 8,
+   "homeBaseId": "AKROTIRI",
+   "estimated": true
+  },
+  {
+   "id": "TUR-ANADOLU",
+   "factionId": "TUR",
+   "name": "TCG Anadolu",
+   "classId": "ANADOLU",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-FF1",
+   "factionId": "TUR",
+   "name": "Fregata TCG #1",
+   "classId": "TR_FRIGATE",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true,
+   "zoneId": "EGEO",
+   "status": "deployed"
+  },
+  {
+   "id": "TUR-FF2",
+   "factionId": "TUR",
+   "name": "Fregata TCG #2",
+   "classId": "TR_FRIGATE",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-FF3",
+   "factionId": "TUR",
+   "name": "Fregata TCG #3",
+   "classId": "TR_FRIGATE",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-FF4",
+   "factionId": "TUR",
+   "name": "Fregata TCG #4",
+   "classId": "TR_FRIGATE",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-SS1",
+   "factionId": "TUR",
+   "name": "Sottomarino Reis #1",
+   "classId": "TYPE214",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-SS2",
+   "factionId": "TUR",
+   "name": "Sottomarino Reis #2",
+   "classId": "TYPE214",
+   "count": 1,
+   "homeBaseId": "AKSAZ",
+   "estimated": true
+  },
+  {
+   "id": "TUR-F16A",
+   "factionId": "TUR",
+   "name": "Filo F-16 Incirlik",
+   "classId": "F16",
+   "count": 18,
+   "homeBaseId": "INCIRLIK",
+   "estimated": true
+  },
+  {
+   "id": "TUR-UCAV",
+   "factionId": "TUR",
+   "name": "UCAV Al-Watiya",
+   "classId": "UCAV_MALE",
+   "count": 8,
+   "homeBaseId": "AL_WATIYA",
+   "estimated": true
+  },
+  {
+   "id": "RUS-GORSHKOV",
+   "factionId": "RUS",
+   "name": "Admiral Gorshkov",
+   "classId": "GORSHKOV",
+   "count": 1,
+   "homeBaseId": "TARTUS",
+   "estimated": true,
+   "zoneId": "MEDITERRANEO_ORIENTALE",
+   "status": "deployed"
+  },
+  {
+   "id": "RUS-KILO1",
+   "factionId": "RUS",
+   "name": "Kilo Tartus #1",
+   "classId": "KILO",
+   "count": 1,
+   "homeBaseId": "TARTUS",
+   "estimated": true
+  },
+  {
+   "id": "RUS-KILO2",
+   "factionId": "RUS",
+   "name": "Kilo Tartus #2",
+   "classId": "KILO",
+   "count": 1,
+   "homeBaseId": "TARTUS",
+   "estimated": true
+  },
+  {
+   "id": "RUS-SU",
+   "factionId": "RUS",
+   "name": "Gruppo aereo Libia",
+   "classId": "SU35",
+   "count": 8,
+   "homeBaseId": "AL_KHADIM",
+   "estimated": true
+  },
+  {
+   "id": "RUS-AC",
+   "factionId": "RUS",
+   "name": "Africa Corps (Libia)",
+   "classId": "AFRICA_CORPS",
+   "count": 1,
+   "homeBaseId": "AL_KHADIM",
+   "estimated": true
+  },
+  {
+   "id": "CHN-052D",
+   "factionId": "CHN",
+   "name": "Type 052D (48ª scorta)",
+   "classId": "DDG_052D",
+   "count": 1,
+   "homeBaseId": "DJIBOUTI_PLA",
+   "estimated": true,
+   "zoneId": "MAR_ROSSO",
+   "status": "deployed"
+  },
+  {
+   "id": "CHN-054A",
+   "factionId": "CHN",
+   "name": "Type 054A (48ª scorta)",
+   "classId": "FFG_054A",
+   "count": 1,
+   "homeBaseId": "DJIBOUTI_PLA",
+   "estimated": true
+  },
+  {
+   "id": "CHN-903",
+   "factionId": "CHN",
+   "name": "Type 903",
+   "classId": "TANKER_903",
+   "count": 1,
+   "homeBaseId": "DJIBOUTI_PLA",
+   "estimated": true
+  },
+  {
+   "id": "GRC-FDI",
+   "factionId": "GRC",
+   "name": "Kimon (FDI)",
+   "classId": "HN_FRIGATE",
+   "count": 1,
+   "homeBaseId": "SALAMINA",
+   "estimated": true,
+   "zoneId": "EGEO",
+   "status": "deployed"
+  },
+  {
+   "id": "GRC-MEKO1",
+   "factionId": "GRC",
+   "name": "Hydra (MEKO)",
+   "classId": "HN_FRIGATE",
+   "count": 1,
+   "homeBaseId": "SALAMINA",
+   "estimated": true
+  },
+  {
+   "id": "GRC-SS",
+   "factionId": "GRC",
+   "name": "Papanikolis (214)",
+   "classId": "TYPE214",
+   "count": 1,
+   "homeBaseId": "SALAMINA",
+   "estimated": true
+  },
+  {
+   "id": "GRC-RAFALE",
+   "factionId": "GRC",
+   "name": "Rafale HAF",
+   "classId": "RAFALE",
+   "count": 12,
+   "homeBaseId": "SOUDA",
+   "estimated": true
+  },
+  {
+   "id": "EGY-FREMM1",
+   "factionId": "EGY",
+   "name": "Al-Galala (FREMM)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "ALESSANDRIA",
+   "estimated": true
+  },
+  {
+   "id": "EGY-FREMM2",
+   "factionId": "EGY",
+   "name": "Bernees (FREMM)",
+   "classId": "FREMM_BERGAMINI",
+   "count": 1,
+   "homeBaseId": "BERENICE",
+   "estimated": true
+  },
+  {
+   "id": "EGY-MISTRAL",
+   "factionId": "EGY",
+   "name": "Gamal Abdel Nasser",
+   "classId": "EG_MISTRAL",
+   "count": 1,
+   "homeBaseId": "ALESSANDRIA",
+   "estimated": true
+  },
+  {
+   "id": "EGY-RAFALE",
+   "factionId": "EGY",
+   "name": "Rafale EAF",
+   "classId": "RAFALE",
+   "count": 16,
+   "homeBaseId": "ALESSANDRIA",
+   "estimated": true
+  },
+  {
+   "id": "ISR-SAAR1",
+   "factionId": "ISR",
+   "name": "INS Magen",
+   "classId": "SAAR6",
+   "count": 1,
+   "homeBaseId": "HAIFA",
+   "estimated": true
+  },
+  {
+   "id": "ISR-SAAR2",
+   "factionId": "ISR",
+   "name": "INS Oz",
+   "classId": "SAAR6",
+   "count": 1,
+   "homeBaseId": "HAIFA",
+   "estimated": true
+  },
+  {
+   "id": "ISR-DOLPHIN",
+   "factionId": "ISR",
+   "name": "Dolphin",
+   "classId": "DOLPHIN",
+   "count": 1,
+   "homeBaseId": "HAIFA",
+   "estimated": true
+  },
+  {
+   "id": "ISR-F35I",
+   "factionId": "ISR",
+   "name": "F-35I",
+   "classId": "F35I",
+   "count": 16,
+   "homeBaseId": "HAIFA",
+   "estimated": true
+  },
+  {
+   "id": "ALG-KILO1",
+   "factionId": "ALG",
+   "name": "Kilo algerino #1",
+   "classId": "KILO",
+   "count": 1,
+   "homeBaseId": "MERS_EL_KEBIR",
+   "estimated": true
+  },
+  {
+   "id": "ALG-KILO2",
+   "factionId": "ALG",
+   "name": "Kilo algerino #2",
+   "classId": "KILO",
+   "count": 1,
+   "homeBaseId": "MERS_EL_KEBIR",
+   "estimated": true
+  },
+  {
+   "id": "ALG-MEKO1",
+   "factionId": "ALG",
+   "name": "Erradii (MEKO)",
+   "classId": "MEKO_A200",
+   "count": 1,
+   "homeBaseId": "MERS_EL_KEBIR",
+   "estimated": true
+  },
+  {
+   "id": "ALG-MEKO2",
+   "factionId": "ALG",
+   "name": "El Moudamir (MEKO)",
+   "classId": "MEKO_A200",
+   "count": 1,
+   "homeBaseId": "MERS_EL_KEBIR",
+   "estimated": true
+  },
+  {
+   "id": "ALG-SU30",
+   "factionId": "ALG",
+   "name": "Su-30MKA",
+   "classId": "SU35",
+   "count": 14,
+   "homeBaseId": "MERS_EL_KEBIR",
+   "estimated": true
+  },
+  {
+   "id": "TUN-OPV1",
+   "factionId": "TUN",
+   "name": "Pattugliatore tunisino #1",
+   "classId": "OPV",
+   "count": 1,
+   "homeBaseId": "BIZERTE",
+   "estimated": true
+  },
+  {
+   "id": "TUN-OPV2",
+   "factionId": "TUN",
+   "name": "Pattugliatore tunisino #2",
+   "classId": "OPV",
+   "count": 1,
+   "homeBaseId": "BIZERTE",
+   "estimated": true
+  },
+  {
+   "id": "GNU-OPV",
+   "factionId": "LBY_GNU",
+   "name": "Guardia costiera Tripoli",
+   "classId": "OPV",
+   "count": 1,
+   "homeBaseId": "TRIPOLI",
+   "estimated": true
+  },
+  {
+   "id": "GNU-BDE",
+   "factionId": "LBY_GNU",
+   "name": "Brigate di Tripoli",
+   "classId": "MILITIA",
+   "count": 1,
+   "homeBaseId": "TRIPOLI",
+   "estimated": true
+  },
+  {
+   "id": "LNA-BDE1",
+   "factionId": "LBY_LNA",
+   "name": "LNA 106ª Brigata",
+   "classId": "MILITIA",
+   "count": 1,
+   "homeBaseId": "BENGASI",
+   "estimated": true
+  },
+  {
+   "id": "LNA-BDE2",
+   "factionId": "LBY_LNA",
+   "name": "LNA Tariq Bin Ziyad",
+   "classId": "MILITIA",
+   "count": 1,
+   "homeBaseId": "BENGASI",
+   "estimated": true
+  },
+  {
+   "id": "LNA-AIR",
+   "factionId": "LBY_LNA",
+   "name": "LNA aviazione (MiG-29)",
+   "classId": "SU35",
+   "count": 6,
+   "homeBaseId": "BENGASI",
+   "estimated": true
+  },
+  {
+   "id": "IRN-FAC",
+   "factionId": "IRN",
+   "name": "Flottiglia IRGCN",
+   "classId": "FAC_IRGC",
+   "count": 12,
+   "homeBaseId": "BANDAR_ABBAS",
+   "estimated": true
+  },
+  {
+   "id": "IRN-DRONES",
+   "factionId": "IRN",
+   "name": "Rete lanciatori proxy Mar Rosso",
+   "classId": "DRONE_SWARM",
+   "count": 20,
+   "homeBaseId": "HODEIDAH",
+   "estimated": true,
+   "zoneId": "MAR_ROSSO",
+   "status": "deployed"
+  }
+ ],
+ "relations": {
+  "default": {
+   "trust": 0,
+   "tension": 20
+  },
+  "pairs": [
+   [
+    "ITA",
+    "USA",
+    60,
+    10
+   ],
+   [
+    "ITA",
+    "FRA",
+    40,
+    20
+   ],
+   [
+    "ITA",
+    "GBR",
+    45,
+    10
+   ],
+   [
+    "ITA",
+    "GRC",
+    45,
+    10
+   ],
+   [
+    "ITA",
+    "TUR",
+    10,
+    30
+   ],
+   [
+    "ITA",
+    "EGY",
+    20,
+    25
+   ],
+   [
+    "ITA",
+    "ISR",
+    20,
+    20
+   ],
+   [
+    "ITA",
+    "ALG",
+    35,
+    10
+   ],
+   [
+    "ITA",
+    "TUN",
+    25,
+    25
+   ],
+   [
+    "ITA",
+    "LBY_GNU",
+    30,
+    30
+   ],
+   [
+    "ITA",
+    "LBY_LNA",
+    -5,
+    40
+   ],
+   [
+    "ITA",
+    "RUS",
+    -40,
+    50
+   ],
+   [
+    "ITA",
+    "CHN",
+    0,
+    25
+   ],
+   [
+    "ITA",
+    "IRN",
+    -20,
+    40
+   ],
+   [
+    "USA",
+    "FRA",
+    50,
+    10
+   ],
+   [
+    "USA",
+    "GBR",
+    75,
+    5
+   ],
+   [
+    "USA",
+    "GRC",
+    55,
+    10
+   ],
+   [
+    "USA",
+    "TUR",
+    15,
+    35
+   ],
+   [
+    "USA",
+    "ISR",
+    75,
+    10
+   ],
+   [
+    "USA",
+    "EGY",
+    35,
+    20
+   ],
+   [
+    "USA",
+    "RUS",
+    -65,
+    65
+   ],
+   [
+    "USA",
+    "CHN",
+    -45,
+    55
+   ],
+   [
+    "USA",
+    "IRN",
+    -80,
+    80
+   ],
+   [
+    "FRA",
+    "TUR",
+    -15,
+    45
+   ],
+   [
+    "FRA",
+    "GRC",
+    55,
+    10
+   ],
+   [
+    "FRA",
+    "LBY_LNA",
+    15,
+    25
+   ],
+   [
+    "FRA",
+    "ALG",
+    -10,
+    40
+   ],
+   [
+    "FRA",
+    "EGY",
+    40,
+    10
+   ],
+   [
+    "FRA",
+    "RUS",
+    -45,
+    50
+   ],
+   [
+    "TUR",
+    "GRC",
+    -25,
+    60
+   ],
+   [
+    "TUR",
+    "LBY_GNU",
+    60,
+    10
+   ],
+   [
+    "TUR",
+    "LBY_LNA",
+    -10,
+    40
+   ],
+   [
+    "TUR",
+    "EGY",
+    0,
+    40
+   ],
+   [
+    "TUR",
+    "ISR",
+    -40,
+    55
+   ],
+   [
+    "TUR",
+    "RUS",
+    10,
+    30
+   ],
+   [
+    "RUS",
+    "LBY_LNA",
+    55,
+    10
+   ],
+   [
+    "RUS",
+    "ALG",
+    45,
+    10
+   ],
+   [
+    "RUS",
+    "IRN",
+    45,
+    10
+   ],
+   [
+    "RUS",
+    "CHN",
+    50,
+    10
+   ],
+   [
+    "LBY_GNU",
+    "LBY_LNA",
+    -40,
+    65
+   ],
+   [
+    "ISR",
+    "IRN",
+    -90,
+    90
+   ],
+   [
+    "EGY",
+    "ISR",
+    10,
+    30
+   ],
+   [
+    "EGY",
+    "IRN",
+    -20,
+    45
+   ],
+   [
+    "CHN",
+    "IRN",
+    30,
+    15
+   ],
+   [
+    "ALG",
+    "TUN",
+    20,
+    20
+   ]
+  ]
+ },
+ "agreements": [
+  {
+   "id": "AG-NATO",
+   "type": "defense",
+   "parties": [
+    "ITA",
+    "USA",
+    "FRA",
+    "GBR",
+    "GRC",
+    "TUR"
+   ],
+   "terms": "Trattato del Nord Atlantico",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-TRANSMED",
+   "type": "energy",
+   "parties": [
+    "ITA",
+    "ALG",
+    "TUN"
+   ],
+   "terms": "Forniture gas via TransMed",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-ITA-LBY-MIG",
+   "type": "migration",
+   "parties": [
+    "ITA",
+    "LBY_GNU"
+   ],
+   "terms": "Memorandum su migrazione e guardia costiera",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-TUR-GNU",
+   "type": "defense",
+   "parties": [
+    "TUR",
+    "LBY_GNU"
+   ],
+   "terms": "Cooperazione militare e presenza ad Al-Watiya",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-RUS-LNA",
+   "type": "secret",
+   "parties": [
+    "RUS",
+    "LBY_LNA"
+   ],
+   "terms": "Accesso a basi in Cirenaica in cambio di armi",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": [
+    "RUS",
+    "LBY_LNA"
+   ],
+   "status": "active"
+  }
+ ],
+ "crises": [
+  {
+   "id": "LBY_OFFSHORE",
+   "title": "Sicurezza offshore Libia / impianti ENI",
+   "type": "energy",
+   "zoneIds": [
+    "MAR_LIBICO",
+    "LIBIA_TERRA"
+   ],
+   "involved": [
+    "ITA",
+    "LBY_GNU",
+    "LBY_LNA",
+    "TUR",
+    "RUS"
+   ],
+   "escalation": 3
+  },
+  {
+   "id": "RED_SEA",
+   "title": "Instabilità Mar Rosso e rotte Suez",
+   "type": "maritime",
+   "zoneIds": [
+    "MAR_ROSSO"
+   ],
+   "involved": [
+    "IRN",
+    "USA",
+    "EGY",
+    "CHN",
+    "ITA",
+    "FRA"
+   ],
+   "escalation": 5
+  },
+  {
+   "id": "EAST_MED",
+   "title": "Tensioni Egeo / Mediterraneo orientale",
+   "type": "interstate",
+   "zoneIds": [
+    "EGEO",
+    "MEDITERRANEO_ORIENTALE"
+   ],
+   "involved": [
+    "TUR",
+    "GRC",
+    "EGY",
+    "ISR"
+   ],
+   "escalation": 3
+  },
+  {
+   "id": "SAHEL_MIG",
+   "title": "Pressione migratoria dal Sahel",
+   "type": "migration",
+   "zoneIds": [
+    "SAHEL",
+    "CANALE_SICILIA"
+   ],
+   "involved": [
+    "ITA",
+    "TUN",
+    "LBY_GNU",
+    "ALG",
+    "RUS"
+   ],
+   "escalation": 4
+  },
+  {
+   "id": "SUBSEA",
+   "title": "Protezione cavi sottomarini",
+   "type": "hybrid",
+   "zoneIds": [
+    "IONIO",
+    "CANALE_SICILIA"
+   ],
+   "involved": [
+    "ITA",
+    "RUS",
+    "GRC"
+   ],
+   "escalation": 2
+  }
+ ],
+ "factions": [
+  {
+   "id": "ITA",
+   "name": "Italia",
+   "kind": "state",
+   "controller": "human",
+   "agentRole": null,
+   "profileRef": "factions/ITA.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 3200,
+    "perTurnIncome": 25
+   },
+   "stocks": {
+    "METEOR": 40,
+    "ASTER30_B1NT": 64,
+    "ASTER15": 40,
+    "STORM_SHADOW": 24,
+    "TESEO_MK2E": 24,
+    "MARTE_ER": 16,
+    "BLACK_SHARK": 24,
+    "GBU_KIT": 200,
+    "IRIS_T": 60
+   },
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-ITA-1",
+     "text": "Flussi di gas da TransMed e Greenstream operativi",
+     "priority": 1,
+     "metric": "infra(TRANSMED).status == operational && infra(GREENSTREAM).status == operational",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ITA-2",
+     "text": "Crisi del Mar Rosso sotto il livello 6",
+     "priority": 2,
+     "metric": "crisis(RED_SEA).escalation < 6",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ITA-3",
+     "text": "Pressione migratoria sotto 60",
+     "priority": 2,
+     "metric": "indicator(migrationPressure) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-ITA-ENI",
+     "text": "Attacco agli impianti energetici italiani",
+     "trigger": "infra(MELLITAH).status == offline || infra(TRANSMED).status == offline",
+     "response": "Risposta militare proporzionata"
+    }
+   ],
+   "isrAssets": [
+    {
+     "id": "ITA-CSK",
+     "type": "SAR_SAT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.75,
+     "tasking": null
+    },
+    {
+     "id": "ITA-AISE-MED",
+     "type": "HUMINT_NET",
+     "coverage": [
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "SAHEL",
+      "CANALE_SICILIA",
+      "MEDITERRANEO_ORIENTALE"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.55,
+     "tasking": null
+    },
+    {
+     "id": "ITA-AISE-GOLFO",
+     "type": "HUMINT_NET",
+     "coverage": [
+      "GOLFO",
+      "MAR_ROSSO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.45,
+     "tasking": null
+    },
+    {
+     "id": "ITA-AISE-BALCANI",
+     "type": "HUMINT_NET",
+     "coverage": [
+      "ADRIATICO",
+      "EGEO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.5,
+     "tasking": null
+    },
+    {
+     "id": "ITA-SIGINT",
+     "type": "SIGINT",
+     "coverage": [
+      "TIRRENO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "ADRIATICO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.6,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 7,
+    "defense": 7
+   },
+   "alliances": [
+    "NATO",
+    "EU"
+   ]
+  },
+  {
+   "id": "USA",
+   "name": "Stati Uniti",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_major",
+   "profileRef": "factions/USA.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 20000,
+    "perTurnIncome": 400
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-USA-1",
+     "text": "Mar Rosso stabilizzato (escalation < 5)",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation < 5",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-USA-2",
+     "text": "Presenza navale nel Mar Rosso",
+     "priority": 2,
+     "metric": "units(USA, MAR_ROSSO) >= 1",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [
+    {
+     "id": "USA-NRO",
+     "type": "EO_SAT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "GOLFO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.9,
+     "tasking": null
+    },
+    {
+     "id": "USA-SIGINT",
+     "type": "SIGINT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "GOLFO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.85,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 9,
+    "defense": 9
+   },
+   "alliances": [
+    "NATO"
+   ]
+  },
+  {
+   "id": "FRA",
+   "name": "Francia",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_major",
+   "profileRef": "factions/FRA.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 3500,
+    "perTurnIncome": 60
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-FRA-1",
+     "text": "Contenere la crisi del Sahel",
+     "priority": 1,
+     "metric": "crisis(SAHEL_MIG).escalation < 6",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-FRA-2",
+     "text": "Presenza nel Mediterraneo occidentale",
+     "priority": 3,
+     "metric": "units(FRA, MED_OCCIDENTALE) >= 1",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [
+    {
+     "id": "FRA-CSO",
+     "type": "EO_SAT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "GOLFO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.7,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 8,
+    "defense": 8
+   },
+   "alliances": [
+    "NATO",
+    "EU"
+   ]
+  },
+  {
+   "id": "TUR",
+   "name": "Turchia",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_major",
+   "profileRef": "factions/TUR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 2500,
+    "perTurnIncome": 45
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-TUR-1",
+     "text": "Presenza navale nell'Egeo",
+     "priority": 1,
+     "metric": "units(TUR, EGEO) >= 2",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-TUR-2",
+     "text": "GNU stabile",
+     "priority": 2,
+     "metric": "faction(LBY_GNU).stability >= 35",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-TUR-EGEO",
+     "text": "Blocco greco nell'Egeo",
+     "trigger": "units(GRC, EGEO) >= 4",
+     "response": "Mobilitazione navale"
+    }
+   ],
+   "isrAssets": [
+    {
+     "id": "TUR-GOKTURK",
+     "type": "EO_SAT",
+     "coverage": [
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_LIBICO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.55,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 7,
+    "defense": 6
+   },
+   "alliances": [
+    "NATO"
+   ]
+  },
+  {
+   "id": "RUS",
+   "name": "Russia",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_major",
+   "profileRef": "factions/RUS.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 4000,
+    "perTurnIncome": 70
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-RUS-1",
+     "text": "Presenza nel Mediterraneo orientale",
+     "priority": 1,
+     "metric": "units(RUS, MEDITERRANEO_ORIENTALE) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-RUS-2",
+     "text": "LNA stabile",
+     "priority": 1,
+     "metric": "faction(LBY_LNA).stability >= 35",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-RUS-LNA",
+     "text": "Crollo dell'LNA",
+     "trigger": "faction(LBY_LNA).stability < 15",
+     "response": "Rinforzo Africa Corps"
+    }
+   ],
+   "isrAssets": [
+    {
+     "id": "RUS-SAT",
+     "type": "EO_SAT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "GOLFO",
+      "SAHEL"
+     ],
+     "revisitTurns": 2,
+     "quality": 0.6,
+     "tasking": null
+    },
+    {
+     "id": "RUS-HUMINT",
+     "type": "HUMINT_NET",
+     "coverage": [
+      "LIBIA_TERRA",
+      "MAR_LIBICO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.6,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 9,
+    "defense": 7
+   },
+   "alliances": []
+  },
+  {
+   "id": "CHN",
+   "name": "Cina",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_major",
+   "profileRef": "factions/CHN.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 6000,
+    "perTurnIncome": 120
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-CHN-1",
+     "text": "Rotte commerciali sicure",
+     "priority": 1,
+     "metric": "indicator(medShippingRisk) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [
+    {
+     "id": "CHN-YAOGAN",
+     "type": "SAR_SAT",
+     "coverage": [
+      "TIRRENO",
+      "ADRIATICO",
+      "IONIO",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "LIBIA_TERRA",
+      "MED_OCCIDENTALE",
+      "EGEO",
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "MAR_NERO",
+      "GOLFO",
+      "SAHEL"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.75,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 9,
+    "defense": 8
+   },
+   "alliances": []
+  },
+  {
+   "id": "GBR",
+   "name": "Regno Unito",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/GBR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 2500,
+    "perTurnIncome": 50
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-GBR-1",
+     "text": "Rotte di Suez aperte",
+     "priority": 1,
+     "metric": "infra(SUEZ).status == operational",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 8,
+    "defense": 8
+   },
+   "alliances": [
+    "NATO"
+   ]
+  },
+  {
+   "id": "GRC",
+   "name": "Grecia",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/GRC.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 800,
+    "perTurnIncome": 15
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-GRC-1",
+     "text": "Tensione con la Turchia sotto 60",
+     "priority": 1,
+     "metric": "relation(GRC, TUR).tension < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 5,
+    "defense": 6
+   },
+   "alliances": [
+    "NATO",
+    "EU"
+   ]
+  },
+  {
+   "id": "EGY",
+   "name": "Egitto",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/EGY.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 900,
+    "perTurnIncome": 15
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-EGY-1",
+     "text": "Canale di Suez operativo",
+     "priority": 1,
+     "metric": "infra(SUEZ).status == operational",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 4,
+    "defense": 4
+   },
+   "alliances": []
+  },
+  {
+   "id": "ISR",
+   "name": "Israele",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/ISR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 2000,
+    "perTurnIncome": 40
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-ISR-1",
+     "text": "Contenere l'escalation del Mar Rosso",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation < 7",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-ISR-IRN",
+     "text": "Escalation iraniana",
+     "trigger": "crisis(RED_SEA).escalation >= 8",
+     "response": "Strike preventivo"
+    }
+   ],
+   "isrAssets": [
+    {
+     "id": "ISR-OFEQ",
+     "type": "EO_SAT",
+     "coverage": [
+      "MEDITERRANEO_ORIENTALE",
+      "MAR_ROSSO",
+      "GOLFO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.85,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 9,
+    "defense": 9
+   },
+   "alliances": []
+  },
+  {
+   "id": "ALG",
+   "name": "Algeria",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/ALG.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 900,
+    "perTurnIncome": 20
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-ALG-1",
+     "text": "Relazione di fiducia con l'Italia",
+     "priority": 2,
+     "metric": "relation(ALG, ITA).trust >= 30",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 5,
+    "defense": 5
+   },
+   "alliances": []
+  },
+  {
+   "id": "TUN",
+   "name": "Tunisia",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/TUN.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 100,
+    "perTurnIncome": 3
+   },
+   "stocks": {},
+   "stability": 40,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-TUN-1",
+     "text": "Sostegno economico italiano",
+     "priority": 2,
+     "metric": "relation(TUN, ITA).trust >= 30",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 3
+   },
+   "alliances": []
+  },
+  {
+   "id": "LBY_GNU",
+   "name": "Libia (GNU, Tripoli)",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/LBY_GNU.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 300,
+    "perTurnIncome": 8
+   },
+   "stocks": {},
+   "stability": 40,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-LBY_GNU-1",
+     "text": "Stabilità interna",
+     "priority": 1,
+     "metric": "faction(LBY_GNU).stability >= 40",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 2
+   },
+   "alliances": []
+  },
+  {
+   "id": "LBY_LNA",
+   "name": "Libia (LNA, Haftar)",
+   "kind": "nonstate",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/LBY_LNA.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 400,
+    "perTurnIncome": 8
+   },
+   "stocks": {},
+   "stability": 40,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-LBY_LNA-1",
+     "text": "Leva sui terminali energetici",
+     "priority": 2,
+     "metric": "crisis(LBY_OFFSHORE).escalation >= 4",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 2
+   },
+   "alliances": []
+  },
+  {
+   "id": "IRN",
+   "name": "Iran",
+   "kind": "state",
+   "controller": "ai",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/IRN.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 1200,
+    "perTurnIncome": 25
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-IRN-1",
+     "text": "Pressione sul Mar Rosso",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation >= 5",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-IRN-HORMUZ",
+     "text": "Blocco di Hormuz da forze ostili",
+     "trigger": "units(USA, GOLFO) >= 3",
+     "response": "Minaccia alla navigazione"
+    }
+   ],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 8,
+    "defense": 6
+   },
+   "alliances": []
+  },
+  {
+   "id": "NATO",
+   "name": "NATO",
+   "kind": "bloc",
+   "controller": "scripted",
+   "agentRole": null,
+   "profileRef": "factions/NATO.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 0,
+    "perTurnIncome": 0
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 0,
+    "defense": 8
+   },
+   "alliances": []
+  },
+  {
+   "id": "EU",
+   "name": "Unione Europea",
+   "kind": "bloc",
+   "controller": "scripted",
+   "agentRole": null,
+   "profileRef": "factions/EU.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 0,
+    "perTurnIncome": 0
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 0,
+    "defense": 7
+   },
+   "alliances": []
+  }
+ ]
+}

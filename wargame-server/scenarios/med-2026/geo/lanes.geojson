@@ -1,0 +1,125 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "SUEZ_GIBILTERRA",
+   "properties": {
+    "id": "SUEZ_GIBILTERRA"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      32.4,
+      31.3
+     ],
+     [
+      25,
+      33.8
+     ],
+     [
+      15.5,
+      36.2
+     ],
+     [
+      11.5,
+      37.3
+     ],
+     [
+      3,
+      37.5
+     ],
+     [
+      -5.5,
+      36
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "SUEZ_GENOVA",
+   "properties": {
+    "id": "SUEZ_GENOVA"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      32.4,
+      31.3
+     ],
+     [
+      20,
+      35
+     ],
+     [
+      15.6,
+      38.2
+     ],
+     [
+      12,
+      41
+     ],
+     [
+      8.9,
+      44.3
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "BAB_SUEZ",
+   "properties": {
+    "id": "BAB_SUEZ"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      43.3,
+      12.6
+     ],
+     [
+      38.5,
+      20
+     ],
+     [
+      33.5,
+      27.5
+     ],
+     [
+      32.5,
+      29.9
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ADRIATICO",
+   "properties": {
+    "id": "ADRIATICO"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      18.5,
+      39.8
+     ],
+     [
+      16,
+      42
+     ],
+     [
+      13.7,
+      45.6
+     ]
+    ]
+   }
+  }
+ ]
+}

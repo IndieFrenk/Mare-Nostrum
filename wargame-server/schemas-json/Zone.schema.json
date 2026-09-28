@@ -1,0 +1,68 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "name": {
+   "type": "string"
+  },
+  "terrain": {
+   "default": "sea",
+   "type": "string",
+   "enum": [
+    "sea",
+    "land"
+   ]
+  },
+  "polygonRef": {
+   "type": "string"
+  },
+  "center": {
+   "type": "object",
+   "properties": {
+    "lat": {
+     "type": "number"
+    },
+    "lon": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "lat",
+    "lon"
+   ]
+  },
+  "seaState": {
+   "type": "number"
+  },
+  "weatherSeed": {
+   "type": "number"
+  },
+  "controlledBy": {
+   "anyOf": [
+    {
+     "type": "string",
+     "minLength": 2
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "tension": {
+   "type": "number"
+  }
+ },
+ "required": [
+  "id",
+  "name",
+  "polygonRef",
+  "center",
+  "seaState",
+  "weatherSeed",
+  "controlledBy",
+  "tension"
+ ]
+}

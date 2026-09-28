@@ -1,0 +1,85 @@
+/* Mare Nostrum — interfaccia a tutto schermo in stile grand strategy */
+:root { --bg: #05080c; --panel-bg: rgba(18, 22, 20, .93); --border: #6b5a32; --line: #2e3a3f; --text: #e8e2cf; --dim: #a39c86; --gold: #d9b862; --accent: #d9b862; --warn: #ffb347; --err: #ff6b6b; --ok: #6fe39a;
+  font: 13px/1.45 'Segoe UI', Roboto, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at center, #0c1622 0%, #03050a 75%); color: var(--text); overflow: hidden; }
+#wg-app { height: 100vh; position: relative; }
+button, select, input, textarea { background: #1d211d; color: var(--text); border: 1px solid #4c4230; border-radius: 3px; padding: 4px 8px; font: inherit; }
+button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--gold); color: #fff; } button:disabled { opacity: .45; cursor: default; }
+.wg-primary { background: linear-gradient(#e2c472, #a8853a); color: #1a1408; border-color: var(--gold); font-weight: 700; }
+#wg-map { position: absolute; inset: 0; }
+#wg-hud { position: absolute; inset: 0; pointer-events: none; }
+#wg-hud > * { pointer-events: auto; }
+.wg-float { position: absolute; background: var(--panel-bg); border: 1px solid var(--border); box-shadow: 0 4px 18px rgba(0,0,0,.6), inset 0 0 0 1px rgba(217,184,98,.12); border-radius: 3px; }
+
+/* barra superiore: risorse, data, avanzamento */
+#wg-top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 10px;
+  background: linear-gradient(#262a24, #121511); border-bottom: 2px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,.7); }
+.wg-flag { width: 58px; height: 38px; font-weight: 800; letter-spacing: .08em; background: linear-gradient(90deg, #1f7a3f 0 33%, #eee 33% 66%, #c33 66%); color: #111; text-shadow: 0 0 3px #fff; border: 2px solid var(--gold); }
+.wg-res { display: flex; flex-direction: column; padding: 2px 10px; border-left: 1px solid #3b3526; min-width: 76px; }
+.wg-res small { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; } .wg-res b { color: var(--gold); font-size: 14px; }
+.wg-spacer { flex: 1; }
+.wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
+.wg-len { font-size: 11px; margin-right: 6px; }
+.wg-play { width: 44px; height: 40px; font-size: 20px; background: linear-gradient(#e2c472, #a8853a); color: #1a1408; border: 2px solid #f0d890; border-radius: 50%; }
+
+/* menu sinistro a icone */
+#wg-menu { position: absolute; top: 64px; left: 10px; display: flex; flex-direction: column; gap: 4px; }
+#wg-menu button { width: 40px; height: 40px; font-size: 18px; background: linear-gradient(#2b2f28, #171a16); border: 1px solid #4c4230; }
+#wg-menu button.on { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 8px rgba(217,184,98,.4); }
+
+.wg-drawer { top: 64px; left: 58px; width: min(440px, calc(100vw - 80px)); bottom: 56px; display: flex; flex-direction: column; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; color: var(--gold); background: linear-gradient(#2a2d26, #1a1c18); }
+.panel-header button, .wg-float header button { padding: 0 7px; }
+.panel-content { padding: 8px 10px; overflow: auto; flex: 1; }
+.panel-content h3 { margin: 4px 0 8px; color: var(--gold); } .panel-content h4 { margin: 12px 0 4px; color: #cfc6a8; } .panel-content p { margin: 4px 0; }
+
+/* avvisi a destra */
+#wg-alerts { position: absolute; top: 62px; right: 10px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; max-width: 320px; }
+.wg-alert { background: rgba(20,22,18,.9); border-left: 3px solid var(--gold); text-align: left; } .wg-alert.crit { border-left-color: var(--err); color: #ffd0c8; }
+
+/* scheda paese e selezione */
+.wg-float header { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 800; letter-spacing: .08em; color: var(--gold); }
+.wg-float header button { margin-left: auto; } .wg-float header i { width: 18px; height: 12px; display: inline-block; border: 1px solid #000; }
+.wg-country { right: 10px; top: 200px; width: 320px; padding-bottom: 8px; } .wg-country > :not(header) { margin: 6px 10px; }
+.wg-country input { width: calc(100% - 20px); }
+.wg-meters { display: grid; gap: 4px; } .wg-meter { position: relative; background: #26271f; min-height: 18px; } .wg-meter b { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #7a2a22, #b89a3a, #3f8f4f); opacity: .7; }
+.wg-meter span { position: relative; z-index: 1; display: block; padding: 1px 6px; font-size: 12px; }
+.wg-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 10px; }
+.wg-selection { left: 58px; bottom: 56px; width: 380px; max-height: 40vh; display: flex; flex-direction: column; }
+.wg-selection ul { list-style: none; margin: 0; padding: 4px; overflow: auto; } .wg-selection p { margin: 4px 10px; }
+.wg-selection li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 3px 6px; cursor: pointer; border-bottom: 1px solid #2c2a20; }
+.wg-selection li em { grid-column: 1 / -1; color: var(--gold); font-size: 11px; font-style: normal; } .wg-selection li.sel { background: rgba(217,184,98,.18); }
+.wg-drawer:not(:empty) ~ .wg-selection { left: 508px; }
+
+/* modalità mappa e log */
+#wg-modes { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 3px; }
+#wg-modes button { text-transform: capitalize; background: rgba(20,22,18,.9); } #wg-modes .on { border-color: var(--gold); color: var(--gold); }
+#wg-log { position: absolute; left: 58px; bottom: 12px; color: var(--dim); max-width: 50vw; pointer-events: none; text-shadow: 0 1px 2px #000; }
+
+/* pedine ed etichette */
+.wg-counter { position: relative; cursor: pointer; filter: drop-shadow(0 1px 2px #000); }
+.wg-counter img { display: block; height: 22px; } .wg-counter.sel img { outline: 2px solid var(--gold); outline-offset: 1px; }
+.wg-counter span { position: absolute; right: -9px; top: -8px; background: var(--gold); color: #1a1408; font-weight: 800; font-size: 10px; border-radius: 8px; padding: 0 4px; }
+.wg-country-label { color: rgba(255,248,225,.72); font: 700 13px Georgia, 'Times New Roman', serif; letter-spacing: .25em; text-shadow: 0 0 4px #000, 0 0 2px #000; pointer-events: none; white-space: nowrap; }
+.wg-tip .maplibregl-popup-content { background: var(--panel-bg); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; }
+.wg-tip .maplibregl-popup-tip { display: none; }
+
+/* contenuti dei pannelli */
+.wg-card { border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; margin: 6px 0; background: rgba(0,0,0,.2); }
+.wg-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+.wg-form { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .wg-form select[multiple] { grid-column: 1 / -1; }
+.wg-table { width: 100%; border-collapse: collapse; font-size: 12px; } .wg-table td, .wg-table th { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; } .wg-table th { color: var(--gold); }
+.wg-table tr.sel { background: rgba(217,184,98,.18); } .wg-table tr[class] { cursor: pointer; }
+.wg-dim { color: var(--dim); } .wg-warn { color: var(--warn); } .wg-err { color: var(--err); } .neg { color: var(--err); } .pos { color: var(--ok); }
+.wg-badge { font-weight: 700; padding: 0 6px; border-radius: 3px; background: #3a3a30; } .rel-B { background: #1e5a3a; } .rel-C { background: #5a5a1e; } .rel-D, .rel-E, .rel-F { background: #5a2a1e; }
+.wg-ladder { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin: 4px 0; } .wg-ladder span { height: 8px; background: #2c2c24; }
+.wg-ladder .l0 { background: #d8c24b; } .wg-ladder .l1 { background: #ff9a3d; } .wg-ladder .l2, .wg-ladder .l3 { background: #ff4d4d; }
+.wg-big { font-size: 26px; font-weight: 700; color: var(--gold); }
+.wg-spark { width: 100%; height: 50px; } .wg-spark polyline { fill: none; stroke: var(--gold); stroke-width: 2; }
+.st-deployed { color: var(--ok); } .st-transit { color: #f2d24b; } .st-damaged, .st-destroyed { color: var(--err); } .st-maintenance { color: var(--dim); }
+.wg-draft li { display: flex; justify-content: space-between; gap: 6px; }
+textarea { width: 100%; }
+#wg-lobby { position: relative; max-width: 720px; margin: 10vh auto; padding: 20px; background: var(--panel-bg); border: 1px solid var(--border); }
+#wg-lobby h1 { color: var(--gold); letter-spacing: .3em; font-family: Georgia, serif; }
+@media (max-width: 800px) { .wg-res:nth-of-type(n+4) { display: none; } .wg-drawer { width: calc(100vw - 68px); } .wg-country { top: auto; bottom: 56px; right: 10px; } }

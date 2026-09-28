@@ -1,0 +1,64 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "name": {
+   "type": "string"
+  },
+  "kind": {
+   "type": "string",
+   "enum": [
+    "munition_lot",
+    "platform"
+   ]
+  },
+  "lotSize": {
+   "type": "number"
+  },
+  "munitionId": {
+   "type": "string"
+  },
+  "cost": {
+   "type": "number"
+  },
+  "leadTimeTurns": {
+   "type": [
+    "number",
+    "null"
+   ]
+  },
+  "repairCostRange": {
+   "type": "array",
+   "prefixItems": [
+    {
+     "type": "number"
+    },
+    {
+     "type": "number"
+    }
+   ],
+   "items": false,
+   "minItems": 2,
+   "maxItems": 2
+  },
+  "compatibleWith": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "platformClassId": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "name",
+  "kind",
+  "cost",
+  "leadTimeTurns"
+ ]
+}

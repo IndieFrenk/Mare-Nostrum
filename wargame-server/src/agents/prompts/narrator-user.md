@@ -1,0 +1,2 @@
+FATTI DEL MOTORE:
+{{facts}}

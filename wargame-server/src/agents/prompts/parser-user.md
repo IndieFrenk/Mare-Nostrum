@@ -1,0 +1,4 @@
+DIRETTIVA: {{text}}
+
+RIFERIMENTI LECITI:
+{{legal}}

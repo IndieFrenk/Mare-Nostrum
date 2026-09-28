@@ -1,0 +1,22 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "string",
+ "enum": [
+  "carrier",
+  "lhd",
+  "destroyer",
+  "frigate",
+  "opv",
+  "submarine",
+  "fighter_sqn",
+  "strike_sqn",
+  "aew",
+  "mpa",
+  "drone_flight",
+  "sam_battery",
+  "ground_bn",
+  "sof_team",
+  "tanker",
+  "transport"
+ ]
+}

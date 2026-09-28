@@ -1,0 +1,129 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "seq": {
+   "type": "integer",
+   "minimum": -9007199254740991,
+   "maximum": 9007199254740991
+  },
+  "phase": {
+   "type": "string",
+   "enum": [
+    "OPEN",
+    "INTEL",
+    "BRIEFING",
+    "PLAYER_ORDERS",
+    "AI_DECISIONS",
+    "ADJUDICATION",
+    "CMO_PENDING",
+    "DEBRIEF",
+    "CLOSED"
+   ]
+  },
+  "type": {
+   "type": "string",
+   "enum": [
+    "UNIT_MOVED",
+    "UNIT_STATUS",
+    "CONTACT_DETECTED",
+    "CONTACT_LOST",
+    "ENGAGEMENT_OPENED",
+    "ENGAGEMENT_RESOLVED",
+    "UNIT_DAMAGED",
+    "UNIT_DESTROYED",
+    "UNIT_CREATED",
+    "MUNITION_EXPENDED",
+    "DELIVERY_ARRIVED",
+    "PROCUREMENT_ORDERED",
+    "BUDGET_CHANGED",
+    "RELATION_CHANGED",
+    "AGREEMENT_CHANGED",
+    "CRISIS_CHANGED",
+    "CYBER_EFFECT",
+    "SOF_RESULT",
+    "DIPLO_MESSAGE",
+    "INFRA_STATUS",
+    "RANDOM_EVENT",
+    "RED_LINE_CROSSED",
+    "FACTION_CHANGED",
+    "INDICATORS_CHANGED",
+    "TURN_ADVANCED",
+    "TURN_CLOSED",
+    "STATEMENT"
+   ]
+  },
+  "actor": {
+   "type": "string"
+  },
+  "targets": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "payload": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {}
+  },
+  "visibility": {
+   "anyOf": [
+    {
+     "type": "string",
+     "const": "public"
+    },
+    {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 2
+     }
+    }
+   ]
+  },
+  "causedBy": {
+   "anyOf": [
+    {
+     "type": "object",
+     "properties": {
+      "orderId": {
+       "type": "string"
+      },
+      "decisionId": {
+       "type": "string"
+      },
+      "rollId": {
+       "type": "string"
+      }
+     }
+    },
+    {
+     "type": "null"
+    }
+   ]
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "seq",
+  "phase",
+  "type",
+  "actor",
+  "targets",
+  "payload",
+  "visibility",
+  "causedBy"
+ ]
+}

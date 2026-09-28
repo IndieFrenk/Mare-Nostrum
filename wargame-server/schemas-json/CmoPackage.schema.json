@@ -1,0 +1,179 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "engagementId": {
+   "type": "string"
+  },
+  "headline": {
+   "type": "string",
+   "const": "RISOLUZIONE SU CMO RICHIESTA"
+  },
+  "playerForces": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "unitId": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "classId": {
+      "type": "string"
+     },
+     "loadout": {
+      "type": "object",
+      "propertyNames": {
+       "type": "string"
+      },
+      "additionalProperties": {
+       "type": "number"
+      }
+     },
+     "readiness": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "unitId",
+     "name",
+     "classId",
+     "loadout",
+     "readiness"
+    ]
+   }
+  },
+  "enemyOobEstimate": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "classification": {
+      "type": "string"
+     },
+     "estCount": {
+      "type": "array",
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+     },
+     "confidence": {
+      "type": "number"
+     },
+     "notes": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "classification",
+     "estCount",
+     "confidence",
+     "notes"
+    ]
+   }
+  },
+  "environment": {
+   "type": "object",
+   "properties": {
+    "date": {
+     "type": "string"
+    },
+    "timeWindowUtc": {
+     "type": "string"
+    },
+    "seaState": {
+     "type": "number"
+    },
+    "visibilityKm": {
+     "type": "number"
+    },
+    "wind": {
+     "type": "string"
+    },
+    "clouds": {
+     "type": "string"
+    },
+    "ducting": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "date",
+    "timeWindowUtc",
+    "seaState",
+    "visibilityKm",
+    "wind",
+    "clouds",
+    "ducting"
+   ]
+  },
+  "roe": {
+   "type": "string",
+   "enum": [
+    "WEAPONS_HOLD",
+    "WEAPONS_TIGHT",
+    "WEAPONS_FREE"
+   ]
+  },
+  "objectives": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "constraints": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "suggestedScenarioArea": {
+   "type": "object",
+   "properties": {
+    "center": {
+     "type": "object",
+     "properties": {
+      "lat": {
+       "type": "number"
+      },
+      "lon": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "lat",
+      "lon"
+     ]
+    },
+    "radiusKm": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "center",
+    "radiusKm"
+   ]
+  }
+ },
+ "required": [
+  "engagementId",
+  "headline",
+  "playerForces",
+  "enemyOobEstimate",
+  "environment",
+  "roe",
+  "objectives",
+  "constraints",
+  "suggestedScenarioArea"
+ ]
+}

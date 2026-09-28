@@ -1,0 +1,963 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "schemaVersion": {
+   "type": "number",
+   "const": 1
+  },
+  "factionId": {
+   "type": "string",
+   "minLength": 2
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "ownUnits": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "factionId": {
+      "type": "string",
+      "minLength": 2
+     },
+     "name": {
+      "type": "string"
+     },
+     "classId": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "carrier",
+       "lhd",
+       "destroyer",
+       "frigate",
+       "opv",
+       "submarine",
+       "fighter_sqn",
+       "strike_sqn",
+       "aew",
+       "mpa",
+       "drone_flight",
+       "sam_battery",
+       "ground_bn",
+       "sof_team",
+       "tanker",
+       "transport"
+      ]
+     },
+     "domain": {
+      "type": "string",
+      "enum": [
+       "sea",
+       "subsurface",
+       "air",
+       "land",
+       "space",
+       "cyber"
+      ]
+     },
+     "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "homeBaseId": {
+      "type": "string"
+     },
+     "location": {
+      "type": "object",
+      "properties": {
+       "lat": {
+        "type": "number"
+       },
+       "lon": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "lat",
+       "lon"
+      ]
+     },
+     "zoneId": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "ready",
+       "deployed",
+       "transit",
+       "maintenance",
+       "damaged",
+       "destroyed"
+      ]
+     },
+     "readiness": {
+      "type": "number"
+     },
+     "damage": {
+      "type": "number"
+     },
+     "usageHours": {
+      "type": "number"
+     },
+     "loadout": {
+      "type": "object",
+      "propertyNames": {
+       "type": "string"
+      },
+      "additionalProperties": {
+       "type": "number"
+      }
+     },
+     "signature": {
+      "type": "object",
+      "properties": {
+       "radar": {
+        "type": "number"
+       },
+       "acoustic": {
+        "type": "number"
+       },
+       "ir": {
+        "type": "number"
+       },
+       "emcon": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "radar",
+       "acoustic",
+       "ir",
+       "emcon"
+      ]
+     },
+     "sensors": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "radar",
+          "sonar",
+          "esm",
+          "eo"
+         ]
+        },
+        "rangeKm": {
+         "type": "number"
+        },
+        "quality": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "type",
+        "rangeKm",
+        "quality"
+       ]
+      }
+     },
+     "currentTask": {
+      "anyOf": [
+       {
+        "type": "object",
+        "propertyNames": {
+         "type": "string"
+        },
+        "additionalProperties": {}
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "opCostPerTurn": {
+      "type": "number"
+     },
+     "estimated": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "factionId",
+     "name",
+     "classId",
+     "type",
+     "domain",
+     "count",
+     "homeBaseId",
+     "location",
+     "zoneId",
+     "status",
+     "readiness",
+     "damage",
+     "usageHours",
+     "loadout",
+     "signature",
+     "sensors",
+     "currentTask",
+     "opCostPerTurn"
+    ]
+   }
+  },
+  "ownFaction": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 2
+    },
+    "name": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "state",
+      "bloc",
+      "nonstate"
+     ]
+    },
+    "controller": {
+     "type": "string",
+     "enum": [
+      "human",
+      "ai",
+      "scripted"
+     ]
+    },
+    "agentRole": {
+     "anyOf": [
+      {
+       "type": "string",
+       "enum": [
+        "faction_major",
+        "faction_minor",
+        "gm_narrator",
+        "intel_analyst",
+        "order_parser",
+        "reflection",
+        "repair"
+       ]
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "profileRef": {
+     "type": "string"
+    },
+    "posture": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "budget": {
+     "type": "object",
+     "properties": {
+      "discretionary": {
+       "type": "number"
+      },
+      "perTurnIncome": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "discretionary",
+      "perTurnIncome"
+     ]
+    },
+    "stocks": {
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "stability": {
+     "type": "number"
+    },
+    "credibility": {
+     "type": "number"
+    },
+    "objectives": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "priority": {
+        "anyOf": [
+         {
+          "type": "number",
+          "const": 1
+         },
+         {
+          "type": "number",
+          "const": 2
+         },
+         {
+          "type": "number",
+          "const": 3
+         }
+        ]
+       },
+       "metric": {
+        "type": "string"
+       },
+       "progress": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "id",
+       "text",
+       "priority",
+       "metric",
+       "progress"
+      ]
+     }
+    },
+    "redLines": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "trigger": {
+        "type": "string"
+       },
+       "response": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "text",
+       "trigger",
+       "response"
+      ]
+     }
+    },
+    "isrAssets": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "type": {
+        "type": "string",
+        "enum": [
+         "SAR_SAT",
+         "EO_SAT",
+         "AEW",
+         "MPA",
+         "MALE_DRONE",
+         "SIGINT",
+         "HUMINT_NET",
+         "OTH_RADAR"
+        ]
+       },
+       "coverage": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "revisitTurns": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+       },
+       "quality": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "tasking": {
+        "type": [
+         "string",
+         "null"
+        ]
+       }
+      },
+      "required": [
+       "id",
+       "type",
+       "coverage",
+       "revisitTurns",
+       "quality",
+       "tasking"
+      ]
+     }
+    },
+    "cyber": {
+     "type": "object",
+     "properties": {
+      "offense": {
+       "type": "number"
+      },
+      "defense": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "offense",
+      "defense"
+     ]
+    },
+    "alliances": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "crossedRedLines": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "id",
+    "name",
+    "kind",
+    "controller",
+    "agentRole",
+    "profileRef",
+    "posture",
+    "budget",
+    "stocks",
+    "stability",
+    "credibility",
+    "objectives",
+    "redLines",
+    "isrAssets",
+    "cyber",
+    "alliances"
+   ]
+  },
+  "contacts": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "firstSeenTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "lastSeenTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "domain": {
+      "type": "string",
+      "enum": [
+       "sea",
+       "subsurface",
+       "air",
+       "land",
+       "space",
+       "cyber"
+      ]
+     },
+     "classification": {
+      "type": "string"
+     },
+     "estFaction": {
+      "type": "string"
+     },
+     "confidence": {
+      "type": "number"
+     },
+     "location": {
+      "type": "object",
+      "properties": {
+       "lat": {
+        "type": "number"
+       },
+       "lon": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "lat",
+       "lon"
+      ]
+     },
+     "errorKm": {
+      "type": "number"
+     },
+     "estCount": {
+      "type": "array",
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+     },
+     "sources": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "radar",
+        "sar",
+        "eo",
+        "sigint",
+        "humint",
+        "ais",
+        "sonar",
+        "osint"
+       ]
+      }
+     },
+     "zoneId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "firstSeenTurn",
+     "lastSeenTurn",
+     "domain",
+     "classification",
+     "estFaction",
+     "confidence",
+     "location",
+     "errorKm",
+     "sources"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "intelReports": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "radar",
+       "sar",
+       "eo",
+       "sigint",
+       "humint",
+       "ais",
+       "sonar",
+       "osint"
+      ]
+     },
+     "reliability": {
+      "type": "string",
+      "pattern": "^[A-F][1-6]$"
+     },
+     "classification": {
+      "type": "string",
+      "enum": [
+       "NS",
+       "NR",
+       "NC",
+       "NS-SEGRETO"
+      ]
+     },
+     "title": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "relatedContacts": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "factsRef": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "id",
+     "turn",
+     "source",
+     "reliability",
+     "classification",
+     "title",
+     "body",
+     "relatedContacts",
+     "factsRef"
+    ]
+   }
+  },
+  "beliefs": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string",
+    "minLength": 2
+   },
+   "additionalProperties": {
+    "type": "object",
+    "properties": {
+     "estPosture": {
+      "type": "number"
+     },
+     "estIntent": {
+      "type": "string"
+     },
+     "confidence": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "estPosture",
+     "estIntent",
+     "confidence"
+    ]
+   }
+  },
+  "knownCrises": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "maritime",
+       "energy",
+       "migration",
+       "hybrid",
+       "terror",
+       "civil_war",
+       "interstate"
+      ]
+     },
+     "zoneIds": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "involved": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 2
+      }
+     },
+     "escalation": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "latent",
+       "active",
+       "frozen",
+       "resolved"
+      ]
+     },
+     "startedTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "history": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "turn": {
+         "type": "integer",
+         "minimum": 0,
+         "maximum": 9007199254740991
+        },
+        "delta": {
+         "type": "number"
+        },
+        "cause": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "turn",
+        "delta",
+        "cause"
+       ]
+      }
+     }
+    },
+    "required": [
+     "id",
+     "title",
+     "type",
+     "zoneIds",
+     "involved",
+     "escalation",
+     "status",
+     "startedTurn",
+     "history"
+    ]
+   }
+  },
+  "knownAgreements": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "defense",
+       "energy",
+       "basing",
+       "migration",
+       "ceasefire",
+       "arms_sale",
+       "intel_sharing",
+       "secret"
+      ]
+     },
+     "parties": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "minLength": 2
+      }
+     },
+     "terms": {
+      "type": "string"
+     },
+     "startTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "endTurn": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "visibility": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "public"
+       },
+       {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "minLength": 2
+        }
+       }
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "proposed",
+       "active",
+       "violated",
+       "expired"
+      ]
+     }
+    },
+    "required": [
+     "id",
+     "type",
+     "parties",
+     "terms",
+     "startTurn",
+     "endTurn",
+     "visibility",
+     "status"
+    ]
+   }
+  },
+  "inbox": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "from": {
+      "type": "string",
+      "minLength": 2
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "channel": {
+      "type": "string",
+      "enum": [
+       "official",
+       "backchannel"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "actionRef": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "turn",
+     "from",
+     "to",
+     "channel",
+     "text"
+    ]
+   }
+  },
+  "publicNews": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "outlet": {
+      "type": "string"
+     },
+     "outletFaction": {
+      "type": "string",
+      "minLength": 2
+     },
+     "bias": {
+      "type": "number"
+     },
+     "headline": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "zoneId": {
+      "type": "string"
+     },
+     "factsRef": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "id",
+     "turn",
+     "outlet",
+     "outletFaction",
+     "bias",
+     "headline",
+     "body",
+     "factsRef"
+    ]
+   }
+  }
+ },
+ "required": [
+  "schemaVersion",
+  "factionId",
+  "turn",
+  "ownUnits",
+  "ownFaction",
+  "contacts",
+  "intelReports",
+  "beliefs",
+  "knownCrises",
+  "knownAgreements",
+  "inbox",
+  "publicNews"
+ ]
+}

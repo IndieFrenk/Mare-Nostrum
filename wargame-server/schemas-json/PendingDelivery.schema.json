@@ -1,0 +1,45 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "factionId": {
+   "type": "string",
+   "minLength": 2
+  },
+  "itemId": {
+   "type": "string"
+  },
+  "qty": {
+   "type": "number"
+  },
+  "orderedTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "deliveryTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "totalCost": {
+   "type": "number"
+  },
+  "destinationBaseId": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "id",
+  "factionId",
+  "itemId",
+  "qty",
+  "orderedTurn",
+  "deliveryTurn",
+  "totalCost",
+  "destinationBaseId"
+ ]
+}

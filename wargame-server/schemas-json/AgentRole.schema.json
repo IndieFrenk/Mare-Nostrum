@@ -1,0 +1,13 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "string",
+ "enum": [
+  "faction_major",
+  "faction_minor",
+  "gm_narrator",
+  "intel_analyst",
+  "order_parser",
+  "reflection",
+  "repair"
+ ]
+}

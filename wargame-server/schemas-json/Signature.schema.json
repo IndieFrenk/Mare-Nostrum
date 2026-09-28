@@ -1,0 +1,24 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "radar": {
+   "type": "number"
+  },
+  "acoustic": {
+   "type": "number"
+  },
+  "ir": {
+   "type": "number"
+  },
+  "emcon": {
+   "type": "boolean"
+  }
+ },
+ "required": [
+  "radar",
+  "acoustic",
+  "ir",
+  "emcon"
+ ]
+}

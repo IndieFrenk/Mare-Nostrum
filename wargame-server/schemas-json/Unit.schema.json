@@ -1,0 +1,198 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "factionId": {
+   "type": "string",
+   "minLength": 2
+  },
+  "name": {
+   "type": "string"
+  },
+  "classId": {
+   "type": "string"
+  },
+  "type": {
+   "type": "string",
+   "enum": [
+    "carrier",
+    "lhd",
+    "destroyer",
+    "frigate",
+    "opv",
+    "submarine",
+    "fighter_sqn",
+    "strike_sqn",
+    "aew",
+    "mpa",
+    "drone_flight",
+    "sam_battery",
+    "ground_bn",
+    "sof_team",
+    "tanker",
+    "transport"
+   ]
+  },
+  "domain": {
+   "type": "string",
+   "enum": [
+    "sea",
+    "subsurface",
+    "air",
+    "land",
+    "space",
+    "cyber"
+   ]
+  },
+  "count": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "homeBaseId": {
+   "type": "string"
+  },
+  "location": {
+   "type": "object",
+   "properties": {
+    "lat": {
+     "type": "number"
+    },
+    "lon": {
+     "type": "number"
+    }
+   },
+   "required": [
+    "lat",
+    "lon"
+   ]
+  },
+  "zoneId": {
+   "type": "string"
+  },
+  "status": {
+   "type": "string",
+   "enum": [
+    "ready",
+    "deployed",
+    "transit",
+    "maintenance",
+    "damaged",
+    "destroyed"
+   ]
+  },
+  "readiness": {
+   "type": "number"
+  },
+  "damage": {
+   "type": "number"
+  },
+  "usageHours": {
+   "type": "number"
+  },
+  "loadout": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number"
+   }
+  },
+  "signature": {
+   "type": "object",
+   "properties": {
+    "radar": {
+     "type": "number"
+    },
+    "acoustic": {
+     "type": "number"
+    },
+    "ir": {
+     "type": "number"
+    },
+    "emcon": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "radar",
+    "acoustic",
+    "ir",
+    "emcon"
+   ]
+  },
+  "sensors": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "radar",
+       "sonar",
+       "esm",
+       "eo"
+      ]
+     },
+     "rangeKm": {
+      "type": "number"
+     },
+     "quality": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "type",
+     "rangeKm",
+     "quality"
+    ]
+   }
+  },
+  "currentTask": {
+   "anyOf": [
+    {
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {}
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "opCostPerTurn": {
+   "type": "number"
+  },
+  "estimated": {
+   "type": "boolean"
+  }
+ },
+ "required": [
+  "id",
+  "factionId",
+  "name",
+  "classId",
+  "type",
+  "domain",
+  "count",
+  "homeBaseId",
+  "location",
+  "zoneId",
+  "status",
+  "readiness",
+  "damage",
+  "usageHours",
+  "loadout",
+  "signature",
+  "sensors",
+  "currentTask",
+  "opCostPerTurn"
+ ]
+}

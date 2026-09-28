@@ -1,0 +1,213 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "schemaVersion": {
+   "type": "number",
+   "const": 1
+  },
+  "id": {
+   "type": "string"
+  },
+  "name": {
+   "type": "string"
+  },
+  "scenarioId": {
+   "type": "string"
+  },
+  "seed": {
+   "type": "string"
+  },
+  "rngCursor": {
+   "type": "integer",
+   "minimum": -9007199254740991,
+   "maximum": 9007199254740991
+  },
+  "createdAt": {
+   "type": "string"
+  },
+  "updatedAt": {
+   "type": "string"
+  },
+  "currentTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "phase": {
+   "type": "string",
+   "enum": [
+    "OPEN",
+    "INTEL",
+    "BRIEFING",
+    "PLAYER_ORDERS",
+    "AI_DECISIONS",
+    "ADJUDICATION",
+    "CMO_PENDING",
+    "DEBRIEF",
+    "CLOSED"
+   ]
+  },
+  "date": {
+   "type": "string"
+  },
+  "turnLength": {
+   "type": "string",
+   "enum": [
+    "week",
+    "month"
+   ]
+  },
+  "playerFaction": {
+   "type": "string",
+   "const": "ITA"
+  },
+  "parent": {
+   "anyOf": [
+    {
+     "type": "object",
+     "properties": {
+      "campaignId": {
+       "type": "string"
+      },
+      "turn": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 9007199254740991
+      }
+     },
+     "required": [
+      "campaignId",
+      "turn"
+     ]
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "status": {
+   "type": "string",
+   "enum": [
+    "active",
+    "ended"
+   ]
+  },
+  "config": {
+   "type": "object",
+   "properties": {
+    "fogLevel": {
+     "type": "string",
+     "enum": [
+      "realistic",
+      "relaxed",
+      "none"
+     ]
+    },
+    "debugGodView": {
+     "type": "boolean"
+    },
+    "cmoThreshold": {
+     "type": "object",
+     "properties": {
+      "majorShips": {
+       "type": "number"
+      },
+      "aircraftPerSide": {
+       "type": "number"
+      },
+      "missileSalvo": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "majorShips",
+      "aircraftPerSide",
+      "missileSalvo"
+     ]
+    },
+    "llm": {
+     "type": "object",
+     "propertyNames": {
+      "type": "string",
+      "enum": [
+       "faction_major",
+       "faction_minor",
+       "gm_narrator",
+       "intel_analyst",
+       "order_parser",
+       "reflection",
+       "repair"
+      ]
+     },
+     "additionalProperties": {
+      "type": "object",
+      "properties": {
+       "model": {
+        "type": "string"
+       },
+       "temperature": {
+        "type": "number"
+       },
+       "maxTokens": {
+        "type": "number"
+       },
+       "timeoutMs": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "model",
+       "temperature",
+       "maxTokens",
+       "timeoutMs"
+      ]
+     },
+     "required": [
+      "faction_major",
+      "faction_minor",
+      "gm_narrator",
+      "intel_analyst",
+      "order_parser",
+      "reflection",
+      "repair"
+     ]
+    },
+    "maxConcurrentAgents": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 9007199254740991
+    },
+    "cmoOnRequest": {
+     "default": false,
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "fogLevel",
+    "debugGodView",
+    "cmoThreshold",
+    "llm",
+    "maxConcurrentAgents"
+   ]
+  }
+ },
+ "required": [
+  "schemaVersion",
+  "id",
+  "name",
+  "scenarioId",
+  "seed",
+  "rngCursor",
+  "createdAt",
+  "updatedAt",
+  "currentTurn",
+  "phase",
+  "date",
+  "turnLength",
+  "playerFaction",
+  "parent",
+  "status",
+  "config"
+ ]
+}

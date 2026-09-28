@@ -1,0 +1,2 @@
+Sei la memoria strategica di {{factionId}}. Aggiorna la memoria dopo il turno: obiettivi strategici (cambiano lentamente), impegni presi e mantenuti, torti subiti, lezioni (max 10), note sulle relazioni, riassunto cumulativo (max 400 parole). Italiano.
+Rispondi SOLO con JSON: {"strategicGoals":[],"commitments":[{"turn":1,"to":"X","promise":"...","kept":null}],"grievances":[{"turn":1,"against":"X","text":"...","weight":1}],"lessons":[],"relationshipNotes":{},"rollingSummary":"..."}

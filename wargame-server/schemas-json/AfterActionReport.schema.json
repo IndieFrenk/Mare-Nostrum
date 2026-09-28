@@ -1,0 +1,93 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "submittedAt": {
+   "type": "string"
+  },
+  "ownLosses": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "unitId": {
+      "type": "string"
+     },
+     "newStatus": {
+      "type": "string",
+      "enum": [
+       "ready",
+       "deployed",
+       "transit",
+       "maintenance",
+       "damaged",
+       "destroyed"
+      ]
+     },
+     "damage": {
+      "type": "number"
+     },
+     "aircraftLost": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "unitId",
+     "newStatus",
+     "damage"
+    ]
+   }
+  },
+  "munitionsExpended": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number"
+   }
+  },
+  "enemyClaims": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "classification": {
+      "type": "string"
+     },
+     "result": {
+      "type": "string",
+      "enum": [
+       "destroyed",
+       "damaged",
+       "withdrew"
+      ]
+     }
+    },
+    "required": [
+     "classification",
+     "result"
+    ]
+   }
+  },
+  "outcome": {
+   "type": "string",
+   "enum": [
+    "victory",
+    "draw",
+    "defeat"
+   ]
+  },
+  "notes": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "submittedAt",
+  "ownLosses",
+  "munitionsExpended",
+  "enemyClaims",
+  "outcome",
+  "notes"
+ ]
+}

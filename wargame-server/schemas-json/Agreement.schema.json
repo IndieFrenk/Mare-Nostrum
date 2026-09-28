@@ -1,0 +1,83 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "type": {
+   "type": "string",
+   "enum": [
+    "defense",
+    "energy",
+    "basing",
+    "migration",
+    "ceasefire",
+    "arms_sale",
+    "intel_sharing",
+    "secret"
+   ]
+  },
+  "parties": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "minLength": 2
+   }
+  },
+  "terms": {
+   "type": "string"
+  },
+  "startTurn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "endTurn": {
+   "anyOf": [
+    {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 9007199254740991
+    },
+    {
+     "type": "null"
+    }
+   ]
+  },
+  "visibility": {
+   "anyOf": [
+    {
+     "type": "string",
+     "const": "public"
+    },
+    {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 2
+     }
+    }
+   ]
+  },
+  "status": {
+   "type": "string",
+   "enum": [
+    "proposed",
+    "active",
+    "violated",
+    "expired"
+   ]
+  }
+ },
+ "required": [
+  "id",
+  "type",
+  "parties",
+  "terms",
+  "startTurn",
+  "endTurn",
+  "visibility",
+  "status"
+ ]
+}
