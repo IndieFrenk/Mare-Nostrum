@@ -37,7 +37,7 @@ describe('lettere: validatore', () => {
 
   it('ogni carica è una carica, non un nome: tutte le fazioni hanno leaderTitle e capital', () => {
     for (const f of Object.values(sc.world.factions)) {
-      expect(f.leaderTitle, f.id).toMatch(/^Il (Presidente|Primo Ministro|Comandante|Segretario)/);
+      expect(f.leaderTitle, f.id).toMatch(/^(Il (Presidente|Primo Ministro|Comandante|Segretario|Cancelliere|Re)|L'Emiro) /);
       expect(f.capital, f.id).not.toBe('');
     }
   });

@@ -1,5 +1,5 @@
 {
-  "_nota": "Alias italiani di zone e fazioni per la Console Ordini (riconoscimento deterministico dei nomi prima dell'LLM). Gli alias di più id non si sostituiscono nel testo.",
+  "_nota": "Alias italiani di zone, fazioni e unità per la Console Ordini (riconoscimento deterministico dei nomi prima dell'LLM). Gli alias di più id non si sostituiscono nel testo. Gli alias delle unità valgono per le unità proprie della fazione che scrive.",
   "zones": {
     "TIRRENO": ["Mar Tirreno", "Tirreno"],
     "ADRIATICO": ["Mar Adriatico", "Adriatico"],
@@ -31,7 +31,38 @@
     "LBY_GNU": ["Libia", "libici", "Tripoli", "GNU", "governo di Tripoli", "Libia occidentale", "Tripolitania"],
     "LBY_LNA": ["Libia", "libici", "Haftar", "LNA", "Bengasi", "Cirenaica", "Libia orientale"],
     "IRN": ["Iran", "Teheran", "iraniani"],
+    "ESP": ["Spagna", "Madrid", "spagnoli"],
+    "MAR": ["Marocco", "Rabat", "marocchini"],
+    "MLT": ["Malta", "La Valletta", "maltesi"],
+    "CYP": ["Cipro", "Nicosia", "ciprioti"],
+    "LBN": ["Libano", "Beirut", "libanesi"],
+    "SYR": ["Siria", "Damasco", "siriani"],
+    "JOR": ["Giordania", "Amman", "giordani"],
+    "SAU": ["Arabia Saudita", "Riad", "Riyad", "sauditi"],
+    "ARE": ["Emirati Arabi Uniti", "Emirati", "EAU", "Abu Dhabi", "emiratini"],
+    "QAT": ["Qatar", "Doha", "qatarini"],
+    "DEU": ["Germania", "Berlino", "tedeschi"],
     "NATO": ["NATO", "Alleanza Atlantica"],
     "EU": ["UE", "Unione Europea", "Bruxelles"]
+  },
+  "units": {
+    "ESP-L61": ["Juan Carlos I", "L61"],
+    "ESP-F101": ["Álvaro de Bazán", "Alvaro de Bazan", "F101"],
+    "ESP-S81": ["Isaac Peral", "S81"],
+    "ESP-ALA11": ["Ala 11", "Eurofighter spagnoli"],
+    "MAR-FREMM": ["Mohammed VI", "FREMM marocchina"],
+    "MAR-SIGMA": ["Tarik Ben Ziyad"],
+    "MAR-F16": ["F-16 marocchini"],
+    "MLT-P61": ["P61", "pattugliatore maltese"],
+    "MLT-P62": ["P62"],
+    "SAU-F3000S1": ["Al Riyadh"],
+    "SAU-F3000S2": ["Makkah"],
+    "SAU-TYPHOON": ["Typhoon sauditi"],
+    "ARE-BAYNUNAH": ["Baynunah", "corvetta emiratina"],
+    "ARE-F16": ["F-16 emiratini", "Desert Falcon"],
+    "QAT-ZUBARAH": ["Al Zubarah", "corvetta qatarina"],
+    "QAT-RAFALE": ["Rafale qatarini"],
+    "DEU-K130": ["Ludwigshafen am Rhein", "Ludwigshafen", "F264"],
+    "DEU-F125": ["Sachsen-Anhalt", "F224"]
   }
 }

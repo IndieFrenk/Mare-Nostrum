@@ -1,3 +1,4 @@
+import { salutation } from '../engine/diplomacy.js';
 import { hashString } from '../engine/rng.js';
 import type { LlmProvider, LlmRequest, LlmResponse } from './llm-client.js';
 
@@ -131,8 +132,8 @@ function reflection(m: M) {
 function letter(m: M) {
   const h = hashString(`${m.seed}:${m.factionId}:${m.to}:${m.turn}:${m.kind}`);
   const tone = m.tone ?? (['formal', 'cordial', 'firm', 'conciliatory'] as const)[h % 4];
-  const title = String(m.toTitle).replace(/^(Il|La) /, '').split(/ (?:del|della|dell'|degli|dei) ?/)[0];
-  const open = [`Signor ${title},`, `Egregio Signor ${title},`][h % 2];
+  const hello = salutation(String(m.toTitle));
+  const open = [`${hello},`, hello.startsWith('Signor') ? `Egregio ${hello},` : `${hello},`][h % 2];
   const core = m.replySubject
     ? `ho letto con attenzione la Sua lettera. ${tone === 'firm' ? 'Il mio Governo non può condividerne alcuni passaggi, ma' : 'Il mio Governo ne condivide lo spirito e'} resta disponibile a un confronto franco sulle questioni sollevate.`
     : `desidero farLe conoscere il pensiero del mio Governo. ${m.gist ?? 'La situazione nel Mediterraneo richiede prudenza da parte di tutti.'} Confido che i nostri Governi sapranno mantenere aperto il dialogo.`;

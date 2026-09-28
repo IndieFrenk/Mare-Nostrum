@@ -44,7 +44,7 @@ export function unitAliases(u: Pick<Unit, 'id' | 'name' | 'classId' | 'type'>, c
 
 export function buildLexicon(units: Unit[], sc: Scenario): Lexicon {
   const entries: NameEntry[] = [
-    ...units.filter((u) => u.status !== 'destroyed').map((u) => ({ id: u.id, kind: 'unit' as const, label: u.name, aliases: unitAliases(u, sc.catalog.classes[u.classId]?.name), note: `classe ${sc.catalog.classes[u.classId]?.name ?? u.classId}` })),
+    ...units.filter((u) => u.status !== 'destroyed').map((u) => ({ id: u.id, kind: 'unit' as const, label: u.name, aliases: [...unitAliases(u, sc.catalog.classes[u.classId]?.name), ...(sc.names.units?.[u.id] ?? [])], note: `classe ${sc.catalog.classes[u.classId]?.name ?? u.classId}` })),
     ...Object.values(sc.world.zones).map((z) => ({ id: z.id, kind: 'zone' as const, label: z.name, aliases: [z.id, z.name, ...(sc.names.zones[z.id] ?? [])] })),
     ...Object.values(sc.world.factions).map((f) => ({ id: f.id, kind: 'faction' as const, label: f.name, aliases: [f.id, f.name, ...(sc.names.factions[f.id] ?? [])] })),
   ];

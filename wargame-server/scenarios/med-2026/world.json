@@ -638,6 +638,188 @@
    "capacity": 10,
    "damage": 0,
    "zoneId": "MAR_ROSSO"
+  },
+  {
+   "id": "ROTA",
+   "name": "Base navale di Rota",
+   "factionId": "ESP",
+   "location": {
+    "lat": 36.62,
+    "lon": -6.35
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "FERROL",
+   "name": "Ferrol (fuori mappa)",
+   "factionId": "ESP",
+   "location": {
+    "lat": 43.48,
+    "lon": -8.24
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "CARTAGENA",
+   "name": "Cartagena",
+   "factionId": "ESP",
+   "location": {
+    "lat": 37.59,
+    "lon": -0.98
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "MORON",
+   "name": "Base aerea di Morón",
+   "factionId": "ESP",
+   "location": {
+    "lat": 37.17,
+    "lon": -5.62
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "KSAR_SGHIR",
+   "name": "Base navale di Ksar Sghir",
+   "factionId": "MAR",
+   "location": {
+    "lat": 35.84,
+    "lon": -5.56
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "BEN_GUERIR",
+   "name": "Base aerea di Ben Guerir",
+   "factionId": "MAR",
+   "location": {
+    "lat": 32.12,
+    "lon": -7.87
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MED_OCCIDENTALE"
+  },
+  {
+   "id": "HAY_WHARF",
+   "name": "Hay Wharf (La Valletta)",
+   "factionId": "MLT",
+   "location": {
+    "lat": 35.89,
+    "lon": 14.51
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "CANALE_SICILIA"
+  },
+  {
+   "id": "JEDDAH",
+   "name": "Base navale Re Faisal (Gedda)",
+   "factionId": "SAU",
+   "location": {
+    "lat": 21.43,
+    "lon": 39.13
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_ROSSO"
+  },
+  {
+   "id": "TAIF",
+   "name": "Base aerea Re Fahd (Taif)",
+   "factionId": "SAU",
+   "location": {
+    "lat": 21.48,
+    "lon": 40.54
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MAR_ROSSO"
+  },
+  {
+   "id": "ABU_DHABI_NB",
+   "name": "Base navale di Abu Dhabi (Mina Zayed)",
+   "factionId": "ARE",
+   "location": {
+    "lat": 24.52,
+    "lon": 54.38
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "GOLFO"
+  },
+  {
+   "id": "AL_DHAFRA",
+   "name": "Base aerea di Al Dhafra",
+   "factionId": "ARE",
+   "location": {
+    "lat": 24.25,
+    "lon": 54.55
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "GOLFO"
+  },
+  {
+   "id": "UMM_AL_HOUL",
+   "name": "Base navale di Umm Al Houl",
+   "factionId": "QAT",
+   "location": {
+    "lat": 25.03,
+    "lon": 51.61
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "GOLFO"
+  },
+  {
+   "id": "DUKHAN",
+   "name": "Base aerea Tamim (Dukhan)",
+   "factionId": "QAT",
+   "location": {
+    "lat": 25.4,
+    "lon": 50.78
+   },
+   "type": "air",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "GOLFO"
+  },
+  {
+   "id": "LIMASSOL",
+   "name": "Limassol (supporto UNIFIL)",
+   "factionId": "DEU",
+   "location": {
+    "lat": 34.65,
+    "lon": 33.03
+   },
+   "type": "naval",
+   "capacity": 10,
+   "damage": 0,
+   "zoneId": "MEDITERRANEO_ORIENTALE"
   }
  ],
  "infrastructure": [
@@ -1633,6 +1815,168 @@
    "estimated": true,
    "zoneId": "MAR_ROSSO",
    "status": "deployed"
+  },
+  {
+   "id": "ESP-L61",
+   "factionId": "ESP",
+   "name": "Juan Carlos I (L 61)",
+   "classId": "JCI",
+   "count": 1,
+   "homeBaseId": "ROTA",
+   "estimated": true
+  },
+  {
+   "id": "ESP-F101",
+   "factionId": "ESP",
+   "name": "Álvaro de Bazán (F 101)",
+   "classId": "F100",
+   "count": 1,
+   "homeBaseId": "FERROL",
+   "estimated": true
+  },
+  {
+   "id": "ESP-S81",
+   "factionId": "ESP",
+   "name": "Isaac Peral (S 81)",
+   "classId": "S80",
+   "count": 1,
+   "homeBaseId": "CARTAGENA",
+   "estimated": true
+  },
+  {
+   "id": "ESP-ALA11",
+   "factionId": "ESP",
+   "name": "Ala 11 Eurofighter (Morón)",
+   "classId": "EF2000",
+   "count": 12,
+   "homeBaseId": "MORON",
+   "estimated": true
+  },
+  {
+   "id": "MAR-FREMM",
+   "factionId": "MAR",
+   "name": "Mohammed VI (FREMM)",
+   "classId": "FREMM_FR",
+   "count": 1,
+   "homeBaseId": "KSAR_SGHIR",
+   "estimated": true
+  },
+  {
+   "id": "MAR-SIGMA",
+   "factionId": "MAR",
+   "name": "Tarik Ben Ziyad (SIGMA 10513)",
+   "classId": "SIGMA",
+   "count": 1,
+   "homeBaseId": "KSAR_SGHIR",
+   "estimated": true
+  },
+  {
+   "id": "MAR-F16",
+   "factionId": "MAR",
+   "name": "F-16 Block 52 (Ben Guerir)",
+   "classId": "F16",
+   "count": 16,
+   "homeBaseId": "BEN_GUERIR",
+   "estimated": true
+  },
+  {
+   "id": "MLT-P61",
+   "factionId": "MLT",
+   "name": "P61 (Diciotti modificata)",
+   "classId": "OPV",
+   "count": 1,
+   "homeBaseId": "HAY_WHARF",
+   "estimated": true
+  },
+  {
+   "id": "MLT-P62",
+   "factionId": "MLT",
+   "name": "P62 (ex classe Emer)",
+   "classId": "OPV",
+   "count": 1,
+   "homeBaseId": "HAY_WHARF",
+   "estimated": true
+  },
+  {
+   "id": "SAU-F3000S1",
+   "factionId": "SAU",
+   "name": "Al Riyadh (F3000S)",
+   "classId": "F3000S",
+   "count": 1,
+   "homeBaseId": "JEDDAH",
+   "estimated": true
+  },
+  {
+   "id": "SAU-F3000S2",
+   "factionId": "SAU",
+   "name": "Makkah (F3000S)",
+   "classId": "F3000S",
+   "count": 1,
+   "homeBaseId": "JEDDAH",
+   "estimated": true
+  },
+  {
+   "id": "SAU-TYPHOON",
+   "factionId": "SAU",
+   "name": "Typhoon RSAF 2° Stormo (Taif)",
+   "classId": "EF2000",
+   "count": 16,
+   "homeBaseId": "TAIF",
+   "estimated": true
+  },
+  {
+   "id": "ARE-BAYNUNAH",
+   "factionId": "ARE",
+   "name": "Baynunah (corvetta)",
+   "classId": "BAYNUNAH",
+   "count": 1,
+   "homeBaseId": "ABU_DHABI_NB",
+   "estimated": true
+  },
+  {
+   "id": "ARE-F16",
+   "factionId": "ARE",
+   "name": "F-16E/F Block 60 (Al Dhafra)",
+   "classId": "F16",
+   "count": 20,
+   "homeBaseId": "AL_DHAFRA",
+   "estimated": true
+  },
+  {
+   "id": "QAT-ZUBARAH",
+   "factionId": "QAT",
+   "name": "Al Zubarah (F 101)",
+   "classId": "AL_ZUBARAH",
+   "count": 1,
+   "homeBaseId": "UMM_AL_HOUL",
+   "estimated": true
+  },
+  {
+   "id": "QAT-RAFALE",
+   "factionId": "QAT",
+   "name": "Rafale QEAF (Dukhan)",
+   "classId": "RAFALE",
+   "count": 12,
+   "homeBaseId": "DUKHAN",
+   "estimated": true
+  },
+  {
+   "id": "DEU-K130",
+   "factionId": "DEU",
+   "name": "Ludwigshafen am Rhein (F 264)",
+   "classId": "K130",
+   "count": 1,
+   "homeBaseId": "LIMASSOL",
+   "estimated": true
+  },
+  {
+   "id": "DEU-F125",
+   "factionId": "DEU",
+   "name": "Sachsen-Anhalt (F 224)",
+   "classId": "F125",
+   "count": 1,
+   "homeBaseId": "LIMASSOL",
+   "estimated": true
   }
  ],
  "relations": {
@@ -1910,6 +2254,906 @@
     "TUN",
     20,
     20
+   ],
+   [
+    "ESP",
+    "ITA",
+    50,
+    10
+   ],
+   [
+    "ESP",
+    "USA",
+    55,
+    10
+   ],
+   [
+    "ESP",
+    "FRA",
+    50,
+    10
+   ],
+   [
+    "ESP",
+    "GBR",
+    35,
+    20
+   ],
+   [
+    "ESP",
+    "MAR",
+    25,
+    30
+   ],
+   [
+    "ESP",
+    "ALG",
+    5,
+    30
+   ],
+   [
+    "ESP",
+    "DEU",
+    55,
+    5
+   ],
+   [
+    "ESP",
+    "GRC",
+    45,
+    10
+   ],
+   [
+    "ESP",
+    "TUR",
+    15,
+    25
+   ],
+   [
+    "ESP",
+    "RUS",
+    -40,
+    40
+   ],
+   [
+    "ESP",
+    "ISR",
+    -15,
+    30
+   ],
+   [
+    "ESP",
+    "IRN",
+    -20,
+    30
+   ],
+   [
+    "ESP",
+    "CHN",
+    5,
+    20
+   ],
+   [
+    "ESP",
+    "QAT",
+    25,
+    10
+   ],
+   [
+    "ESP",
+    "SAU",
+    20,
+    10
+   ],
+   [
+    "ESP",
+    "ARE",
+    20,
+    10
+   ],
+   [
+    "ESP",
+    "MLT",
+    40,
+    5
+   ],
+   [
+    "ESP",
+    "CYP",
+    40,
+    5
+   ],
+   [
+    "MAR",
+    "USA",
+    50,
+    10
+   ],
+   [
+    "MAR",
+    "FRA",
+    40,
+    15
+   ],
+   [
+    "MAR",
+    "ALG",
+    -50,
+    70
+   ],
+   [
+    "MAR",
+    "ISR",
+    25,
+    15
+   ],
+   [
+    "MAR",
+    "ARE",
+    50,
+    5
+   ],
+   [
+    "MAR",
+    "SAU",
+    40,
+    5
+   ],
+   [
+    "MAR",
+    "QAT",
+    30,
+    10
+   ],
+   [
+    "MAR",
+    "ITA",
+    30,
+    10
+   ],
+   [
+    "MAR",
+    "EGY",
+    20,
+    15
+   ],
+   [
+    "MAR",
+    "IRN",
+    -40,
+    35
+   ],
+   [
+    "MAR",
+    "TUN",
+    -10,
+    30
+   ],
+   [
+    "MAR",
+    "DEU",
+    25,
+    10
+   ],
+   [
+    "MAR",
+    "GBR",
+    25,
+    10
+   ],
+   [
+    "MAR",
+    "RUS",
+    0,
+    20
+   ],
+   [
+    "MAR",
+    "CHN",
+    15,
+    15
+   ],
+   [
+    "MAR",
+    "TUR",
+    15,
+    15
+   ],
+   [
+    "MLT",
+    "ITA",
+    45,
+    15
+   ],
+   [
+    "MLT",
+    "LBY_GNU",
+    25,
+    20
+   ],
+   [
+    "MLT",
+    "TUN",
+    20,
+    15
+   ],
+   [
+    "MLT",
+    "FRA",
+    35,
+    10
+   ],
+   [
+    "MLT",
+    "GBR",
+    40,
+    10
+   ],
+   [
+    "MLT",
+    "USA",
+    30,
+    10
+   ],
+   [
+    "MLT",
+    "RUS",
+    -15,
+    20
+   ],
+   [
+    "MLT",
+    "DEU",
+    40,
+    5
+   ],
+   [
+    "MLT",
+    "GRC",
+    40,
+    5
+   ],
+   [
+    "MLT",
+    "CYP",
+    40,
+    5
+   ],
+   [
+    "CYP",
+    "GRC",
+    80,
+    5
+   ],
+   [
+    "CYP",
+    "TUR",
+    -60,
+    70
+   ],
+   [
+    "CYP",
+    "ISR",
+    45,
+    10
+   ],
+   [
+    "CYP",
+    "EGY",
+    45,
+    10
+   ],
+   [
+    "CYP",
+    "FRA",
+    50,
+    10
+   ],
+   [
+    "CYP",
+    "USA",
+    40,
+    10
+   ],
+   [
+    "CYP",
+    "ITA",
+    45,
+    10
+   ],
+   [
+    "CYP",
+    "RUS",
+    -10,
+    25
+   ],
+   [
+    "CYP",
+    "LBN",
+    30,
+    15
+   ],
+   [
+    "CYP",
+    "SYR",
+    -10,
+    30
+   ],
+   [
+    "CYP",
+    "GBR",
+    25,
+    20
+   ],
+   [
+    "CYP",
+    "ARE",
+    30,
+    10
+   ],
+   [
+    "CYP",
+    "DEU",
+    40,
+    10
+   ],
+   [
+    "LBN",
+    "ISR",
+    -60,
+    80
+   ],
+   [
+    "LBN",
+    "SYR",
+    -10,
+    40
+   ],
+   [
+    "LBN",
+    "IRN",
+    0,
+    35
+   ],
+   [
+    "LBN",
+    "FRA",
+    50,
+    10
+   ],
+   [
+    "LBN",
+    "USA",
+    30,
+    20
+   ],
+   [
+    "LBN",
+    "SAU",
+    35,
+    10
+   ],
+   [
+    "LBN",
+    "QAT",
+    35,
+    10
+   ],
+   [
+    "LBN",
+    "ITA",
+    40,
+    10
+   ],
+   [
+    "LBN",
+    "EGY",
+    25,
+    10
+   ],
+   [
+    "LBN",
+    "TUR",
+    10,
+    20
+   ],
+   [
+    "LBN",
+    "DEU",
+    30,
+    5
+   ],
+   [
+    "LBN",
+    "JOR",
+    30,
+    10
+   ],
+   [
+    "SYR",
+    "TUR",
+    55,
+    15
+   ],
+   [
+    "SYR",
+    "ISR",
+    -60,
+    75
+   ],
+   [
+    "SYR",
+    "RUS",
+    -10,
+    35
+   ],
+   [
+    "SYR",
+    "IRN",
+    -60,
+    60
+   ],
+   [
+    "SYR",
+    "USA",
+    10,
+    30
+   ],
+   [
+    "SYR",
+    "SAU",
+    45,
+    10
+   ],
+   [
+    "SYR",
+    "QAT",
+    55,
+    10
+   ],
+   [
+    "SYR",
+    "ARE",
+    20,
+    20
+   ],
+   [
+    "SYR",
+    "JOR",
+    30,
+    20
+   ],
+   [
+    "SYR",
+    "FRA",
+    10,
+    25
+   ],
+   [
+    "SYR",
+    "DEU",
+    15,
+    20
+   ],
+   [
+    "SYR",
+    "EGY",
+    0,
+    30
+   ],
+   [
+    "SYR",
+    "ITA",
+    10,
+    25
+   ],
+   [
+    "JOR",
+    "USA",
+    70,
+    5
+   ],
+   [
+    "JOR",
+    "ISR",
+    10,
+    45
+   ],
+   [
+    "JOR",
+    "SAU",
+    55,
+    5
+   ],
+   [
+    "JOR",
+    "ARE",
+    50,
+    5
+   ],
+   [
+    "JOR",
+    "EGY",
+    55,
+    5
+   ],
+   [
+    "JOR",
+    "QAT",
+    35,
+    10
+   ],
+   [
+    "JOR",
+    "IRN",
+    -45,
+    50
+   ],
+   [
+    "JOR",
+    "GBR",
+    55,
+    5
+   ],
+   [
+    "JOR",
+    "FRA",
+    45,
+    5
+   ],
+   [
+    "JOR",
+    "ITA",
+    40,
+    5
+   ],
+   [
+    "JOR",
+    "DEU",
+    40,
+    5
+   ],
+   [
+    "JOR",
+    "TUR",
+    25,
+    10
+   ],
+   [
+    "SAU",
+    "USA",
+    55,
+    15
+   ],
+   [
+    "SAU",
+    "ARE",
+    45,
+    15
+   ],
+   [
+    "SAU",
+    "QAT",
+    35,
+    15
+   ],
+   [
+    "SAU",
+    "IRN",
+    -20,
+    45
+   ],
+   [
+    "SAU",
+    "ISR",
+    -10,
+    35
+   ],
+   [
+    "SAU",
+    "EGY",
+    50,
+    10
+   ],
+   [
+    "SAU",
+    "CHN",
+    35,
+    10
+   ],
+   [
+    "SAU",
+    "RUS",
+    20,
+    15
+   ],
+   [
+    "SAU",
+    "TUR",
+    25,
+    15
+   ],
+   [
+    "SAU",
+    "FRA",
+    35,
+    10
+   ],
+   [
+    "SAU",
+    "GBR",
+    40,
+    10
+   ],
+   [
+    "SAU",
+    "ITA",
+    30,
+    10
+   ],
+   [
+    "SAU",
+    "DEU",
+    25,
+    10
+   ],
+   [
+    "SAU",
+    "LBY_GNU",
+    10,
+    20
+   ],
+   [
+    "ARE",
+    "USA",
+    55,
+    10
+   ],
+   [
+    "ARE",
+    "QAT",
+    15,
+    30
+   ],
+   [
+    "ARE",
+    "IRN",
+    -30,
+    45
+   ],
+   [
+    "ARE",
+    "ISR",
+    30,
+    25
+   ],
+   [
+    "ARE",
+    "EGY",
+    55,
+    5
+   ],
+   [
+    "ARE",
+    "FRA",
+    55,
+    5
+   ],
+   [
+    "ARE",
+    "ITA",
+    40,
+    5
+   ],
+   [
+    "ARE",
+    "GRC",
+    50,
+    5
+   ],
+   [
+    "ARE",
+    "TUR",
+    5,
+    25
+   ],
+   [
+    "ARE",
+    "LBY_LNA",
+    40,
+    10
+   ],
+   [
+    "ARE",
+    "LBY_GNU",
+    -10,
+    30
+   ],
+   [
+    "ARE",
+    "RUS",
+    15,
+    15
+   ],
+   [
+    "ARE",
+    "CHN",
+    35,
+    10
+   ],
+   [
+    "ARE",
+    "GBR",
+    45,
+    5
+   ],
+   [
+    "ARE",
+    "DEU",
+    30,
+    10
+   ],
+   [
+    "QAT",
+    "USA",
+    60,
+    10
+   ],
+   [
+    "QAT",
+    "TUR",
+    70,
+    5
+   ],
+   [
+    "QAT",
+    "IRN",
+    15,
+    25
+   ],
+   [
+    "QAT",
+    "EGY",
+    10,
+    25
+   ],
+   [
+    "QAT",
+    "ISR",
+    -40,
+    55
+   ],
+   [
+    "QAT",
+    "ITA",
+    45,
+    5
+   ],
+   [
+    "QAT",
+    "FRA",
+    45,
+    5
+   ],
+   [
+    "QAT",
+    "GBR",
+    45,
+    5
+   ],
+   [
+    "QAT",
+    "DEU",
+    30,
+    5
+   ],
+   [
+    "QAT",
+    "LBY_GNU",
+    40,
+    10
+   ],
+   [
+    "QAT",
+    "LBY_LNA",
+    -20,
+    35
+   ],
+   [
+    "QAT",
+    "CHN",
+    30,
+    10
+   ],
+   [
+    "QAT",
+    "RUS",
+    10,
+    15
+   ],
+   [
+    "DEU",
+    "ITA",
+    55,
+    5
+   ],
+   [
+    "DEU",
+    "FRA",
+    60,
+    5
+   ],
+   [
+    "DEU",
+    "USA",
+    55,
+    15
+   ],
+   [
+    "DEU",
+    "GBR",
+    55,
+    5
+   ],
+   [
+    "DEU",
+    "GRC",
+    40,
+    10
+   ],
+   [
+    "DEU",
+    "TUR",
+    20,
+    25
+   ],
+   [
+    "DEU",
+    "RUS",
+    -65,
+    65
+   ],
+   [
+    "DEU",
+    "CHN",
+    -5,
+    30
+   ],
+   [
+    "DEU",
+    "ISR",
+    55,
+    10
+   ],
+   [
+    "DEU",
+    "IRN",
+    -45,
+    45
+   ],
+   [
+    "DEU",
+    "EGY",
+    30,
+    10
+   ],
+   [
+    "DEU",
+    "ALG",
+    20,
+    10
+   ],
+   [
+    "DEU",
+    "TUN",
+    25,
+    10
+   ],
+   [
+    "DEU",
+    "LBY_GNU",
+    15,
+    20
    ]
   ]
  },
@@ -1923,7 +3167,9 @@
     "FRA",
     "GBR",
     "GRC",
-    "TUR"
+    "TUR",
+    "ESP",
+    "DEU"
    ],
    "terms": "Trattato del Nord Atlantico",
    "startTurn": 0,
@@ -1986,6 +3232,50 @@
     "LBY_LNA"
    ],
    "status": "active"
+  },
+  {
+   "id": "AG-EU",
+   "type": "defense",
+   "parties": [
+    "ITA",
+    "FRA",
+    "GRC",
+    "ESP",
+    "DEU",
+    "MLT",
+    "CYP"
+   ],
+   "terms": "Clausola di mutua assistenza dell'Unione europea (art. 42.7 TUE)",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-TUR-QAT",
+   "type": "defense",
+   "parties": [
+    "TUR",
+    "QAT"
+   ],
+   "terms": "Cooperazione militare e base turca in Qatar (accordo del 2014)",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
+  },
+  {
+   "id": "AG-GRC-ARE",
+   "type": "defense",
+   "parties": [
+    "GRC",
+    "ARE"
+   ],
+   "terms": "Partenariato strategico con clausola di assistenza reciproca (2020)",
+   "startTurn": 0,
+   "endTurn": null,
+   "visibility": "public",
+   "status": "active"
   }
  ],
  "crises": [
@@ -2019,7 +3309,8 @@
     "EGY",
     "CHN",
     "ITA",
-    "FRA"
+    "FRA",
+    "SAU"
    ],
    "escalation": 5
   },
@@ -2035,7 +3326,8 @@
     "TUR",
     "GRC",
     "EGY",
-    "ISR"
+    "ISR",
+    "CYP"
    ],
    "escalation": 3
   },
@@ -2052,7 +3344,8 @@
     "TUN",
     "LBY_GNU",
     "ALG",
-    "RUS"
+    "RUS",
+    "MLT"
    ],
    "escalation": 4
   },
@@ -3003,7 +4296,7 @@
   },
   {
    "id": "LBY_LNA",
-   "name": "Libia (LNA, Haftar)",
+   "name": "Libia (LNA, Bengasi)",
    "kind": "nonstate",
    "controller": "ai",
    "agentRole": "faction_minor",
@@ -3099,6 +4392,613 @@
      "MEDITERRANEO_ORIENTALE": 0.4
     },
     "maxStancesPerTurn": 3
+   }
+  },
+  {
+   "id": "ESP",
+   "name": "Spagna",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/ESP.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 1500,
+    "perTurnIncome": 30
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-ESP-1",
+     "text": "Presenza nel Mediterraneo occidentale",
+     "priority": 2,
+     "metric": "units(ESP, MED_OCCIDENTALE) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ESP-2",
+     "text": "Pressione migratoria sotto 60",
+     "priority": 2,
+     "metric": "indicator(migrationPressure) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-ESP-CEUTA",
+     "text": "Pressione marocchina su Ceuta e Melilla",
+     "trigger": "relation(ESP, MAR).tension >= 80",
+     "response": "Mobilitazione navale"
+    }
+   ],
+   "isrAssets": [
+    {
+     "id": "ESP-PAZ",
+     "type": "SAR_SAT",
+     "coverage": [
+      "MED_OCCIDENTALE",
+      "CANALE_SICILIA",
+      "MAR_LIBICO",
+      "TIRRENO"
+     ],
+     "revisitTurns": 1,
+     "quality": 0.7,
+     "tasking": null
+    }
+   ],
+   "cyber": {
+    "offense": 6,
+    "defense": 7
+   },
+   "alliances": [
+    "NATO",
+    "EU"
+   ],
+   "leaderTitle": "Il Presidente del Governo di Spagna",
+   "capital": "Madrid",
+   "policy": {
+    "_nota": "Europeista e prudente, rischio basso; Stretto di Gibilterra, Ceuta e Melilla, rotta migratoria occidentale; contributi alle missioni UE (Irini).",
+    "aggressiveness": 0.3,
+    "riskTolerance": 0.3,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MED_OCCIDENTALE": 1,
+     "CANALE_SICILIA": 0.3,
+     "MAR_LIBICO": 0.2
+    },
+    "maxStancesPerTurn": 2
+   }
+  },
+  {
+   "id": "MAR",
+   "name": "Marocco",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/MAR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 600,
+    "perTurnIncome": 12
+   },
+   "stocks": {},
+   "stability": 65,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-MAR-1",
+     "text": "Presenza nello Stretto di Gibilterra",
+     "priority": 2,
+     "metric": "units(MAR, MED_OCCIDENTALE) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-MAR-2",
+     "text": "Relazione di fiducia con la Spagna",
+     "priority": 3,
+     "metric": "relation(MAR, ESP).trust >= 30",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-MAR-ALG",
+     "text": "Rottura con l'Algeria oltre il punto di non ritorno",
+     "trigger": "relation(MAR, ALG).tension >= 85",
+     "response": "Mobilitazione navale"
+    }
+   ],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 4,
+    "defense": 5
+   },
+   "alliances": [],
+   "leaderTitle": "Il Re del Marocco",
+   "capital": "Rabat",
+   "policy": {
+    "_nota": "Rivalità con l'Algeria (Sahara occidentale), partner di Stati Uniti, Francia, Golfo e Israele (accordi di Abramo); rischio medio-basso; marina concentrata sullo Stretto.",
+    "aggressiveness": 0.4,
+    "riskTolerance": 0.35,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MED_OCCIDENTALE": 1
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "MLT",
+   "name": "Malta",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/MLT.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 50,
+    "perTurnIncome": 1
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-MLT-1",
+     "text": "Pressione migratoria sotto 60",
+     "priority": 1,
+     "metric": "indicator(migrationPressure) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 4
+   },
+   "alliances": [
+    "EU"
+   ],
+   "leaderTitle": "Il Primo Ministro della Repubblica di Malta",
+   "capital": "La Valletta",
+   "policy": {
+    "_nota": "Neutrale per Costituzione, nessuna capacità offensiva: soccorso e controllo delle partenze nel Canale di Sicilia, diplomazia conciliante.",
+    "aggressiveness": 0.05,
+    "riskTolerance": 0.1,
+    "cyberPropensity": 0.0,
+    "diplomacyStyle": "conciliatory",
+    "zoneInterests": {
+     "CANALE_SICILIA": 1,
+     "MAR_LIBICO": 0.4
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "CYP",
+   "name": "Cipro",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/CYP.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 150,
+    "perTurnIncome": 3
+   },
+   "stocks": {},
+   "stability": 65,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-CYP-1",
+     "text": "Tensione con la Turchia sotto 70",
+     "priority": 1,
+     "metric": "relation(CYP, TUR).tension < 70",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-CYP-ZEE",
+     "text": "Flotta turca nella ZEE cipriota",
+     "trigger": "units(TUR, MEDITERRANEO_ORIENTALE) >= 3",
+     "response": "Richiesta di sanzioni UE"
+    }
+   ],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 4
+   },
+   "alliances": [
+    "EU"
+   ],
+   "leaderTitle": "Il Presidente della Repubblica di Cipro",
+   "capital": "Nicosia",
+   "policy": {
+    "_nota": "Nessuna marina rilevante: difende ZEE e giacimenti con la diplomazia UE e con Grecia, Egitto e Israele; rischio basso.",
+    "aggressiveness": 0.15,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.05,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1,
+     "EGEO": 0.5
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "LBN",
+   "name": "Libano",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/LBN.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 30,
+    "perTurnIncome": 1
+   },
+   "stocks": {},
+   "stability": 35,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-LBN-1",
+     "text": "Stabilità interna",
+     "priority": 1,
+     "metric": "faction(LBN).stability >= 40",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-LBN-ISR",
+     "text": "Nuova offensiva israeliana",
+     "trigger": "relation(ISR, LBN).tension >= 90",
+     "response": "Appello al Consiglio di sicurezza dell'ONU"
+    }
+   ],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 1,
+    "defense": 2
+   },
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Libanese",
+   "capital": "Beirut",
+   "policy": {
+    "_nota": "Stato fragile dopo la guerra del 2024, dipende da UNIFIL e dagli aiuti: solo diplomazia, conciliante; nessuna forza navale o aerea rilevante.",
+    "aggressiveness": 0.1,
+    "riskTolerance": 0.15,
+    "cyberPropensity": 0.05,
+    "diplomacyStyle": "conciliatory",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "SYR",
+   "name": "Siria",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/SYR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 80,
+    "perTurnIncome": 2
+   },
+   "stocks": {},
+   "stability": 30,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-SYR-1",
+     "text": "Stabilità interna",
+     "priority": 1,
+     "metric": "faction(SYR).stability >= 40",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 2,
+    "defense": 2
+   },
+   "alliances": [],
+   "leaderTitle": "Il Presidente della Repubblica Araba Siriana",
+   "capital": "Damasco",
+   "policy": {
+    "_nota": "Governo di transizione dopo il 2024, vicino a Turchia e Qatar e ostile all'Iran; marina distrutta nel dicembre 2024: solo diplomazia.",
+    "aggressiveness": 0.2,
+    "riskTolerance": 0.3,
+    "cyberPropensity": 0.1,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 1
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "JOR",
+   "name": "Giordania",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/JOR.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 300,
+    "perTurnIncome": 6
+   },
+   "stocks": {},
+   "stability": 55,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-JOR-1",
+     "text": "Mar Rosso sotto 7 (porto di Aqaba)",
+     "priority": 2,
+     "metric": "crisis(RED_SEA).escalation < 7",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 4,
+    "defense": 5
+   },
+   "alliances": [],
+   "leaderTitle": "Il Re del Regno Hascemita di Giordania",
+   "capital": "Amman",
+   "policy": {
+    "_nota": "Alleato degli Stati Uniti e mediatore, rischio basso; interessi sul Mar Rosso (Aqaba) e sul Levante; forze aeree solo per la difesa del proprio spazio aereo.",
+    "aggressiveness": 0.15,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "conciliatory",
+    "zoneInterests": {
+     "MAR_ROSSO": 0.6,
+     "MEDITERRANEO_ORIENTALE": 0.6
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "SAU",
+   "name": "Arabia Saudita",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/SAU.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 4000,
+    "perTurnIncome": 80
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-SAU-1",
+     "text": "Mar Rosso stabilizzato",
+     "priority": 1,
+     "metric": "crisis(RED_SEA).escalation < 6",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-SAU-2",
+     "text": "Presenza navale nel Mar Rosso",
+     "priority": 2,
+     "metric": "units(SAU, MAR_ROSSO) >= 1",
+     "progress": 0
+    }
+   ],
+   "redLines": [
+    {
+     "id": "RL-SAU-REDSEA",
+     "text": "Attacchi alla navigazione saudita nel Mar Rosso",
+     "trigger": "crisis(RED_SEA).escalation >= 8",
+     "response": "Mobilitazione navale"
+    }
+   ],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 5,
+    "defense": 6
+   },
+   "alliances": [],
+   "leaderTitle": "Il Re dell'Arabia Saudita",
+   "capital": "Riad",
+   "policy": {
+    "_nota": "Flotta occidentale a Gedda sul Mar Rosso, distensione con l'Iran dal 2023 ma diffidenza, legami con Stati Uniti ed Egitto; rischio medio.",
+    "aggressiveness": 0.45,
+    "riskTolerance": 0.4,
+    "cyberPropensity": 0.3,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MAR_ROSSO": 1,
+     "GOLFO": 0.9
+    },
+    "maxStancesPerTurn": 2
+   }
+  },
+  {
+   "id": "ARE",
+   "name": "Emirati Arabi Uniti",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/ARE.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 2500,
+    "perTurnIncome": 50
+   },
+   "stocks": {},
+   "stability": 75,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-ARE-1",
+     "text": "Presenza navale nel Golfo",
+     "priority": 2,
+     "metric": "units(ARE, GOLFO) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-ARE-2",
+     "text": "Rotte commerciali sicure",
+     "priority": 1,
+     "metric": "indicator(medShippingRisk) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 7,
+    "defense": 7
+   },
+   "alliances": [],
+   "leaderTitle": "Il Presidente degli Emirati Arabi Uniti",
+   "capital": "Abu Dhabi",
+   "policy": {
+    "_nota": "Attivo e assertivo (Libia orientale, Corno d'Africa), cyber avanzato, partenariato di difesa con la Grecia e la Francia; rischio medio.",
+    "aggressiveness": 0.5,
+    "riskTolerance": 0.5,
+    "cyberPropensity": 0.5,
+    "diplomacyStyle": "assertive",
+    "zoneInterests": {
+     "GOLFO": 1,
+     "MAR_ROSSO": 0.7,
+     "MAR_LIBICO": 0.3
+    },
+    "maxStancesPerTurn": 2
+   }
+  },
+  {
+   "id": "QAT",
+   "name": "Qatar",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/QAT.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 1500,
+    "perTurnIncome": 30
+   },
+   "stocks": {},
+   "stability": 75,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-QAT-1",
+     "text": "Rotte del GNL sicure",
+     "priority": 1,
+     "metric": "indicator(medShippingRisk) < 60",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-QAT-2",
+     "text": "Relazione di fiducia con l'Italia",
+     "priority": 3,
+     "metric": "relation(QAT, ITA).trust >= 40",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 4,
+    "defense": 5
+   },
+   "alliances": [],
+   "leaderTitle": "L'Emiro del Qatar",
+   "capital": "Doha",
+   "policy": {
+    "_nota": "Mediatore (Gaza, Afghanistan), esportatore di GNL anche verso l'Italia, base turca e base USA di Al Udeid; basso profilo militare, diplomazia conciliante.",
+    "aggressiveness": 0.1,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.2,
+    "diplomacyStyle": "conciliatory",
+    "zoneInterests": {
+     "GOLFO": 1,
+     "MAR_ROSSO": 0.3
+    },
+    "maxStancesPerTurn": 1
+   }
+  },
+  {
+   "id": "DEU",
+   "name": "Germania",
+   "kind": "state",
+   "controller": "scripted",
+   "agentRole": "faction_minor",
+   "profileRef": "factions/DEU.md",
+   "posture": 4,
+   "budget": {
+    "discretionary": 3000,
+    "perTurnIncome": 60
+   },
+   "stocks": {},
+   "stability": 70,
+   "credibility": 60,
+   "objectives": [
+    {
+     "id": "OBJ-DEU-1",
+     "text": "Presenza nel Mediterraneo orientale (UNIFIL)",
+     "priority": 2,
+     "metric": "units(DEU, MEDITERRANEO_ORIENTALE) >= 1",
+     "progress": 0
+    },
+    {
+     "id": "OBJ-DEU-2",
+     "text": "Pressione migratoria sotto 60",
+     "priority": 2,
+     "metric": "indicator(migrationPressure) < 60",
+     "progress": 0
+    }
+   ],
+   "redLines": [],
+   "isrAssets": [],
+   "cyber": {
+    "offense": 7,
+    "defense": 8
+   },
+   "alliances": [
+    "NATO",
+    "EU"
+   ],
+   "leaderTitle": "Il Cancelliere della Repubblica Federale di Germania",
+   "capital": "Berlino",
+   "policy": {
+    "_nota": "Contributi limitati alle missioni ONU/UE (UNIFIL da Limassol, Irini), multilateralismo e prudenza; rischio basso.",
+    "aggressiveness": 0.2,
+    "riskTolerance": 0.2,
+    "cyberPropensity": 0.3,
+    "diplomacyStyle": "formal",
+    "zoneInterests": {
+     "MEDITERRANEO_ORIENTALE": 0.8,
+     "MAR_LIBICO": 0.5,
+     "CANALE_SICILIA": 0.4
+    },
+    "maxStancesPerTurn": 2
    }
   },
   {

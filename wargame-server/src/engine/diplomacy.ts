@@ -21,6 +21,17 @@ export const LETTER_TONE_EFFECTS: Record<LetterTone, { trust: number; tension: n
   threatening: { trust: -5, tension: 8 },
 };
 
+/**
+ * Apertura di una lettera dalla carica del destinatario: «Il Presidente della Repubblica di Turchia» → «Signor Presidente»,
+ * i sovrani con il titolo d'uso: «Il Re del Marocco» → «Maestà», «L'Emiro del Qatar» → «Altezza».
+ */
+export function salutation(title: string): string {
+  const role = title.replace(/^(Il|La|L') ?/, '').split(/ (?:del|della|dell'|degli|dei|di) ?/)[0]!.trim();
+  if (/^Re\b/.test(role)) return 'Maestà';
+  if (/^(Emiro|Principe)\b/.test(role)) return 'Altezza';
+  return `Signor ${role}`;
+}
+
 /** Carica e città di una fazione per intestazione e firma (mai nomi di persona). */
 export function leaderOf(s: WorldState, f: string) {
   const x = s.factions[f];
