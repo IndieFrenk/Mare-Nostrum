@@ -70,7 +70,8 @@ describe('store', () => {
     const s = new JsonStore(dir);
     let release!: () => void;
     const first = s.withLock('c2', () => new Promise<void>((r) => (release = r)), 'turno');
-    await new Promise((r) => setTimeout(r, 10));
+    // il lock si scrive in modo asincrono: si aspetta che esista (sotto carico 10 ms fissi non bastano)
+    for (let i = 0; i < 200 && !release; i++) await new Promise((r) => setTimeout(r, 10));
     expect(await s.lockInfo('c2')).toMatchObject({ op: 'turno', pid: process.pid });
     const err = await s.withLock('c2', async () => 1).catch((e) => e);
     expect(err).toBeInstanceOf(LockError);
