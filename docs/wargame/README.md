@@ -14,7 +14,7 @@ npm --prefix wargame-server install
 WARGAME_MOCK=1 npm run wargame:all    # server :8787 + frontend su http://localhost:5173/wargame.html
 ```
 1. **Crea** una campagna.
-2. Leggi il **Briefing**, poi apri **Console Ordini**: scrivi una direttiva ("Pattugliare CANALE_SICILIA con ITA-F592") → *Interpreta* → *Valida*, oppure usa il costruttore.
+2. Leggi il **Briefing**, poi apri **Console Ordini**: scrivi una direttiva ("Manda la Bergamini a pattugliare il Canale di Sicilia e chiedi alla Tunisia più controlli") → *Interpreta* → *Valida*, oppure usa il costruttore.
 3. **Esegui turno**. Se un ingaggio supera la soglia CMO, apri **Coda CMO**: scarica il pacchetto, gioca su CMO e compila l'AAR (oppure *Risoluzione automatica*), poi **Prosegui**.
 
 ## Comandi dell'interfaccia
@@ -34,7 +34,23 @@ npm run wargame:all
 - Ruoli: `FACTION_MAJOR` (USA, FRA, TUR, RUS, CHN), `FACTION_MINOR` (gli altri 9), `GM_NARRATOR` (briefing, debriefing, notizie), `INTEL_ANALYST`, `ORDER_PARSER`, `REFLECTION`, `REPAIR`, `DIPLOMAT` (lettere; senza `LLM_MODEL_DIPLOMAT` usa il modello di `FACTION_MAJOR`). Variabili: `LLM_MODEL` (default), `LLM_MODEL_<RUOLO>`, `LLM_TEMPERATURE_<RUOLO>`, `LLM_MAX_TOKENS_<RUOLO>`, `LLM_TIMEOUT_MS`.
 - I modelli vengono copiati nella campagna alla creazione; per cambiarli in corsa: `POST /api/wg/campaigns/:id/config {"llm": {"faction_major": {"model": "..."}}}`.
 - Se il modello non supporta `response_format: json_schema`, il client passa da solo a `json_object`; JSON invalido → 2 tentativi di repair → ordini di dottrina.
+- `WARGAME_ALLOW_OFFLINE=1`: turni anche con i modelli spenti (dottrina); senza, ▶ risponde 503 se i modelli non rispondono (vedi «Stato dei modelli»).
 - Consigli: un modello da 30B+ con buon JSON per `FACTION_MAJOR` e `GM_NARRATOR`; 7–14B per gli altri ruoli. Con modelli locali tieni `maxConcurrentAgents` a 2 (ogni turno: 14 decisioni di fazione + 14 riflessioni + 3–4 chiamate di narrazione e intel).
+
+## Stato dei modelli (pallino accanto a ▶)
+Il server prova `LLM_BASE_URL/models` (timeout 3 s, risultato in cache 30 s) e la UI lo mostra nella barra in alto, aggiornato ogni 60 s e prima di ▶; clic sul pallino = ricontrolla subito.
+- **Verde** «LLM»: i modelli rispondono e quelli configurati ci sono. **Giallo** «N mancanti»: il server risponde ma non elenca N modelli configurati (o la latenza supera 2 s): controlla i nomi nel tooltip (`ollama list`). **Rosso** «LLM spenti»: il server non risponde (PC con Ollama spento, indirizzo sbagliato, chiave rifiutata); ▶ è disattivato. «mock»: `WARGAME_MOCK=1`, nessuna rete.
+- Tooltip: indirizzo, latenza, errore, modello per ruolo (quelli della campagna), modelli mancanti, ora del controllo.
+- Se i modelli non rispondono, `advance` (▶), la creazione di una campagna, *Interpreta* e la bozza di lettera rispondono subito **503 `LLM_UNREACHABLE`** («I modelli non rispondono: accendi il PC con Ollama…») invece di giocare un turno tutto in dottrina.
+- `WARGAME_ALLOW_OFFLINE=1`: si gioca lo stesso (le fazioni usano gli ordini di dottrina); il pallino resta rosso ma ▶ è attivo. Con `WARGAME_MOCK=1` il controllo è spento.
+- API: `GET /api/wg/llm/status[?campaignId=…&fresh=1]` → `{ reachable, baseUrl, models: { ruolo: modello }, missing, listed, latencyMs, error, enforced, offlineAllowed }`.
+
+## Console Ordini: da testo a ordini
+*Interpreta* (`POST /campaigns/:id/orders/parse`) passa per tre fasi; le prime e l'ultima sono deterministiche.
+1. **Nomi → id, prima dell'LLM** (`engine/names.ts`): unità proprie per nome, nome breve, sigla e classe («Bergamini» → ITA-F590, «Cavour» → ITA-CAVOUR, «F 590»), zone e paesi con gli alias italiani di `scenarios/<scenario>/names.json` («Mar Ionio»/«Ionio» → IONIO, «Tunisia» → TUN). Il modello riceve il testo con l'id tra parentesi quadre («la Bergamini [ITA-F590]») e una tabella nome → id. Gli alias di più voci non si sostituiscono («Libia» → ambiguità GNU/LNA).
+2. **LLM** (ruolo `ORDER_PARSER`): stesso elenco di campi degli ordini delle fazioni (`prompts/order-fields.md`), solo id delle AZIONI LECITE, cyber solo se il testo parla di cyber/hacking. Se il testo chiede forze in una zona senza nominare le unità («più presenza nel Canale di Sicilia») risponde con `zoneStances` e il motore sceglie le unità come per le fazioni IA.
+3. **Controlli del motore** (`engine/parse-review.ts`), come avvisi (non bloccano la bozza): verbo di movimento («pattuglia», «porta», «manda», «schiera», «dimostrazione di forza») senza un ordine con unità, zona o unità nominate e non usate; **⚠ azione ostile verso un alleato** (CYBER_OP disruption, THREAT, SANCTION, BLOCKADE, STRIKE verso NATO/UE o fiducia ≥ 40); **⚠ CYBER_OP non richiesta**; verbo diplomatico senza l'azione corrispondente. Un `target` che non è una fazione (es. una zona) resta un errore del validatore.
+Sotto il pulsante compaiono i nomi riconosciuti; le ambiguità in basso, gli avvisi nella validazione.
 
 ## Come le fazioni IA usano le forze: posture per zona
 Un modello piccolo (es. `qwen3.5:4b`) non riesce a scrivere ordini con gli id di unità giusti; per questo la decisione di fazione ha il campo `zoneStances`: l'IA dice **dove** e **come**, il motore sceglie **quali** unità (`engine/stances.ts`, deterministico).
@@ -76,7 +92,7 @@ Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), l
 | `npm --prefix wargame-server run schemas:export` | JSON Schema in `wargame-server/schemas-json/` |
 | `npm --prefix wargame-server run playtest -- --turns 6` | partita automatica via API (con lettere ogni 2 turni) e report dei problemi, degli ordini IA alle unità (quanti dalle posture) e degli ingaggi |
 | `npm --prefix wargame-server run balance -- --seeds 10 --turns 20` | statistica di bilanciamento delle crisi su N seed (IA mock, giocatore moderato del playtest): escalation finale per crisi, turno medio del primo 10/10, pressione migratoria media |
-| `npm --prefix wargame-server run bench:models -- <cartella-campagna> <modello>…` | banco dei modelli: fazioni (con ordini militari per tipo e quanti dalle posture), narratore, riflessione e lettera |
+| `npm --prefix wargame-server run bench:models -- <cartella-campagna> <modello>… [--solo parser,fazioni,…] [--mock]` | banco dei modelli: fazioni (con ordini militari per tipo e quanti dalle posture), narratore, riflessione, lettera e **parser** (14 direttive del giocatore: corretti / sbagliati / pericolosi) |
 
 Il database è in `wargame-server/data/campaigns/{id}/` (JSON/JSONL leggibili, vedi SPEC §5).
 
