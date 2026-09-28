@@ -33,10 +33,11 @@ describe('API', () => {
     const adv = await j('POST', `/campaigns/${c.id}/advance`);
     expect(adv.body.phase).toBe('CMO_PENDING');
     const cmo = (await j('GET', `/campaigns/${c.id}/cmo`)).body;
-    expect(cmo).toHaveLength(1);
+    // lo strike del giocatore, più eventuali ingaggi nati dalle posture delle fazioni IA
+    expect(cmo.length).toBeGreaterThanOrEqual(1);
     const txt = await app.inject({ method: 'GET', url: `/api/wg/campaigns/${c.id}/cmo?format=txt` });
     expect(txt.body).toContain('RISOLUZIONE SU CMO RICHIESTA');
-    expect((await j('POST', `/campaigns/${c.id}/cmo/${cmo[0].id}/aar`, { autoResolve: true })).body.status).toBe('resolved');
+    for (const e of cmo) expect((await j('POST', `/campaigns/${c.id}/cmo/${e.id}/aar`, { autoResolve: true })).body.status).toBe('resolved');
     const next = await j('POST', `/campaigns/${c.id}/advance`);
     expect(next.body).toMatchObject({ currentTurn: 2, phase: 'PLAYER_ORDERS' });
     expect((await j('GET', `/campaigns/${c.id}/ledger?turn=1`)).body.every((l: { factionId: string }) => l.factionId === 'ITA')).toBe(true);

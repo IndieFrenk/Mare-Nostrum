@@ -72,8 +72,9 @@ describe('posture per zona → ordini (traduttore deterministico)', () => {
     const units = unitsOf('ITA'); // fregate 1,2–1,5 M€ a turno
     const r = translateStances({ ...base, budget: 2, units, stances: [{ zoneId: 'IONIO', stance: 'patrol', intensity: 3 }] });
     const fromBase = idsOf(r.orders[0] as never).filter((id) => sc.world.units[id]!.status === 'ready');
-    // 2 M€: una fregata (1,5) e il drone (0,1) dalla base; i sottomarini (0,8) non ci stanno più; il resto è già schierato (gratis)
-    expect(fromBase).toEqual(['ITA-F593', 'ITA-MQ9']);
+    // 2 M€: una fregata (1,5), il drone (0,1) e un gruppo caccia (0,25) dalla base; i sottomarini (0,8) non ci stanno più;
+    // il resto è già schierato (gratis)
+    expect(fromBase).toEqual(['ITA-F593', 'ITA-MQ9', 'ITA-36ST']);
     expect(fromBase.reduce((a, id) => a + sc.world.units[id]!.opCostPerTurn, 0)).toBeLessThanOrEqual(2);
     const none = translateStances({ ...base, budget: 0.2, units: unitsOf('TUN'), stances: [{ zoneId: 'CANALE_SICILIA', stance: 'patrol', intensity: 1 }] });
     expect(none.orders).toEqual([]); // OPV da 0,3 M€ a turno, budget 0,2

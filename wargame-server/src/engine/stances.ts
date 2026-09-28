@@ -9,9 +9,9 @@ import { PARAMS } from './params.js';
 
 /** Tipi di unità adatti a ogni postura, a scaglioni: si pesca dal primo scaglione, poi dal successivo. */
 const POOLS: Record<Exclude<Stance, 'withdraw'>, { sea: UnitType[][]; land: UnitType[][] | null }> = {
-  patrol: { sea: [['frigate', 'opv', 'destroyer', 'submarine'], ['mpa', 'drone_flight', 'aew']], land: [['drone_flight', 'mpa', 'aew', 'fighter_sqn'], ['ground_bn']] },
+  patrol: { sea: [['frigate', 'opv', 'destroyer', 'submarine'], ['mpa', 'drone_flight', 'aew', 'fighter_sqn']], land: [['drone_flight', 'mpa', 'aew', 'fighter_sqn'], ['ground_bn']] },
   presence: { sea: [['frigate', 'opv', 'destroyer', 'lhd', 'carrier']], land: [['ground_bn'], ['fighter_sqn', 'drone_flight']] },
-  show_of_force: { sea: [['carrier', 'lhd', 'destroyer', 'frigate'], ['fighter_sqn', 'strike_sqn']], land: [['fighter_sqn', 'strike_sqn'], ['ground_bn']] },
+  show_of_force: { sea: [['carrier', 'lhd', 'destroyer', 'frigate'], ['fighter_sqn', 'strike_sqn', 'opv']], land: [['fighter_sqn', 'strike_sqn'], ['ground_bn']] },
   escort_shipping: { sea: [['frigate', 'destroyer', 'opv']], land: null },
   blockade: { sea: [['destroyer', 'frigate', 'opv'], ['submarine']], land: null },
   air_defense: { sea: [['sam_battery'], ['destroyer', 'frigate', 'fighter_sqn']], land: [['sam_battery'], ['fighter_sqn']] },

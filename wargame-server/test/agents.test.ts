@@ -50,6 +50,35 @@ describe('agenti', () => {
     for (let t = 1; t <= 3; t++) expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(src.id, t));
   }, 30_000);
 
+  it('il mock produce posture per zona deterministiche, tradotte in ordini con unità', async () => {
+    const run = async () => {
+      const e = makeEngine();
+      const c = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'm', seed: 'mock-stances' }), 2)).campaign;
+      return Promise.all(AI.map((f) => e.store.getDecision(c.id, 1, f)));
+    };
+    const [a, b] = [await run(), await run()];
+    expect(a.map((d) => [d!.zoneStances, d!.stanceOrders, d!.orders.military])).toEqual(b.map((d) => [d!.zoneStances, d!.stanceOrders, d!.orders.military]));
+    for (const d of a) {
+      expect(d!.zoneStances.length).toBeGreaterThan(0);
+      expect(d!.stanceOrders.length).toBeGreaterThan(0);
+      const ids = new Set(d!.orders.military.map((o) => o.id));
+      for (const s of d!.stanceOrders) expect(ids.has(s.orderId)).toBe(true);
+    }
+  }, 30_000);
+
+  it('replay identico anche con le posture (ordini già tradotti nelle decisioni salvate)', async () => {
+    const e = makeEngine();
+    const src = (await runSim(e, await e.createCampaign({ scenarioId: 'med-2026', name: 'src', seed: 'replay-stances' }), 3)).campaign;
+    const stanceOrders = (await Promise.all(AI.map((f) => e.store.getDecision(src.id, 2, f)))).flatMap((d) => d!.stanceOrders);
+    expect(stanceOrders.length).toBeGreaterThan(AI.length / 2);
+    const replay = new Engine(e.store, new ReplayAgents(e.store, src.id));
+    const c = await replay.createCampaign({ scenarioId: 'med-2026', name: 'rep', seed: src.seed });
+    const r = await runSim(replay, c, 3, async (t) => { const o = await e.store.getOrders(src.id, t, 'ITA'); if (o) await e.store.saveOrders(c.id, o); });
+    for (let t = 1; t <= 3; t++) expect(await e.store.getState(r.campaign.id, t)).toEqual(await e.store.getState(src.id, t));
+    const again = await e.store.getDecision(r.campaign.id, 2, 'TUR');
+    expect(again!.stanceOrders).toEqual((await e.store.getDecision(src.id, 2, 'TUR'))!.stanceOrders);
+  }, 30_000);
+
   it('validatore numeri del narratore', () => {
     expect(numbersNotInFacts('FOED a 3200 M€, 5 unità', ['FOED disponibile: 3200 M€.', '5 unità schierate'])).toEqual([]);
     expect(numbersNotInFacts('Perse 3 fregate', ['nessuna perdita'])).toEqual(['3']);

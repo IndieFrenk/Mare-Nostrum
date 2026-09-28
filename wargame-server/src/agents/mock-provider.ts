@@ -44,9 +44,25 @@ function faction(m: M) {
   const ship = (legal.units as M[]).find((u) => u.status === 'ready' && ['frigate', 'destroyer', 'opv'].includes(u.type) && u.readiness >= 50);
   const tired = (legal.units as M[]).filter((u) => u.status === 'deployed' && u.readiness < 40).map((u) => u.id);
   const military: M[] = [];
-  if (ship) military.push({ id: 'o1', kind: h % 5 === 0 ? 'SHOW_OF_FORCE' : 'PATROL', unitIds: [ship.id], zoneId: zone, roe: 'WEAPONS_TIGHT' });
+  // un ordine preciso a una nave solo ogni tanto: le forze si muovono soprattutto con le posture per zona (come i modelli piccoli)
+  if (ship && h % 4 === 0) military.push({ id: 'o1', kind: h % 5 === 0 ? 'SHOW_OF_FORCE' : 'PATROL', unitIds: [ship.id], zoneId: zone, roe: 'WEAPONS_TIGHT' });
   if (tired.length) military.push({ id: 'o2', kind: 'RETURN_TO_BASE', unitIds: tired });
   if (legal.isrAssets.length && h % 2 === 0) military.push({ id: 'o3', kind: 'ISR', assetIds: [legal.isrAssets[0].id], zoneId: zone });
+  // posture per zona: una delle zone di crisi e la zona di mare dove la fazione ha più unità (difesa di casa)
+  const usable = Object.keys((legal.unitsPerSeaZone ?? {}) as Record<string, number>);
+  const crisisZones = [...new Set(crises.flatMap((c) => c.zones as string[]))].filter((z) => usable.includes(z)).slice(0, 3);
+  const count = (z: string) => (legal.units as M[]).filter((u) => u.zoneId === z).length;
+  const byUnits = [...usable].sort((a, b) => count(b) - count(a) || a.localeCompare(b));
+  const kinds = ['patrol', 'presence', 'show_of_force', 'escort_shipping', 'air_defense'] as const;
+  const zoneStances: M[] = [];
+  if (usable.length) {
+    const main = crisisZones.length ? crisisZones[h % crisisZones.length]! : byUnits[0]!;
+    zoneStances.push({ zoneId: main, stance: h % 13 === 0 ? 'blockade' : kinds[h % kinds.length], intensity: 1 + (h % 3) });
+    const home = byUnits.find((z) => z !== main && count(z) > 0);
+    if (home) zoneStances.push({ zoneId: home, stance: (h >> 3) % 2 ? 'air_defense' : 'patrol', intensity: 1 });
+    const deployedIn = (legal.units as M[]).find((u) => u.status === 'deployed' && u.zoneId !== main && u.zoneId !== home)?.zoneId;
+    if (deployedIn && h % 7 === 0) zoneStances.push({ zoneId: deployedIn, stance: 'withdraw', intensity: 1 });
+  }
   const others = legal.factions as string[];
   const target = others[h % Math.max(1, others.length)];
   const diplomacy: M[] = target ? [{ id: 'd1', kind: h % 3 === 0 ? 'DEMARCHE' : 'REASSURANCE', target, message: 'Richiamo alla moderazione nelle aree di crisi.', visibility: 'public' }] : [];
@@ -62,6 +78,7 @@ function faction(m: M) {
     threats: target ? [{ factionId: target, level: 1 + (h % 3), rationale: 'Attività nelle zone di interesse.' }] : [],
     optionsConsidered: [{ label: 'Presenza', summary: `Pattugliamento in ${zone}`, expectedGain: 0.4, risk: 0.2, chosen: true }, { label: 'Attesa', summary: 'Nessuna azione', expectedGain: 0.1, risk: 0.1, chosen: false }],
     privateIntent: `Consolidare la presenza in ${zone} senza escalation.`,
+    zoneStances,
     orders: { military, diplomacy, procurement, statements: [] },
     confidence: 0.55,
   };
