@@ -86,6 +86,45 @@ describe('console ordini: posture per zona dal parser', () => {
   });
 });
 
+describe('console ordini: le unità nominate hanno la precedenza sulle posture', () => {
+  // errore dei modelli locali: il testo arriva con «Bergamini [ITA-F590]» ma il modello risponde con una postura
+  const stanceOnly = (zoneStances: unknown[]) => ({ orders: empty, zoneStances, ambiguities: [] });
+
+  it('«Bergamini» + postura patrol nel Canale di Sicilia → PATROL con ITA-F590, nessuna ambiguità sulla nave', async () => {
+    const e = makeEngine(new ScriptedParser(stanceOnly([{ zoneId: 'CANALE_SICILIA', stance: 'patrol', intensity: 1 }])));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'pref', seed: 'pref' });
+    const r = await e.parseOrders(c.id, FRASE_1);
+    expect(r.orders.military).toEqual([{ id: r.stanceOrders[0]!.orderId, kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' }]);
+    expect(r.ambiguities.filter((x) => x.includes('ITA-F590'))).toEqual([]);
+  });
+
+  it('«Cavour» + show_of_force intensità 2 nello Ionio → la Cavour c\'è', async () => {
+    const e = makeEngine(new ScriptedParser(stanceOnly([{ zoneId: 'IONIO', stance: 'show_of_force', intensity: 2 }])));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'cav', seed: 'cav' });
+    const r = await e.parseOrders(c.id, FRASE_2);
+    expect(r.orders.military[0]).toMatchObject({ kind: 'SHOW_OF_FORCE', zoneId: 'IONIO' });
+    expect((r.orders.military[0] as { unitIds: string[] }).unitIds).toContain('ITA-CAVOUR');
+    expect(r.ambiguities.filter((x) => x.includes('ITA-CAVOUR'))).toEqual([]);
+  });
+
+  it('un\'unità nominata ma danneggiata non entra nella postura e resta l\'ambiguità', async () => {
+    const e = makeEngine(new ScriptedParser(stanceOnly([{ zoneId: 'CANALE_SICILIA', stance: 'patrol', intensity: 1 }])));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'dan', seed: 'dan' });
+    const s = await e.store.getState(c.id);
+    const k = (await e.store.getKnowledge(c.id, 'ITA', 1))!;
+    Object.assign(s.units['ITA-F590']!, { status: 'damaged', damage: 30 });
+    Object.assign(k.ownUnits.find((u) => u.id === 'ITA-F590')!, { status: 'damaged', damage: 30 });
+    await e.store.saveState(c.id, s);
+    await e.store.saveKnowledge(c.id, k);
+    const r = await e.parseOrders(c.id, FRASE_1);
+    const patrol = r.orders.military.find((o) => o.kind === 'PATROL') as { unitIds: string[] };
+    expect(patrol.unitIds).not.toContain('ITA-F590');
+    expect(r.orders.military.find((o) => o.kind === 'REPAIR')).toMatchObject({ unitIds: ['ITA-F590'] });
+    expect(r.ambiguities).toContain('ITA-F590 è nominata nella direttiva ma nessun ordine la impiega.');
+    expect(r.ambiguities).toContain('postura — unità nominata ITA-F590: danneggiata, va in riparazione');
+  });
+});
+
 describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)', () => {
   const setup = async (reply: unknown, seed: string) => {
     const e = makeEngine(new ScriptedParser(reply));

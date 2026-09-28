@@ -32,6 +32,11 @@ export interface StanceInput {
   /** M€ ancora spendibili (budget meno il costo degli ordini espliciti) */
   budget: number;
   turnLength: 'week' | 'month';
+  /**
+   * Unità nominate dal giocatore nel testo (Console Ordini): scelte per prime, prima delle candidate normali, nella postura
+   * della zona più vicina a cui sono adatte (`unfitReason`), senza scaglioni di tipo né `busyElsewhere`. Vuoto per le fazioni IA.
+   */
+  prefer?: string[];
 }
 export interface StanceOrigin { stance: Stance | 'worn'; zoneId: string | null }
 export interface StanceResult { orders: Order[]; origins: StanceOrigin[]; notes: string[] }
@@ -44,6 +49,21 @@ const taskZoneOf = (u: Unit, zones: Record<string, Zone>) => (out(u) ? taskZone(
 const busyElsewhere = (u: Unit, zone: Zone, zones: Record<string, Zone>) => { const tz = taskZoneOf(u, zones); return tz !== null && tz !== zone.id; };
 /** l'unità è già nella zona (anche in base) o ci sta andando per un compito: prima scelta, e la postura la conferma */
 const inZone = (u: Unit, zone: Zone, zones: Record<string, Zone>) => u.zoneId === zone.id || taskZoneOf(u, zones) === zone.id;
+
+/**
+ * Perché un'unità nominata dal giocatore NON è adatta a una postura in una zona (null = adatta): distrutta, danneggiata,
+ * in manutenzione, prontezza sotto `minReadiness`, nave in una zona terrestre (come nel validatore); per `withdraw` deve
+ * essere fuori base. Niente scaglioni di tipo (`POOLS`) né `busyElsewhere`: se il giocatore la nomina, ci va.
+ */
+export function unfitReason(u: Unit, zone: Zone, stance: Stance): string | null {
+  if (u.status === 'destroyed') return 'distrutta';
+  if (u.status === 'damaged') return 'danneggiata';
+  if (stance === 'withdraw') return out(u) ? null : 'già in base';
+  if (u.status !== 'ready' && !out(u)) return `non disponibile (${u.status})`;
+  if (u.readiness < PARAMS.stances.minReadiness) return `prontezza ${u.readiness} sotto ${PARAMS.stances.minReadiness}`;
+  if (zone.terrain === 'land' && (u.domain === 'sea' || u.domain === 'subsurface')) return `unità navale, ${zone.id} è una zona terrestre`;
+  return null;
+}
 
 /** Unità candidate per una postura in una zona, nell'ordine in cui il motore le sceglie. */
 export function candidates(units: Unit[], zone: Zone, stance: Exclude<Stance, 'withdraw'>, used: Set<string>, zones: Record<string, Zone> = { [zone.id]: zone }): Unit[] {
@@ -75,13 +95,41 @@ export function translateStances(i: StanceInput): StanceResult {
   if (worn.length) { push({ id: '', kind: 'RETURN_TO_BASE', unitIds: worn.map((u) => u.id) }, { stance: 'worn', zoneId: null }); worn.forEach((u) => used.add(u.id)); }
   if (damaged.length) { push({ id: '', kind: 'REPAIR', unitIds: damaged.map((u) => u.id) }, { stance: 'worn', zoneId: null }); damaged.forEach((u) => used.add(u.id)); }
 
-  // 2) posture, nell'ordine in cui le ha date la fazione
-  for (const st of i.stances) {
+  // 2) unità nominate dal giocatore (prefer) → la postura della zona più vicina tra quelle a cui sono adatte (a parità, la
+  //    prima data); con una postura sola vanno tutte lì. Riservate: le candidate normali delle altre posture non le prendono.
+  const named = new Map<number, Unit[]>();
+  const reserved = new Set<string>();
+  for (const id of new Set(i.prefer ?? [])) {
+    const u = units.find((x) => x.id === id);
+    if (!u) continue;
+    if (used.has(u.id)) {
+      if (worn.includes(u)) notes.push(`unità nominata ${u.id}: logorata (prontezza ${u.readiness}), rientra alla base`);
+      else if (damaged.includes(u)) notes.push(`unità nominata ${u.id}: danneggiata, va in riparazione`);
+      continue;
+    }
+    let best = -1; let bestKm = Infinity; let why: string | null = null;
+    i.stances.forEach((st, j) => {
+      const zone = i.zones[st.zoneId];
+      if (!zone || (st.stance !== 'withdraw' && !POOLS[st.stance][zone.terrain === 'land' ? 'land' : 'sea'])) return;
+      const r = unfitReason(u, zone, st.stance);
+      if (r) { why ??= r; return; }
+      const km = inZone(u, zone, i.zones) ? 0 : distanceKm(u.location, zone.center);
+      if (km < bestKm) { best = j; bestKm = km; }
+    });
+    if (best < 0) { if (why) notes.push(`unità nominata ${u.id}: ${why}`); continue; }
+    (named.get(best) ?? named.set(best, []).get(best)!).push(u);
+    reserved.add(u.id);
+  }
+  const taken = () => new Set([...used, ...reserved]);
+
+  // 3) posture, nell'ordine in cui le ha date la fazione
+  for (const [j, st] of i.stances.entries()) {
     const zone = i.zones[st.zoneId];
     const label = `postura ${st.stance} in ${st.zoneId}`;
     if (!zone) { notes.push(`${label}: zona sconosciuta`); continue; }
+    const mine = named.get(j) ?? [];
     if (st.stance === 'withdraw') {
-      const back = units.filter((u) => !used.has(u.id) && out(u) && inZone(u, zone, i.zones));
+      const back = [...mine, ...units.filter((u) => !taken().has(u.id) && out(u) && inZone(u, zone, i.zones))];
       if (!back.length) { notes.push(`${label}: nessuna unità schierata da ritirare`); continue; }
       push({ id: '', kind: 'RETURN_TO_BASE', unitIds: back.map((u) => u.id) }, { stance: 'withdraw', zoneId: zone.id });
       back.forEach((u) => used.add(u.id));
@@ -90,14 +138,16 @@ export function translateStances(i: StanceInput): StanceResult {
     if (!POOLS[st.stance][zone.terrain === 'land' ? 'land' : 'sea']) { notes.push(`${label}: postura possibile solo in zone di mare`); continue; }
     const want = PARAMS.stances.unitsByIntensity[Math.max(1, Math.min(3, Math.round(st.intensity)))]!;
     const picked: Unit[] = []; let tooExpensive = 0;
-    for (const u of candidates(units, zone, st.stance, used, i.zones)) {
+    // solo le unità che partono dalla base costano (stessa regola del validatore)
+    const afford = (u: Unit) => { const cost = u.status === 'ready' ? u.opCostPerTurn * mult : 0; if (cost > budget) return false; budget -= cost; return true; };
+    // le nominate entrano tutte (contano nell'intensità), poi si completa con le candidate normali
+    for (const u of mine) if (afford(u)) picked.push(u); else notes.push(`unità nominata ${u.id}: budget insufficiente`);
+    for (const u of candidates(units, zone, st.stance, taken(), i.zones)) {
       if (picked.length >= want) break;
-      // solo le unità che partono dalla base costano (stessa regola del validatore)
-      const cost = u.status === 'ready' ? u.opCostPerTurn * mult : 0;
-      if (cost > budget) { tooExpensive++; continue; }
-      budget -= cost; picked.push(u);
+      if (!afford(u)) { tooExpensive++; continue; }
+      picked.push(u);
     }
-    if (!picked.length) { notes.push(`${label}: ${tooExpensive ? 'budget insufficiente' : 'nessuna unità adatta disponibile'}`); continue; }
+    if (!picked.length) { notes.push(`${label}: ${tooExpensive || mine.length ? 'budget insufficiente' : 'nessuna unità adatta disponibile'}`); continue; }
     const unitIds = picked.map((u) => u.id);
     picked.forEach((u) => used.add(u.id));
     const origin = { stance: st.stance, zoneId: zone.id };

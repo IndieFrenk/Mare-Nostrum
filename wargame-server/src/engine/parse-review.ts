@@ -22,6 +22,9 @@ export interface FinishInput {
 /**
  * Completa la bozza del parser in modo deterministico: id univoci (la bozza si somma a quella del giocatore),
  * posture per zona tradotte in ordini con le unità scelte dal motore (engine/stances.ts), validazione.
+ * Le unità nominate nel testo e non usate da un ordine esplicito vanno per prime nelle posture (`prefer`): i modelli
+ * piccoli rispondono «CANALE_SICILIA patrol» invece di un ordine alla Bergamini, e senza `prefer` il motore sceglierebbe
+ * la nave più vicina al posto di quella nominata.
  */
 export function finishParsed(i: FinishInput): ParsedDraft {
   const { state: s, factionId, knowledge: k } = i;
@@ -34,15 +37,19 @@ export function finishParsed(i: FinishInput): ParsedDraft {
     military: p.military.map((x) => ({ ...x, id: id() })), diplomacy: p.diplomacy.map((x) => ({ ...x, id: id() })),
     procurement: p.procurement.map((x) => ({ ...x, id: id() })), statements: p.statements.map((x) => ({ ...x, id: id() })),
   };
+  const recognized = i.parsed.recognized ?? recognize(i.text, buildLexicon(k.ownUnits, i.scenario)).hits;
+  const explicit = orders.military.flatMap((o) => ('unitIds' in o ? o.unitIds : []));
+  const prefer = [...new Set(recognized.filter((h) => h.kind === 'unit').map((h) => h.id))].filter((u) => !explicit.includes(u));
   const spent = validateOrders(s, i.scenario.catalog, factionId, orders, refs, i.turnLength).estCost;
   const t = translateStances({
     units: k.ownUnits, zones: i.scenario.world.zones, stances: i.parsed.zoneStances, turnLength: i.turnLength,
-    exclude: orders.military.flatMap((o) => ('unitIds' in o ? o.unitIds : [])), budget: k.ownFaction.budget.discretionary - spent,
+    exclude: explicit, prefer, budget: k.ownFaction.budget.discretionary - spent,
   });
   const stanceOrders = t.orders.map((o, j) => { const oid = id(); orders.military.push({ ...o, id: oid }); return { orderId: oid, ...t.origins[j]! }; });
   const v = validateOrders(s, i.scenario.catalog, factionId, orders, refs, i.turnLength);
-  const recognized = i.parsed.recognized ?? recognize(i.text, buildLexicon(k.ownUnits, i.scenario)).hits;
-  const review = reviewParsed({ text: i.text, orders, state: s, factionId, knowledge: k, recognized });
+  // rientri dei logorati e riparazioni dei danneggiati: il motore li aggiunge comunque, non impiegano le unità nominate
+  const auto = new Set(stanceOrders.filter((x) => x.stance === 'worn').map((x) => x.orderId));
+  const review = reviewParsed({ text: i.text, orders, state: s, factionId, knowledge: k, recognized, auto });
   return {
     orders, zoneStances: i.parsed.zoneStances, recognized, stanceOrders,
     // avvisi, non errori: la bozza resta modificabile; gli errori veri (es. destinatario che non è una fazione) li dà il validatore
@@ -66,7 +73,11 @@ const DIPLO_VERBS: [RegExp, string[], string][] = [
   [/\b(chied\w*|chiedi|sollecit\w*|protest\w*)/, ['DEMARCHE', 'BACKCHANNEL', 'PROPOSE_AGREEMENT', 'LETTER', 'THREAT'], 'chiedere o protestare'],
 ];
 
-export interface ReviewInput { text: string; orders: OrdersBody; state: WorldState; factionId: string; knowledge: FactionKnowledge; recognized: NameHit[] }
+export interface ReviewInput {
+  text: string; orders: OrdersBody; state: WorldState; factionId: string; knowledge: FactionKnowledge; recognized: NameHit[];
+  /** ordini aggiunti dal motore a prescindere dalla direttiva (rientro dei logorati, riparazioni): non impiegano le unità */
+  auto?: Set<string>;
+}
 
 /** Un alleato: stessa alleanza (NATO, UE), il blocco di cui si fa parte, o fiducia ≥ soglia. Restituisce il motivo o null. */
 export function allyReason(s: WorldState, me: string, other: string): string | null {
@@ -87,7 +98,7 @@ export function reviewParsed(i: ReviewInput): { risks: string[]; ambiguities: st
   const risks: string[] = []; const ambiguities: string[] = [];
   const text = plain(i.text);
   const name = (f: string) => `${s.factions[f]?.name ?? f} (${f})`;
-  const withUnits = orders.military.filter((o) => 'unitIds' in o && o.unitIds.length);
+  const withUnits = orders.military.filter((o) => 'unitIds' in o && o.unitIds.length && !i.auto?.has(o.id));
   const namedUnits = [...new Set(i.recognized.filter((h) => h.kind === 'unit').map((h) => h.id))];
   const namedZones = [...new Set(i.recognized.filter((h) => h.kind === 'zone').map((h) => h.id))];
   const namedFactions = [...new Set(i.recognized.filter((h) => h.kind === 'faction' && h.id !== me).map((h) => h.id))];
