@@ -23,7 +23,7 @@ const DecisionForModel = DecisionOutput.extend({
   }),
   letterIntents: z.array(z.object({ to: z.string(), gist: z.string().max(LETTER_LIMITS.gist), tone: LetterTone })).max(ORDER_CAPS.letterIntents).default([]),
 });
-const DECISION_SCHEMA = z.toJSONSchema(DecisionForModel, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
+export const DECISION_SCHEMA = z.toJSONSchema(DecisionForModel, { io: 'input', unrepresentable: 'any' }) as Record<string, unknown>;
 /** in lettura si tagliano le liste troppo lunghe invece di scartare la risposta (provider senza grammatica) */
 const cap = (n: number) => (v: unknown) => (Array.isArray(v) ? v.slice(0, n) : v);
 const DecisionLenient = z.preprocess((raw) => {

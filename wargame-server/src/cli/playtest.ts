@@ -1,6 +1,7 @@
 // Partita automatica attraverso l'API HTTP, come farebbe la UI: N turni con ordini del giocatore (pattuglie, diplomazia,
 // acquisti, dichiarazioni, una lettera ogni 2 turni a TUR/LBY_GNU/EGY), ingaggi CMO risolti in automatico, controlli di coerenza
-// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA, lettere-modello).
+// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA, lettere-modello; ordini IA
+// alle unità, quanti dalle posture per zona, ingaggi del turno).
 // Uso: npm run playtest -- --turns 10 [--base http://127.0.0.1:8787] [--name playtest] [--minor-every 2 --reflect-every 3]
 // Report: stampa a video e JSON in <WARGAME_DATA_DIR>/../playtest/<id>.json
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -27,6 +28,7 @@ async function advance(id: string): Promise<J> {
   }
 }
 const problems: string[] = [];
+const UNIT_KINDS = ['PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'AIR_DEFENSE', 'MOVE', 'RETURN_TO_BASE', 'REPAIR'];
 const problem = (t: number, s: string) => { problems.push(`T${t}: ${s}`); console.log(`  ! ${s}`); };
 const t0 = Date.now();
 const mins = (ms: number) => `${(ms / 60_000).toFixed(1)} min`;
@@ -113,6 +115,12 @@ while (c.currentTurn <= target && c.status === 'active') {
   const firstTry = decisions.filter((d) => d.model !== 'dottrina' && !d.validation.fallbackUsed && d.validation.repairAttempts === 0).length;
   const repaired = decisions.filter((d) => d.validation.repairAttempts > 0 && !d.validation.fallbackUsed).length;
   const orderCount = decisions.reduce((n, d) => n + d.orders.military.length + d.orders.diplomacy.length + d.orders.procurement.length + d.orders.statements.length, 0);
+  // ordini militari IA che muovono unità vere, e quanti vengono dalle posture per zona (stanceOrders; 'worn' = rientro dei logorati)
+  const unitOrders = decisions.flatMap((d) => (d.orders.military as J[]).filter((o) => UNIT_KINDS.includes(o.kind)));
+  const stanceOrders = decisions.flatMap((d) => (d.stanceOrders ?? []) as J[]);
+  const byKind: Record<string, number> = {};
+  for (const o of unitOrders) byKind[o.kind] = (byKind[o.kind] ?? 0) + 1;
+  const engagements = (pm.events as J[]).filter((e) => e.type === 'ENGAGEMENT_OPENED' && e.turn === t).length;
   const done = await call('GET', `/campaigns/${c.id}/narrative/${t}`);
   if (!done.debriefing) problem(t, 'debriefing mancante');
   const fallbackNarr = [done.briefing, done.debriefing].filter((x) => x && x.sections.every((s: J) => /Nessuna variazione rilevante|^$/.test(s.body) || x.factsRef.length === 0)).length;
@@ -136,19 +144,24 @@ while (c.currentTurn <= target && c.status === 'active') {
   };
   const row = {
     turn: t, minutes: +((Date.now() - tt) / 60_000).toFixed(1), decisions: decisions.length, firstTry, repaired, fallback: fallback.length, doctrine, byModel, fallbackDetail: fallback,
-    aiOrders: orderCount, rejectedOrders: rejected, cmo, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
+    aiOrders: orderCount, rejectedOrders: rejected, cmo,
+    unitOrders: { total: unitOrders.length, perFaction: +(unitOrders.length / Math.max(1, decisions.length)).toFixed(2), fromStances: stanceOrders.filter((x) => x.stance !== 'worn').length, worn: stanceOrders.filter((x) => x.stance === 'worn').length, byKind },
+    engagements, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
     letters: letterRow,
     foed: ita.budget.discretionary, stability: ita.stability, crises: Object.fromEntries(Object.entries(s.crises as Record<string, J>).map(([id, cr]) => [id, cr.escalation])),
   };
   turns.push(row);
   console.log(`  ${row.minutes} min · decisioni IA ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
+  console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
   console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} · lettere-modello ${letterRow.template.length}`);
   for (const x of [...letterRow.sent.map((l) => `→ ${l}`), ...letterRow.received.map((l) => `← ${l}`)]) console.log(`    ✉ ${x}`);
   if (letterRow.template.length) console.log(`  lettere-modello: ${letterRow.template.join(' | ')}`);
 }
-const report = { campaign: c.id, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), cadence: c.config.agentCadence, turns, problems };
+const unitAvg = turns.reduce((a, r) => a + r.unitOrders.perFaction, 0) / Math.max(1, turns.length);
+const report = { campaign: c.id, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), cadence: c.config.agentCadence, turns, problems,
+  unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(report, null, 1));
-console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length}\nreport ${out}`);
+console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements}\nreport ${out}`);
