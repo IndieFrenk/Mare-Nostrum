@@ -46,6 +46,21 @@ describe('console ordini: nomi riconosciuti prima dell\'LLM', () => {
     expect(r.ambiguous).toEqual([{ alias: 'Libia', ids: ['LBY_GNU', 'LBY_LNA'] }]);
   });
 
+  it('Libia orientale / occidentale: il governo giusto, senza ambiguità («Libia» da sola resta ambigua)', () => {
+    const lna = recognize('Lancia un attacco informatico contro la Libia orientale', lex);
+    expect(lna.hits).toEqual([{ alias: 'Libia orientale', id: 'LBY_LNA', kind: 'faction' }]);
+    expect(lna.ambiguous).toEqual([]);
+    for (const a of ['Libia orientale', 'Cirenaica', 'Bengasi']) expect(recognize(`Chiedi a ${a} di collaborare`, lex).hits.map((h) => h.id), a).toEqual(['LBY_LNA']);
+    for (const a of ['Libia occidentale', 'Tripolitania', 'Tripoli', 'il governo di Tripoli']) expect(recognize(`Chiedi a ${a} di collaborare`, lex).hits.map((h) => h.id), a).toEqual(['LBY_GNU']);
+    expect(recognize('Rassicura la Libia', lex).ambiguous).toEqual([{ alias: 'Libia', ids: ['LBY_GNU', 'LBY_LNA'] }]);
+  });
+
+  it('navi con e senza articolo', () => {
+    const cases: [string, string][] = [['la Luigi Rizzo', 'ITA-F595'], ['la Fasan', 'ITA-F591'], ['il Todaro', 'ITA-S526'], ['l\'Andrea Doria', 'ITA-D553'], ['l’Andrea Doria', 'ITA-D553'], ['la Margottini', 'ITA-F592']];
+    for (const [name, id] of cases) for (const text of [`Manda ${name} nello Ionio`, `Manda ${name.replace(/^(la |il |l['’])/, '')} nello Ionio`])
+      expect(recognize(text, lex).hits.map((h) => h.id), text).toEqual([id, 'IONIO']);
+  });
+
   it('un id già scritto non viene ripetuto', () => {
     expect(recognize('Pattugliare CANALE_SICILIA con ITA-F592', lex).text).toBe('Pattugliare CANALE_SICILIA con ITA-F592');
   });
@@ -368,6 +383,13 @@ describe('console ordini: operazioni cyber chieste nel testo', () => {
     expect(cyberOf(attack)).toMatchObject([{ target: 'RUS', effect: 'disruption' }]);
     const { r: shield } = await run({ orders: empty, ambiguities: [] }, 'Rafforza la difesa informatica contro gli attacchi della Russia', 'cy3');
     expect(cyberOf(shield)).toMatchObject([{ target: 'RUS', effect: 'defense_hardening' }]);
+  });
+
+  it('«attacco informatico contro la Libia orientale» → CYBER_OP disruption contro LBY_LNA, senza ambiguità sulla Libia', async () => {
+    const { r } = await run({ orders: empty, ambiguities: [] }, 'Lancia un attacco informatico contro la Libia orientale', 'cyl');
+    expect(cyberOf(r)).toMatchObject([{ target: 'LBY_LNA', effect: 'disruption' }]);
+    expect(r.ambiguities.some((x) => x.includes('può indicare'))).toBe(false);
+    expect(r.recognized).toEqual([{ alias: 'Libia orientale', id: 'LBY_LNA', kind: 'faction' }]);
   });
 
   it('non completa: CYBER_OP già data, negazione, due fazioni, un blocco, testo senza cyber', async () => {
