@@ -1,6 +1,7 @@
 import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
 import { FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
 import { leaderOf } from './diplomacy.js';
+import { letterTriggers, type LetterTriggerKind } from './letter-triggers.js';
 import type { JsonStore } from '../store/json-store.js';
 import { adjudicate } from './adjudication.js';
 import { applyAttrition } from './attrition.js';
@@ -234,14 +235,16 @@ export class Engine {
   /**
    * Lettere IA del turno, scelte in modo deterministico e poi scritte dal ruolo diplomat:
    * 1) risposte alle lettere del giocatore del turno precedente (sempre, al massimo una per fazione, anche nei turni «senza IA»);
-   * 2) iniziative dai letterIntents delle decisioni IA (max 1 per le minori, 2 per le maggiori), al massimo lettersPerTurn,
-   *    prima le maggiori e poi per id. Diventano azioni LETTER negli ordini: stesso validatore ed effetti del giocatore.
+   * 2) iniziative: prima i letterIntents delle decisioni IA, poi gli inneschi del motore sul turno precedente (engine/letter-triggers.ts:
+   *    minaccia, blocco, sanzione o ingaggio subiti, tensione salita, accordo appena accettato); max 1 per le minori e 2 per le maggiori,
+   *    in tutto al massimo lettersPerTurn, prima le maggiori e poi per id. Diventano azioni LETTER negli ordini: stesso validatore
+   *    ed effetti del giocatore.
    */
   private async letters(ctx: TurnCtx, c: Campaign, decisions: AgentDecision[], inputs: DecideInput[], progress: (m: Record<string, unknown>) => void) {
     const s = ctx.state; const player = c.playerFaction;
     const byF = new Map(decisions.map((d) => [d.factionId, d]));
     for (const d of decisions) { d.orders.diplomacy = d.orders.diplomacy.filter((x) => x.kind !== 'LETTER'); d.letters = []; }
-    type Choice = { factionId: string; to: string; kind: 'reply' | 'initiative'; replyTo?: DiploLetter; gist?: string; tone?: LetterTone };
+    type Choice = { factionId: string; to: string; kind: 'reply' | 'initiative'; replyTo?: DiploLetter; gist?: string; tone?: LetterTone; trigger?: LetterTriggerKind };
     const picks: Choice[] = [];
     const replying = new Set<string>();
     for (const l of ctx.turn > 1 ? await this.store.getLetters(c.id, ctx.turn - 1) : []) {
@@ -250,11 +253,20 @@ export class Engine {
       picks.push({ factionId: l.to, to: player, kind: 'reply', replyTo: l });
     }
     const major = (f: string) => s.factions[f]?.agentRole === 'faction_major';
-    const initiatives = decisions.filter((d) => d.model !== 'dottrina').flatMap((d) => {
+    const prev = ctx.turn - 1;
+    const triggers = prev >= 1 ? letterTriggers({
+      state: s, writers: [...byF.keys()],
+      prevEvents: await this.store.getEvents(c.id, prev),
+      prevOrders: (await Promise.all(Object.keys(s.factions).sort().map((f) => this.store.getOrders(c.id, prev, f)))).filter((o): o is FactionOrders => !!o),
+      prevState: await this.store.getState(c.id, prev), prevPrevState: await this.store.getState(c.id, prev - 1).catch(() => null),
+    }) : [];
+    const initiatives = [...byF.values()].sort((a, b) => a.factionId.localeCompare(b.factionId)).flatMap((d) => {
       const seen = new Set<string>();
-      return d.letterIntents.slice(0, major(d.factionId) ? 2 : 1).filter((li) => li.to !== d.factionId && s.factions[li.to] && s.factions[li.to]!.kind !== 'bloc'
+      const fromIntents = d.model === 'dottrina' ? [] : d.letterIntents.map((li): Choice => ({ factionId: d.factionId, to: li.to, kind: 'initiative', gist: li.gist.slice(0, LETTER_LIMITS.gist), tone: li.tone }));
+      const fromTriggers = triggers.filter((t) => t.factionId === d.factionId).map((t): Choice => ({ factionId: d.factionId, to: t.to, kind: 'initiative', gist: t.gist, tone: t.tone, trigger: t.kind }));
+      return [...fromIntents, ...fromTriggers].filter((li) => li.to !== d.factionId && s.factions[li.to] && s.factions[li.to]!.kind !== 'bloc'
         && !(li.to === player && replying.has(d.factionId)) && !seen.has(li.to) && !!seen.add(li.to))
-        .map((li): Choice => ({ factionId: d.factionId, to: li.to, kind: 'initiative', gist: li.gist.slice(0, LETTER_LIMITS.gist), tone: li.tone }));
+        .slice(0, major(d.factionId) ? 2 : 1);
     }).sort((a, b) => Number(major(b.factionId)) - Number(major(a.factionId)) || a.factionId.localeCompare(b.factionId));
     picks.push(...initiatives.slice(0, cadenceOf(c).lettersPerTurn));
     if (!picks.length) return;
@@ -268,7 +280,7 @@ export class Engine {
       const d = byF.get(p.factionId)!; const r = results[i]!;
       const action: LetterAction = { id: `${p.factionId}-${ctx.turn}-L${d.letters.length + 1}`, kind: 'LETTER', target: p.to, subject: r.subject, body: r.body, tone: r.tone, visibility: 'private', ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), model: r.model };
       d.orders.diplomacy.push(action);
-      d.letters.push({ actionId: action.id, to: p.to, kind: p.kind, ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), source: r.source, model: r.model, errors: r.errors });
+      d.letters.push({ actionId: action.id, to: p.to, kind: p.kind, ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), ...(p.trigger ? { trigger: p.trigger } : {}), source: r.source, model: r.model, errors: r.errors });
     });
   }
 

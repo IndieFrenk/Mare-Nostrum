@@ -27,4 +27,6 @@ export const PARAMS = {
   autoResolveUncertainty: 0.3,
   /** posture per zona (engine/stances.ts): unità per livello di intensità (indice 1–3), prontezza minima, soglia di logoramento */
   stances: { unitsByIntensity: [0, 1, 3, 5], minReadiness: 50, wornReadiness: 35 },
+  /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
+  letterTriggers: { tensionJump: 10 },
 } as const;

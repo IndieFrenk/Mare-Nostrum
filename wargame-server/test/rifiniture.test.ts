@@ -4,6 +4,10 @@ import type { LlmProvider, LlmRequest } from '../src/agents/llm-client.js';
 import { writeNews } from '../src/agents/gm-narrator.js';
 import { numbersNotInFacts } from '../src/agents/repair.js';
 import { makeEngine } from './helpers.js';
+import { letterTriggers } from '../src/engine/letter-triggers.js';
+import { loadScenario } from '../src/engine/scenario.js';
+import { runSim } from '../src/cli/sim.js';
+import type { FactionOrders } from '../src/schemas/index.js';
 
 /** Modello finto: risponde sempre con lo stesso testo e conta le chiamate. */
 const fixed = (payload: unknown): LlmProvider & { calls: LlmRequest[] } => {
@@ -56,4 +60,52 @@ describe('notizie: un numero inventato non cancella tutto il turno', () => {
     await e.advance(c.id);
     expect((await e.store.getNarrative(c.id, 1))!.news.length).toBeGreaterThan(0);
   }, 30_000);
+});
+
+describe('lettere IA di iniziativa: inneschi del motore', () => {
+  const sc = loadScenario('med-2026');
+  const writers = Object.values(sc.world.factions).filter((f) => f.controller === 'ai').map((f) => f.id);
+  const ev = (seq: number, type: GameEvent['type'], actor: string, payload: Record<string, unknown>): GameEvent =>
+    ({ id: `E3-${seq}`, turn: 3, seq, phase: 'ADJUDICATION', type, actor, targets: [], payload, visibility: 'public', causedBy: null });
+  const orders = (factionId: string, diplomacy: FactionOrders['diplomacy']): FactionOrders =>
+    ({ schemaVersion: 1, factionId, turn: 3, source: 'ai', military: [], diplomacy, procurement: [], statements: [] });
+
+  it('minaccia, sanzione, blocco, ingaggio, tensione e accordo fanno scrivere chi li ha subiti, in ordine stabile', () => {
+    const prevPrev = structuredClone(sc.world); const prev = structuredClone(sc.world);
+    prev.relations.ALG!.TUN!.tension += 10; prev.relations.TUN!.ALG!.tension += 10; // il reducer le aggiorna entrambe
+    const t = letterTriggers({
+      state: sc.world, writers, prevState: prev, prevPrevState: prevPrev,
+      prevOrders: [orders('TUR', [{ id: 'x', kind: 'THREAT', target: 'GRC', message: 'Ultimo avvertimento.', visibility: 'public' }, { id: 'y', kind: 'SANCTION', target: 'CHN', scope: 'acciaio' }]),
+        orders('ITA', [{ id: 'z', kind: 'THREAT', target: 'NATO', message: 'x', visibility: 'public' }])],
+      prevEvents: [
+        ev(1, 'RELATION_CHANGED', 'FRA', { a: 'FRA', b: 'RUS', trust: -5, tension: 10, note: 'BLOCKADE in MAR_LIBICO' }),
+        ev(2, 'ENGAGEMENT_OPENED', 'USA', { engagement: { id: 'ENG-3-1', zoneId: 'MAR_ROSSO', sides: [{ factionId: 'USA', unitIds: [] }, { factionId: 'IRN', unitIds: [] }] } }),
+        ev(3, 'AGREEMENT_CHANGED', 'EGY', { agreement: { id: 'AG-3-ISR-1', type: 'energy', parties: ['ISR', 'EGY'], status: 'active' } }),
+      ],
+    });
+    const key = t.map((x) => `${x.factionId}>${x.to}:${x.kind}:${x.tone}`);
+    expect(key).toEqual([
+      'ALG>TUN:tension:formal', 'CHN>TUR:sanction:firm', 'EGY>ISR:agreement:cordial', 'GRC>TUR:threat:firm',
+      'IRN>USA:engagement:firm', 'RUS>FRA:blockade:firm', 'TUN>ALG:tension:formal', 'USA>IRN:engagement:firm',
+    ]);
+    // il gist viene dai fatti, senza numeri da inventare
+    expect(t.find((x) => x.kind === 'blockade')!.gist).toContain(sc.world.zones.MAR_LIBICO!.name);
+    expect(t.every((x) => !/\d/.test(x.gist))).toBe(true);
+    // al primo turno (nessuno stato precedente) non c'è tensione da confrontare
+    expect(letterTriggers({ state: sc.world, writers, prevState: null, prevPrevState: null, prevOrders: [], prevEvents: [] })).toEqual([]);
+  });
+
+  it('in mock: almeno 1 iniziativa dagli inneschi in media dal turno 2, tetto lettersPerTurn rispettato, replay identico', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'ini', seed: 'iniziative', config: { agentCadence: { lettersPerTurn: 2 } } });
+    const r = await runSim(e, c, 5);
+    const factions = Object.keys((await e.store.getState(r.campaign.id)).factions);
+    let triggered = 0;
+    for (let t = 2; t <= 5; t++) {
+      const ls = (await Promise.all(factions.map((f) => e.store.getDecision(r.campaign.id, t, f)))).flatMap((d) => d?.letters ?? []);
+      expect(ls.filter((l) => l.kind === 'initiative').length).toBeLessThanOrEqual(2);
+      triggered += ls.filter((l) => l.trigger).length;
+    }
+    expect(triggered / 4).toBeGreaterThanOrEqual(1);
+  }, 60_000);
 });

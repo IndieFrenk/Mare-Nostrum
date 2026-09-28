@@ -1,6 +1,7 @@
 // Partita automatica attraverso l'API HTTP, come farebbe la UI: N turni con ordini del giocatore (pattuglie, diplomazia,
 // acquisti, dichiarazioni, una lettera ogni 2 turni a TUR/LBY_GNU/EGY), ingaggi CMO risolti in automatico, controlli di coerenza
-// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA, lettere-modello; ordini IA
+// e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA e quante dagli inneschi del motore,
+// lettere-modello; ordini IA
 // alle unità, quanti dalle posture per zona, ingaggi del turno).
 // Uso: npm run playtest -- --turns 10 [--base http://127.0.0.1:8787] [--name playtest] [--minor-every 2 --reflect-every 3]
 // Report: stampa a video e JSON in <WARGAME_DATA_DIR>/../playtest/<id>.json
@@ -139,7 +140,7 @@ while (c.currentTurn <= target && c.status === 'active') {
   const aiLetters = decisions.flatMap((d) => (d.letters ?? []) as J[]);
   const letterRow = {
     sent: letters.filter((l) => l.from === 'ITA').map((l) => `${l.to}: ${l.subject}`), received: letters.filter((l) => l.to === 'ITA').map((l) => `${l.from}${l.inReplyTo ? ' (risposta)' : ''}: ${l.subject}`),
-    replies: replies.map((r) => `${r.to}: ${r.reply ? 'sì' : 'no'}`), aiInitiative: aiLetters.filter((l) => l.kind === 'initiative').length, aiReplies: aiLetters.filter((l) => l.kind === 'reply').length,
+    replies: replies.map((r) => `${r.to}: ${r.reply ? 'sì' : 'no'}`), aiInitiative: aiLetters.filter((l) => l.kind === 'initiative').length, aiTriggered: aiLetters.filter((l) => l.trigger).length, aiReplies: aiLetters.filter((l) => l.kind === 'reply').length,
     template: aiLetters.filter((l) => l.source === 'template').map((l) => `${l.actionId}: ${(l.errors as string[]).join('; ').slice(0, 120)}`),
   };
   const row = {
@@ -154,14 +155,16 @@ while (c.currentTurn <= target && c.status === 'active') {
   console.log(`  ${row.minutes} min · decisioni IA ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
   console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
-  console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} · lettere-modello ${letterRow.template.length}`);
+  console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} (dagli inneschi del motore ${letterRow.aiTriggered}) · lettere-modello ${letterRow.template.length}`);
   for (const x of [...letterRow.sent.map((l) => `→ ${l}`), ...letterRow.received.map((l) => `← ${l}`)]) console.log(`    ✉ ${x}`);
   if (letterRow.template.length) console.log(`  lettere-modello: ${letterRow.template.join(' | ')}`);
 }
 const unitAvg = turns.reduce((a, r) => a + r.unitOrders.perFaction, 0) / Math.max(1, turns.length);
+const fromT2 = turns.filter((r) => r.turn >= 2);
+const initiativeAvg = fromT2.reduce((a, r) => a + r.letters.aiInitiative, 0) / Math.max(1, fromT2.length);
 const report = { campaign: c.id, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), cadence: c.config.agentCadence, turns, problems,
-  unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0) };
+  unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0), aiInitiativesPerTurnFromT2: +initiativeAvg.toFixed(2) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(report, null, 1));
-console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements}\nreport ${out}`);
+console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}\nreport ${out}`);
