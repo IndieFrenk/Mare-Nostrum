@@ -18,6 +18,7 @@ import { continueTransit } from './movement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
+import { finishParsed, type ParsedDirective } from './parse-review.js';
 import { AGENT_ROLES, cadenceDefaults, llmDefaults } from '../config.js';
 import { doctrineDecision } from '../agents/faction-agent.js';
 import { quickMemory } from '../agents/reflection.js';
@@ -40,7 +41,8 @@ export interface AgentsPort {
   decideAll(inputs: DecideInput[], onProgress: (factionId: string, status: string) => void): Promise<AgentDecision[]>;
   debrief(i: { campaign: Campaign; facts: Fact[]; publicEvents: GameEvent[] }): Promise<{ debriefing: NonNullable<TurnNarrative['debriefing']>; news: NewsItem[] }>;
   reflect(i: { campaign: Campaign; factionId: string; decision: AgentDecision | null; visibleEvents: GameEvent[]; memory: AgentMemory }): Promise<AgentMemory>;
-  parseOrders(i: { campaign: Campaign; text: string; knowledge: FactionKnowledge }): Promise<{ orders: OrdersBody; ambiguities: string[] }>;
+  /** Bozza di ordini da una direttiva in linguaggio naturale: il motore poi completa, traduce le posture e controlla (parse-review). */
+  parseOrders(i: { campaign: Campaign; text: string; knowledge: FactionKnowledge }): Promise<ParsedDirective>;
   /** Scrive le lettere IA del turno, nello stesso ordine dei job (in replay: le rilegge dalle decisioni salvate). */
   writeLetters(jobs: LetterJob[], onProgress: (factionId: string, status: string) => void): Promise<LetterResult[]>;
   /** Bozza di lettera per il giocatore (non cambia lo stato). */
@@ -337,9 +339,10 @@ export class Engine {
 
   async parseOrders(id: string, text: string) {
     const c = await this.store.getCampaign(id);
-    const r = await this.agents.parseOrders({ campaign: c, text, knowledge: await this.knowledge(id) });
+    const knowledge = await this.knowledge(id);
+    const parsed = await this.agents.parseOrders({ campaign: c, text, knowledge });
     await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
-    return { ...r, validation: await this.validate(id, r.orders) };
+    return finishParsed({ state: await this.store.getState(id), scenario: loadScenario(c.scenarioId), factionId: c.playerFaction, knowledge, turnLength: c.turnLength, text, parsed });
   }
 
   /** Bozza di lettera del giocatore scritta dal ruolo diplomat a nome dell'Italia: il giocatore la rivede e la invia come ordine LETTER. */

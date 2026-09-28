@@ -2,7 +2,7 @@
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
 import { api } from './api-client';
-import { configure, createCampaign, leaveCampaign, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
+import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
 import { WarMap } from './layers/map';
 import { countryCard, orderToZone, selectionCard } from './panels/hud';
@@ -15,11 +15,31 @@ let map: WarMap | null = null;
 const mapEl = h('div', { id: 'wg-map' });
 const hud = h('div', { id: 'wg-hud' });
 
+/** Pallino dello stato dei modelli: verde (rispondono), giallo (manca un modello o lenti), rosso (irraggiungibili). Clic: ricontrolla. */
+function llmDot(s: UiState) {
+  const l = s.llm;
+  if (!l) return h('button', { class: 'wg-llm', title: 'Stato dei modelli: in verifica…', onclick: () => void checkLlm(true) }, h('i', {}), 'LLM');
+  const slow = (l.latencyMs ?? 0) > 2000;
+  const cls = !l.reachable ? 'down' : l.missing.length || slow ? 'warn' : 'ok';
+  const roles = Object.entries(l.models).map(([r, m]) => `  ${r}: ${m}`).join('\n');
+  const title = l.mode === 'mock' ? 'Modelli finti (WARGAME_MOCK): nessuna rete.'
+    : [
+      !l.reachable ? `Modelli irraggiungibili: ${l.baseUrl}${l.error ? ` — ${l.error}` : ''}` : `Modelli raggiungibili: ${l.baseUrl} · ${l.latencyMs} ms${slow ? ' (lenti)' : ''}`,
+      !l.reachable ? (l.offlineAllowed ? 'WARGAME_ALLOW_OFFLINE: i turni si giocano con gli ordini di dottrina.' : 'Accendi il PC con Ollama: ▶ è disattivato finché non rispondono.') : null,
+      l.missing.length ? `Modelli mancanti sul server: ${l.missing.join(', ')}` : null,
+      l.listed === null && l.reachable ? 'Il server non elenca i modelli (/models): presenza non verificata.' : null,
+      `Modelli per ruolo:\n${roles}`,
+      `Controllato alle ${new Date(l.checkedAt).toLocaleTimeString('it-IT')} · clic per ricontrollare`,
+    ].filter(Boolean).join('\n');
+  return h('button', { class: `wg-llm ${cls}`, title, 'aria-label': title, onclick: () => void checkLlm(true) }, h('i', {}), l.mode === 'mock' ? 'mock' : !l.reachable ? 'LLM spenti' : l.missing.length ? `${l.missing.length} mancanti` : 'LLM');
+}
+
 function topbar(s: UiState) {
   const c = s.campaign!;
   const f = s.knowledge?.ownFaction;
   const g = s.overview?.indicators;
   const canRun = c.status === 'active' && (c.phase === 'PLAYER_ORDERS' || c.phase === 'CLOSED' || (c.phase === 'CMO_PENDING' && !s.cmo.length));
+  const offline = llmBlocked(s);
   const res = (label: string, value: string, title: string) => h('div', { class: 'wg-res', title }, h('small', {}, label), h('b', {}, value));
   return h('header', { id: 'wg-top' },
     h('button', { class: 'wg-flag', title: 'Italia', onclick: () => set({ country: 'ITA' }) }, 'ITA'),
@@ -28,7 +48,8 @@ function topbar(s: UiState) {
     h('div', { class: 'wg-spacer' }),
     h('div', { class: 'wg-date' }, h('b', {}, c.date), h('small', {}, `T${c.currentTurn} · ${c.phase}`)),
     h('button', { class: 'wg-len', disabled: s.busy || !!s.running, title: 'Durata del turno (passa a settimanale in crisi acuta)', onclick: () => configure({ turnLength: c.turnLength === 'week' ? 'month' : 'week' }) }, c.turnLength === 'week' ? 'Settimana' : 'Mese'),
-    h('button', { class: 'wg-play', disabled: !canRun || s.busy || !!s.running, onclick: runTurn, title: s.running ? 'Turno in corso sul server' : undefined, 'aria-label': c.phase === 'CMO_PENDING' ? 'Prosegui' : 'Esegui turno' }, s.busy || s.running ? '…' : '▶'),
+    llmDot(s),
+    h('button', { class: 'wg-play', disabled: !canRun || s.busy || !!s.running || offline, onclick: runTurn, title: s.running ? 'Turno in corso sul server' : offline ? 'I modelli non rispondono: accendi il PC con Ollama (clic sul pallino rosso per ricontrollare)' : undefined, 'aria-label': c.phase === 'CMO_PENDING' ? 'Prosegui' : 'Esegui turno' }, s.busy || s.running ? '…' : '▶'),
   );
 }
 

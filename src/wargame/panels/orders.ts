@@ -50,12 +50,13 @@ export function ordersPanel(s: UiState) {
   const add = (e: Event) => { e.preventDefault(); set({ draft: { ...state.draft, military: [...state.draft.military, buildOrder(e.target as HTMLFormElement)] }, validation: null, submitted: false }); };
   const addDiplo = (e: Event) => { e.preventDefault(); set({ draft: { ...state.draft, diplomacy: [...state.draft.diplomacy, buildDiplo(e.target as HTMLFormElement)] }, validation: null, submitted: false }); };
   const remove = (key: 'military' | 'diplomacy' | 'procurement' | 'statements', id: string) => set({ draft: { ...state.draft, [key]: (state.draft[key] as { id: string }[]).filter((x) => x.id !== id) }, validation: null, submitted: false });
-  const text = h('textarea', { rows: 2, placeholder: 'Es.: Pattugliare CANALE_SICILIA con ITA-F592 e ITA-P430' });
+  const text = h('textarea', { rows: 2, placeholder: 'Es.: Manda la Bergamini a pattugliare il Canale di Sicilia e chiedi alla Tunisia più controlli' });
   const phaseOk = s.campaign?.phase === 'PLAYER_ORDERS';
   return h('div', {},
     phaseOk ? null : h('p', { class: 'wg-warn' }, `Fase ${s.campaign?.phase}: ordini non modificabili.`),
     h('h4', {}, 'Direttiva in linguaggio naturale'),
     text, h('button', { onclick: () => text.value.trim() && parseText(text.value) }, 'Interpreta → bozza'),
+    s.parseNote ? h('p', { class: 'wg-dim', style: 'white-space:pre-line' }, s.parseNote) : null,
     h('h4', {}, 'Ordine militare'),
     h('form', { onsubmit: add, class: 'wg-form' },
       select('kind', KINDS), select('zone', zones), select('roe', ROE, 'WEAPONS_TIGHT'),

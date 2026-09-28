@@ -46,4 +46,6 @@ export const PARAMS = {
   stances: { unitsByIntensity: [0, 1, 3, 5], minReadiness: 50, wornReadiness: 35 },
   /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
   letterTriggers: { tensionJump: 10 },
+  /** Console Ordini (engine/parse-review.ts): fiducia da cui una fazione conta come alleata negli avvisi sulle azioni ostili */
+  parser: { allyTrust: 40 },
 } as const;
