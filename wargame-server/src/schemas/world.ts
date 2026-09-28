@@ -12,7 +12,7 @@ export const Roe = z.enum(['WEAPONS_HOLD', 'WEAPONS_TIGHT', 'WEAPONS_FREE']);
 export const UnitType = z.enum(['carrier', 'lhd', 'destroyer', 'frigate', 'opv', 'submarine', 'fighter_sqn', 'strike_sqn', 'aew', 'mpa', 'drone_flight', 'sam_battery', 'ground_bn', 'sof_team', 'tanker', 'transport']);
 export const Domain = z.enum(['sea', 'subsurface', 'air', 'land', 'space', 'cyber']);
 export const UnitStatus = z.enum(['ready', 'deployed', 'transit', 'maintenance', 'damaged', 'destroyed']);
-export const AgentRole = z.enum(['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair']);
+export const AgentRole = z.enum(['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat']);
 
 export const Objective = z.object({ id: z.string(), text: z.string(), priority: z.union([z.literal(1), z.literal(2), z.literal(3)]), metric: z.string(), progress: z.number() });
 export const RedLine = z.object({ id: z.string(), text: z.string(), trigger: z.string(), response: z.string() });
@@ -33,6 +33,10 @@ export const Faction = z.object({
   cyber: z.object({ offense: z.number(), defense: z.number() }),
   alliances: z.array(z.string()),
   crossedRedLines: z.array(z.string()).default([]),
+  /** carica del capo di Stato/governo (mai un nome di persona), per intestazione e firma delle lettere */
+  leaderTitle: z.string().default(''),
+  /** città da cui si scrivono le lettere (es. «Roma, 9 marzo 2026») */
+  capital: z.string().default(''),
 });
 
 export const Sensor = z.object({ type: z.enum(['radar', 'sonar', 'esm', 'eo']), rangeKm: z.number(), quality: z.number() });

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
 import { migrate } from './migrations/index.js';
-import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
+import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
 
@@ -31,6 +31,8 @@ export interface Store {
   getNarrative(id: string, turn: number): Promise<TurnNarrative | null>;
   saveNarrative(id: string, id2: number, n: TurnNarrative): Promise<void>;
   appendLlmCalls(id: string, turn: number, c: LlmCall[]): Promise<void>;
+  getLetters(id: string, turn: number): Promise<DiploLetter[]>;
+  appendLetters(id: string, turn: number, l: DiploLetter[]): Promise<void>;
   withLock<T>(id: string, fn: () => Promise<T>, op?: string): Promise<T>;
   /** Chi tiene il lock della campagna (questo processo o un altro ancora vivo), o null. */
   lockInfo(id: string): Promise<LockInfo | null>;
@@ -129,6 +131,9 @@ export class JsonStore implements Store {
   getNarrative(id: string, turn: number) { return this.read(this.dir(id, 'narrative', `turn-${pad(turn)}.json`), S.TurnNarrative); }
   saveNarrative(id: string, turn: number, n: TurnNarrative) { return this.write(this.dir(id, 'narrative', `turn-${pad(turn)}.json`), n, S.TurnNarrative); }
   appendLlmCalls(id: string, turn: number, c: LlmCall[]) { return this.append(this.dir(id, 'llm-log', `turn-${pad(turn)}.jsonl`), c, S.LlmCall); }
+  /** Lettere tra capi di Stato consegnate nel turno (tutte: la visibilità la filtrano knowledge e API). */
+  getLetters(id: string, turn: number) { return this.readLines(this.dir(id, 'letters', `turn-${pad(turn)}.jsonl`), S.DiploLetter); }
+  appendLetters(id: string, turn: number, l: DiploLetter[]) { return this.append(this.dir(id, 'letters', `turn-${pad(turn)}.jsonl`), l, S.DiploLetter); }
 
   /** Verità dei contatti (solo motore, mai esposta via API). */
   async saveTruthContacts(id: string, turn: number, c: Record<string, Contact[]>) { await this.write(this.dir(id, 'truth', `turn-${pad(turn)}.json`), c); }

@@ -1,4 +1,4 @@
-import type { Contact, DiploMessage, FactionKnowledge, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
+import type { Contact, DiploLetter, DiploMessage, FactionKnowledge, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
 import { hashString } from './rng.js';
 
 const INTENT = ['guerra aperta', 'confronto armato limitato', 'coercizione', 'competizione', 'cooperazione'];
@@ -8,7 +8,9 @@ export function stripContact({ truthUnitId: _t, ...c }: Contact): Omit<Contact, 
   return c;
 }
 
-export function buildKnowledge(s: WorldState, factionId: string, contacts: Contact[], extra: { inbox: DiploMessage[]; news: NewsItem[]; reports?: IntelReport[] }): FactionKnowledge {
+export const letterVisibleTo = (l: DiploLetter, f: string) => l.visibility === 'public' || l.from === f || l.to === f;
+
+export function buildKnowledge(s: WorldState, factionId: string, contacts: Contact[], extra: { inbox: DiploMessage[]; news: NewsItem[]; reports?: IntelReport[]; letters?: DiploLetter[] }): FactionKnowledge {
   const f = s.factions[factionId];
   const beliefs: FactionKnowledge['beliefs'] = {};
   for (const o of Object.values(s.factions)) {
@@ -29,5 +31,6 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
     knownAgreements: Object.values(s.agreements).filter((a) => a.visibility === 'public' || a.visibility.includes(factionId) || a.parties.includes(factionId)),
     inbox: extra.inbox.filter((m) => m.to === factionId),
     publicNews: extra.news,
+    letters: (extra.letters ?? []).filter((l) => letterVisibleTo(l, factionId) && l.turn >= s.turn - 3),
   };
 }

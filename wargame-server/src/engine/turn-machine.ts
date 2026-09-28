@@ -1,4 +1,4 @@
-import type { AfterActionReport, AgentDecision, AgentMemory, Campaign, Contact, DiploMessage, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
+import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
 import { FactionOrders as FactionOrdersSchema } from '../schemas/index.js';
 import type { JsonStore } from '../store/json-store.js';
 import { adjudicate } from './adjudication.js';
@@ -15,7 +15,7 @@ import { deliver } from './procurement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
-import { cadenceDefaults, llmDefaults } from '../config.js';
+import { AGENT_ROLES, cadenceDefaults, llmDefaults } from '../config.js';
 import { doctrineDecision } from '../agents/faction-agent.js';
 import { quickMemory } from '../agents/reflection.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
@@ -31,9 +31,16 @@ export interface AgentsPort {
   drainLlmCalls(): LlmCall[];
 }
 
+type LlmRoleConfig = NonNullable<Campaign['config']['llm']['diplomat']>;
+/** Configurazione LLM di un ruolo (diplomat assente nelle campagne vecchie → quella di faction_major). */
+export const roleConfig = (c: Campaign, role: AgentRole): LlmRoleConfig => c.config.llm[role] ?? c.config.llm.faction_major;
+
 export class GameError extends Error { constructor(public code: string, message: string, public details?: unknown) { super(message); } }
 
-export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Partial<Campaign['config']> }
+type Cadence = Campaign['config']['agentCadence'];
+export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Omit<Partial<Campaign['config']>, 'agentCadence'> & { agentCadence?: Partial<Cadence> } }
+/** Cadenza della campagna con i default per i campi aggiunti dopo (campagne vecchie). */
+export const cadenceOf = (c: Campaign): Cadence => Object.assign({ minorEvery: 1, reflectEvery: 1, lettersPerTurn: 3 }, c.config.agentCadence);
 
 
 export class Engine {
@@ -50,7 +57,7 @@ export class Engine {
       config: {
         fogLevel: 'realistic', debugGodView: false, cmoThreshold: { majorShips: 1, aircraftPerSide: 4, missileSalvo: 8 },
         llm: llmDefaults(),
-        maxConcurrentAgents: 2, cmoOnRequest: false, agentCadence: cadenceDefaults(), ...o.config,
+        maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config, agentCadence: { ...cadenceDefaults(), ...o.config?.agentCadence },
       },
     };
     const s = sc.world;
@@ -118,6 +125,7 @@ export class Engine {
             const orders = (await Promise.all(Object.keys(ctx.state.factions).sort().map((f) => this.store.getOrders(id, ctx.turn, f)))).filter((o): o is FactionOrders => !!o);
             const rejected = adjudicate(ctx, orders);
             if (rejected.length) progress({ rejected });
+            await this.store.appendLetters(id, ctx.turn, ctx.events.filter((e) => e.type === 'LETTER_SENT' && e.turn === ctx.turn).map((e) => (e.payload as { letter: DiploLetter }).letter));
             for (const e of Object.values(ctx.state.engagements).filter((e) => e.turn === ctx.turn && e.cmoPackage)) await this.store.saveCmo(id, ctx.turn, e.id, { package: e.cmoPackage });
             ctx.phase = this.pendingCmo(ctx.state).length ? 'CMO_PENDING' : 'DEBRIEF';
             break;
@@ -141,7 +149,8 @@ export class Engine {
     const prevEvents = ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : [];
     const inbox = prevEvents.filter((e) => e.type === 'DIPLO_MESSAGE').map((e) => (e.payload as { message: DiploMessage }).message);
     const news = (await this.store.getNarrative(c.id, ctx.turn - 1))?.news ?? [];
-    return { inbox, news };
+    const letters = (await Promise.all([3, 2, 1].filter((d) => ctx.turn - d >= 1).map((d) => this.store.getLetters(c.id, ctx.turn - d)))).flat();
+    return { inbox, news, letters };
   }
 
   private async intel(ctx: TurnCtx, c: Campaign) {
@@ -183,7 +192,7 @@ export class Engine {
       inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc });
     }
     // cadenza: le fazioni minori saltano l'IA a turni alterni (sfalsate), con ordini di dottrina deterministici
-    const cad = c.config.agentCadence ?? { minorEvery: 1, reflectEvery: 1 };
+    const cad = cadenceOf(c);
     const minors = ai.filter((f) => ctx.state.factions[f]!.agentRole === 'faction_minor');
     const withLlm = (f: string) => { const i = minors.indexOf(f); return i < 0 || (cad.minorEvery > 0 && (ctx.turn + i) % cad.minorEvery === 0); };
     const skipped = inputs.filter((i) => !withLlm(i.factionId)).map((i) => {
@@ -209,7 +218,7 @@ export class Engine {
     const { debriefing, news } = await this.agents.debrief({ campaign: c, facts, publicEvents: events.filter((e) => e.visibility === 'public') });
     const narrative = (await this.store.getNarrative(c.id, ctx.turn))!;
     await this.store.saveNarrative(c.id, ctx.turn, { ...narrative, debriefing, news });
-    const cad = c.config.agentCadence ?? { minorEvery: 1, reflectEvery: 1 };
+    const cad = cadenceOf(c);
     const ai = Object.values(ctx.state.factions).filter((f) => f.controller === 'ai').map((f) => f.id).sort();
     for (const f of Object.values(ctx.state.factions).filter((f) => f.controller === 'ai')) {
       const memory = (await this.store.getMemory(c.id, f.id))!;
@@ -274,15 +283,17 @@ export class Engine {
   }
 
   /** Cambi di configurazione in corsa (es. turno mensile→settimanale in crisi acuta, CMO su richiesta, modelli per ruolo). */
-  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; agentCadence?: Campaign['config']['agentCadence']; llm?: Record<string, Partial<Campaign['config']['llm'][keyof Campaign['config']['llm']]>> }) {
+  configure(id: string, patch: { turnLength?: Campaign['turnLength']; cmoOnRequest?: boolean; debugGodView?: boolean; maxConcurrentAgents?: number; agentCadence?: Partial<Cadence>; llm?: Record<string, Partial<LlmRoleConfig>> }) {
     return this.store.withLock(id, async () => {
       const c = await this.store.getCampaign(id);
       if (patch.turnLength) c.turnLength = patch.turnLength;
-      const { llm, turnLength: _t, ...rest } = patch;
+      const { llm, turnLength: _t, agentCadence, ...rest } = patch;
       Object.assign(c.config, rest);
+      if (agentCadence) c.config.agentCadence = { ...cadenceOf(c), ...agentCadence };
       for (const [role, cfg] of Object.entries(llm ?? {})) {
-        if (!(role in c.config.llm)) throw new GameError('VALIDATION', `ruolo sconosciuto ${role}`);
-        Object.assign(c.config.llm[role as keyof typeof c.config.llm], cfg);
+        if (!(AGENT_ROLES as readonly string[]).includes(role)) throw new GameError('VALIDATION', `ruolo sconosciuto ${role}`);
+        const r = role as AgentRole;
+        c.config.llm[r] = { ...roleConfig(c, r), ...cfg };
       }
       c.updatedAt = new Date().toISOString();
       await this.store.saveCampaign(c);

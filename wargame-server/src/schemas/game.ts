@@ -15,7 +15,12 @@ export const Campaign = z.object({
   config: z.object({
     fogLevel: z.enum(['realistic', 'relaxed', 'none']), debugGodView: z.boolean(),
     cmoThreshold: z.object({ majorShips: z.number(), aircraftPerSide: z.number(), missileSalvo: z.number() }),
-    llm: z.record(AgentRole, LlmRoleConfig), maxConcurrentAgents: z.number().int().min(1),
+    llm: z.object({
+      faction_major: LlmRoleConfig, faction_minor: LlmRoleConfig, gm_narrator: LlmRoleConfig, intel_analyst: LlmRoleConfig,
+      order_parser: LlmRoleConfig, reflection: LlmRoleConfig, repair: LlmRoleConfig,
+      /** facoltativo: le campagne create prima delle lettere usano il modello di faction_major */
+      diplomat: LlmRoleConfig.optional(),
+    }), maxConcurrentAgents: z.number().int().min(1),
     /** il giocatore chiede CMO per ogni ingaggio che lo coinvolge, anche minore */
     cmoOnRequest: z.boolean().default(false),
     /**
@@ -23,7 +28,11 @@ export const Campaign = z.object({
      * sfalsate tra loro) e ogni fazione aggiorna la memoria con l'IA un turno ogni `reflectEvery` (negli altri turni
      * un riassunto senza IA). 1/1 = tutto con l'IA a ogni turno.
      */
-    agentCadence: z.object({ minorEvery: z.number().int().min(0), reflectEvery: z.number().int().min(1) }).default({ minorEvery: 1, reflectEvery: 1 }),
+    agentCadence: z.object({
+      minorEvery: z.number().int().min(0), reflectEvery: z.number().int().min(1),
+      /** lettere IA «di iniziativa» per turno (le risposte alle lettere del giocatore non contano: una per fazione, sempre) */
+      lettersPerTurn: z.number().int().min(0).default(3),
+    }).default({ minorEvery: 1, reflectEvery: 1, lettersPerTurn: 3 }),
   }),
 });
 
@@ -41,6 +50,16 @@ export const IntelReport = z.object({
   relatedContacts: z.array(z.string()), factsRef: z.array(z.string()),
 });
 export const DiploMessage = z.object({ id: z.string(), turn: Turn, from: FactionId, to: FactionId, channel: z.enum(['official', 'backchannel']), text: z.string(), actionRef: z.string().optional() });
+export const LetterTone = z.enum(['cordial', 'formal', 'firm', 'threatening', 'conciliatory']);
+/** Lettera formale tra capi di Stato (indicati solo con la carica): salvata in letters/turn-N.jsonl. */
+export const DiploLetter = z.object({
+  id: z.string(), turn: Turn, date: z.string(), from: FactionId, to: FactionId,
+  fromTitle: z.string(), toTitle: z.string(), place: z.string(),
+  subject: z.string(), body: z.string(), tone: LetterTone, visibility: z.enum(['private', 'public']),
+  inReplyTo: z.string().optional(),
+  /** human = scritta (o rivista) dal giocatore; ai = scritta da un LLM; template = lettera-modello di ripiego */
+  source: z.enum(['human', 'ai', 'template']), model: z.string().optional(),
+});
 export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()) });
 
 export const FactionKnowledge = z.object({
@@ -51,12 +70,14 @@ export const FactionKnowledge = z.object({
   beliefs: z.record(FactionId, z.object({ estPosture: z.number(), estIntent: z.string(), confidence: z.number() })),
   knownCrises: z.array(Crisis), knownAgreements: z.array(Agreement),
   inbox: z.array(DiploMessage), publicNews: z.array(NewsItem),
+  /** lettere ricevute e inviate negli ultimi 3 turni (solo quelle visibili alla fazione) */
+  letters: z.array(DiploLetter).default([]),
 });
 
 export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED', 'CONTACT_LOST', 'ENGAGEMENT_OPENED', 'ENGAGEMENT_RESOLVED',
   'UNIT_DAMAGED', 'UNIT_DESTROYED', 'UNIT_CREATED', 'MUNITION_EXPENDED', 'DELIVERY_ARRIVED', 'PROCUREMENT_ORDERED',
   'BUDGET_CHANGED', 'RELATION_CHANGED', 'AGREEMENT_CHANGED', 'CRISIS_CHANGED', 'CYBER_EFFECT', 'SOF_RESULT', 'DIPLO_MESSAGE',
-  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT']);
+  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT']);
 export const GameEvent = z.object({
   id: z.string(), turn: Turn, seq: z.number().int(), phase: TurnPhase, type: EventType,
   actor: z.string(), targets: z.array(z.string()), payload: z.record(z.string(), z.unknown()),
@@ -76,6 +97,8 @@ export const DecisionOutput = z.object({
   privateIntent: z.string(),
   orders: OrdersBody,
   confidence: z.number().min(0).max(1),
+  /** lettere che la fazione vuole scrivere (max 1 per le minori, 2 per le maggiori): il testo lo scrive poi il ruolo diplomat */
+  letterIntents: z.array(z.object({ to: FactionId, gist: z.string(), tone: LetterTone })).default([]),
 });
 export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   schemaVersion: z.literal(1), id: z.string(), factionId: FactionId, turn: Turn,
@@ -83,6 +106,11 @@ export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   orders: FactionOrders,
   validation: z.object({ valid: z.boolean(), errors: z.array(z.string()), repairAttempts: z.number(), fallbackUsed: z.boolean() }),
   usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
+  /** lettere scritte nel turno (risposte e iniziative): il testo è negli ordini (azioni LETTER), qui l'esito della scrittura */
+  letters: z.array(z.object({
+    actionId: z.string(), to: FactionId, kind: z.enum(['reply', 'initiative']), inReplyTo: z.string().optional(),
+    source: z.enum(['ai', 'template']), model: z.string(), errors: z.array(z.string()),
+  })).default([]),
 });
 export const AgentMemory = z.object({
   schemaVersion: z.literal(1), factionId: FactionId, updatedTurn: Turn,
@@ -115,6 +143,8 @@ export type Contact = z.infer<typeof Contact>;
 export type IntelReport = z.infer<typeof IntelReport>;
 export type DiploMessage = z.infer<typeof DiploMessage>;
 export type NewsItem = z.infer<typeof NewsItem>;
+export type LetterTone = z.infer<typeof LetterTone>;
+export type DiploLetter = z.infer<typeof DiploLetter>;
 export type FactionKnowledge = z.infer<typeof FactionKnowledge>;
 export type EventType = z.infer<typeof EventType>;
 export type GameEvent = z.infer<typeof GameEvent>;
