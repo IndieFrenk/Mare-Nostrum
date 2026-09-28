@@ -180,3 +180,13 @@ describe('limiti realistici agli ordini IA', () => {
     expect(lna.validation.errors.some((x) => x.includes('oltre il budget'))).toBe(true);
   }, 30_000);
 });
+
+describe('errori del validatore legati all\'ordine', () => {
+  it('una zona inventata porta l\'id dell\'ordine (così l\'ordine si può scartare da solo)', async () => {
+    const { validateOrders } = await import('../src/engine/validators.js');
+    const { loadScenario } = await import('../src/engine/scenario.js');
+    const sc = loadScenario('med-2026');
+    const v = validateOrders(sc.world, sc.catalog, 'ITA', { military: [{ id: 'z1', kind: 'PATROL', unitIds: ['ITA-F590'], zoneId: 'EGEO_MEDITERRANEO_ORT', roe: 'WEAPONS_TIGHT' }], diplomacy: [], procurement: [], statements: [] });
+    expect(v.errors).toContain('z1: zona sconosciuta: EGEO_MEDITERRANEO_ORT');
+  });
+});

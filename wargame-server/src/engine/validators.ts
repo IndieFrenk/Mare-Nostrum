@@ -13,9 +13,12 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
   const used = new Set<string>();
   const usedAssets = new Set<string>();
   let cyberOps = 0;
-  const zoneOk = (z: string) => !!s.zones[z] || (errors.push(`zona sconosciuta: ${z}`), false);
+  // l'errore porta l'id dell'ordine: così un ordine con una zona inventata si può scartare da solo
+  let current = '';
+  const zoneOk = (z: string) => !!s.zones[z] || (errors.push(`${current}: zona sconosciuta: ${z}`), false);
   const mult = PARAMS.opCostMultiplier[turnLength];
   for (const ord of o.military) {
+    current = ord.id;
     const unitIds = 'unitIds' in ord ? ord.unitIds : [];
     for (const id of unitIds) {
       const u = s.units[id];
