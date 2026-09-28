@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // wargame-server/.env (vedi .env.example): le variabili già impostate nell'ambiente hanno la precedenza
-if (existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
+// (non nei test: devono dare lo stesso risultato qualunque sia la configurazione locale)
+if (!process.env.VITEST && existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
 
 export const config = {
   port: Number(process.env.WARGAME_PORT ?? 8787),
