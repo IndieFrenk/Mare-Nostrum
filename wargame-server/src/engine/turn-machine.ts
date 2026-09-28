@@ -14,6 +14,7 @@ import { briefingFacts, debriefFacts, energyFacts, type Fact } from './facts.js'
 import { addDays } from './geo.js';
 import { buildKnowledge } from './knowledge.js';
 import { deliver } from './procurement.js';
+import { continueTransit } from './movement.js';
 import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
@@ -128,7 +129,7 @@ export class Engine {
             ctx.startTurn(ctx.state.turn + 1, addDays(ctx.state.date, c.turnLength === 'week' ? 7 : 30));
             break;
           case 'OPEN':
-            deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); recoverInfrastructure(ctx); evolveCrises(ctx);
+            deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); continueTransit(ctx); recoverInfrastructure(ctx); evolveCrises(ctx);
             ctx.phase = 'INTEL'; break;
           case 'INTEL': await this.intel(ctx, c); ctx.phase = 'BRIEFING'; break;
           case 'BRIEFING': await this.briefing(ctx, c); ctx.phase = 'PLAYER_ORDERS'; await this.flush(ctx, c); return c;

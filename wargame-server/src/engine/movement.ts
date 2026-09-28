@@ -1,4 +1,4 @@
-import type { LatLon, Unit, ZoneId } from '../schemas/index.js';
+import type { LatLon, Unit, WorldState, ZoneId } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { distanceKm, lerp, nearestZone } from './geo.js';
 import { PARAMS } from './params.js';
@@ -26,4 +26,29 @@ export function returnToBase(ctx: TurnCtx, u: Unit, status: Unit['status'], orde
   const b = ctx.state.bases[u.homeBaseId];
   ctx.emit('UNIT_MOVED', u.factionId, { unitId: u.id, location: b.location, zoneId: b.zoneId, status }, { visibility: [u.factionId], causedBy: { orderId } });
   ctx.emit('UNIT_STATUS', u.factionId, { unitId: u.id, patch: { currentTask: null } }, { visibility: [u.factionId] });
+}
+
+/** Zona in cui si svolge il compito di un'unità (null se il compito non ha una zona: rientro, ISR, strike…). */
+export function taskZone(s: Pick<WorldState, 'zones' | 'units' | 'infrastructure'>, task: Unit['currentTask']): string | null {
+  const t = task as { kind?: string; zoneId?: string; to?: unknown; protect?: string } | null;
+  if (!t) return null;
+  if (typeof t.zoneId === 'string' && s.zones[t.zoneId]) return t.zoneId;
+  if (t.kind === 'MOVE' && typeof t.to === 'string' && s.zones[t.to]) return t.to;
+  if (t.kind === 'ESCORT' && typeof t.protect === 'string') {
+    const convoy = /^convoglio\s+(\S+)/i.exec(t.protect)?.[1];
+    return s.units[t.protect]?.zoneId ?? s.infrastructure[t.protect]?.zoneId ?? (convoy && s.zones[convoy] ? convoy : null);
+  }
+  return null;
+}
+
+/**
+ * OPEN: le unità rimaste in transito proseguono verso la zona del loro compito (stessa velocità di crociera degli ordini di zona).
+ * Prima di questa fase un'unità che non arrivava in un turno restava a metà strada per sempre, finché qualcuno non la riordinava.
+ */
+export function continueTransit(ctx: TurnCtx) {
+  for (const u of Object.values(ctx.state.units).sort((a, b) => a.id.localeCompare(b.id))) {
+    if (u.status !== 'transit') continue;
+    const z = taskZone(ctx.state, u.currentTask);
+    if (z) moveUnit(ctx, u, z, 'cruise', String((u.currentTask as { id?: string }).id ?? 'transito'));
+  }
 }

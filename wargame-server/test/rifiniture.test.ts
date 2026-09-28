@@ -8,6 +8,10 @@ import { letterTriggers } from '../src/engine/letter-triggers.js';
 import { loadScenario } from '../src/engine/scenario.js';
 import { runSim } from '../src/cli/sim.js';
 import type { FactionOrders } from '../src/schemas/index.js';
+import { translateStances } from '../src/engine/stances.js';
+import { TurnCtx } from '../src/engine/context.js';
+import { Rng } from '../src/engine/rng.js';
+import { continueTransit } from '../src/engine/movement.js';
 
 /** Modello finto: risponde sempre con lo stesso testo e conta le chiamate. */
 const fixed = (payload: unknown): LlmProvider & { calls: LlmRequest[] } => {
@@ -108,4 +112,40 @@ describe('lettere IA di iniziativa: inneschi del motore', () => {
     }
     expect(triggered / 4).toBeGreaterThanOrEqual(1);
   }, 60_000);
+});
+
+describe('unità impegnate tra un turno e l\'altro', () => {
+  const sc = loadScenario('med-2026');
+  const ships = () => Object.values(structuredClone(sc.world.units)).filter((u) => u.factionId === 'ITA' && ['frigate', 'destroyer', 'opv'].includes(u.type)).sort((a, b) => a.id.localeCompare(b.id));
+  const task = (zoneId: string) => ({ id: 'ITA-1-1', kind: 'PATROL', unitIds: [], zoneId, roe: 'WEAPONS_TIGHT' });
+
+  it('una postura nella zona dove l\'unità è già impegnata (anche in viaggio) la conferma invece di scartarla', () => {
+    const us = ships();
+    // tutte le navi sono fuori: una in transito verso MAR_ROSSO (ancora in IONIO), le altre schierate con un compito in EGEO
+    us.forEach((u) => Object.assign(u, { status: 'deployed', zoneId: 'EGEO', currentTask: task('EGEO') }));
+    Object.assign(us[0]!, { status: 'transit', zoneId: 'IONIO', currentTask: task('MAR_ROSSO') });
+    const r = translateStances({ units: us, zones: sc.world.zones, budget: 1000, turnLength: 'week', stances: [
+      { zoneId: 'MAR_ROSSO', stance: 'patrol', intensity: 1 }, { zoneId: 'EGEO', stance: 'patrol', intensity: 1 }, { zoneId: 'IONIO', stance: 'patrol', intensity: 1 }] });
+    expect(r.orders[0]).toMatchObject({ kind: 'PATROL', zoneId: 'MAR_ROSSO', unitIds: [us[0]!.id] });
+    expect(r.orders[1]).toMatchObject({ kind: 'PATROL', zoneId: 'EGEO' });
+    expect((r.orders[1] as { unitIds: string[] }).unitIds.every((id) => us.find((u) => u.id === id)!.zoneId === 'EGEO')).toBe(true);
+    // in IONIO la nave di passaggio verso il Mar Rosso non viene distolta
+    expect(r.orders.find((o) => 'zoneId' in o && o.zoneId === 'IONIO')).toBeUndefined();
+    expect(r.notes.join()).toContain('postura patrol in IONIO: nessuna unità adatta disponibile');
+    // il ritiro da MAR_ROSSO richiama anche chi ci sta ancora andando
+    const w = translateStances({ units: us, zones: sc.world.zones, budget: 1000, turnLength: 'week', stances: [{ zoneId: 'MAR_ROSSO', stance: 'withdraw', intensity: 1 }] });
+    expect(w.orders).toEqual([expect.objectContaining({ kind: 'RETURN_TO_BASE', unitIds: [us[0]!.id] })]);
+  });
+
+  it('un\'unità rimasta in transito prosegue verso la zona del compito all\'apertura del turno', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'tr', seed: 'transito' });
+    const state = await e.store.getState(c.id);
+    const u = Object.values(state.units).find((x) => x.factionId === 'ITA' && x.type === 'frigate')!;
+    Object.assign(u, { status: 'transit', zoneId: 'IONIO', location: state.zones.IONIO!.center, currentTask: task('MAR_ROSSO') });
+    const ctx = new TurnCtx(state, c, loadScenario('med-2026'), new Rng(c.seed, c.rngCursor, 2), 0);
+    continueTransit(ctx);
+    expect(ctx.state.units[u.id]).toMatchObject({ status: 'deployed', zoneId: 'MAR_ROSSO' });
+    expect(ctx.events.map((x) => x.type)).toEqual(['UNIT_MOVED']);
+  });
 });
