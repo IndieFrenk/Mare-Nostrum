@@ -15,14 +15,29 @@ export const FACTIONS: Record<string, { iso: string | null; color: string; label
   LBY_GNU: { iso: 'LBY', color: '#7e8f3c', label: [14.2, 27.5] },
   LBY_LNA: { iso: null, color: '#8f6a3a', label: [21.5, 29.2] },
   IRN: { iso: 'IRN', color: '#3a7a5a', label: [54, 32.5] },
+  // paesi decisi a regole (controller «scripted»)
+  ESP: { iso: 'ESP', color: '#d08c2e', label: [-3.7, 40.2] },
+  MAR: { iso: 'MAR', color: '#9c3f5c', label: [-6.3, 31.8] },
+  MLT: { iso: 'MLT', color: '#b8b2d6', label: [14.4, 35.6] },
+  CYP: { iso: 'CYP', color: '#6fb3a6', label: [32.9, 35.4] },
+  LBN: { iso: 'LBN', color: '#8fbf5a', label: [35.6, 33.9] },
+  SYR: { iso: 'SYR', color: '#8a6db0', label: [39.8, 35.4] },
+  JOR: { iso: 'JOR', color: '#a0785a', label: [38.2, 30.0] },
+  SAU: { iso: 'SAU', color: '#1f6f8b', label: [42.5, 22.8] },
+  ARE: { iso: 'ARE', color: '#b0647a', label: [54.6, 23.2] },
+  QAT: { iso: 'QAT', color: '#7a2f4f', label: [51.2, 25.7] },
+  DEU: { iso: 'DEU', color: '#9aa3b5', label: [10.4, 51.1] },
 };
 
 /** Etichette brevi sulla mappa. */
-export const MAP_LABELS: Record<string, string> = { LBY_GNU: 'Tripolitania', LBY_LNA: 'Cirenaica' };
+export const MAP_LABELS: Record<string, string> = { LBY_GNU: 'Tripolitania', LBY_LNA: 'Cirenaica', ARE: 'Emirati' };
 
 export const NAMES: Record<string, string> = {
   ITA: 'Italia', USA: 'Stati Uniti', FRA: 'Francia', GBR: 'Regno Unito', TUR: 'Turchia', RUS: 'Russia', CHN: 'Cina', GRC: 'Grecia', EGY: 'Egitto',
   ISR: 'Israele', ALG: 'Algeria', TUN: 'Tunisia', LBY_GNU: 'Libia (GNU)', LBY_LNA: 'Libia (LNA)', IRN: 'Iran',
+  ESP: 'Spagna', MAR: 'Marocco', MLT: 'Malta', CYP: 'Cipro', LBN: 'Libano', SYR: 'Siria', JOR: 'Giordania', SAU: 'Arabia Saudita',
+  ARE: 'Emirati Arabi Uniti', QAT: 'Qatar', DEU: 'Germania',
 };
 
-export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'DEU', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE'];
+/** Paesi UE che non sono fazioni (colore comune nella mappa politica): chi diventa fazione esce da qui (Spagna, Germania, Malta, Cipro). */
+export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CZE', 'DNK', 'EST', 'FIN', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'SWE'];
