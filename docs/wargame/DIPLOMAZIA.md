@@ -239,6 +239,8 @@ A ogni turno, solo da eventi **pubblici** e da quanto riguarda lo Stato stesso (
 
 ## 11. Agenti LLM a budget
 
+> **Realizzato nel settore 11** (PR «Agenti LLM a budget: strateghi, cancellerie e profili di provider»; dettagli in `AGENTS.md`). Scelte oltre la spec: `LLM_BUDGET_CALLS` predefinito 10 solo nelle campagne a regole (in modalità `llm` nessun tetto); il limite al minuto aspetta un posto fino a `LLM_MAX_WAIT_MS` (45 s), un modello in pausa dopo un 429 no; le cancellerie scrivono al massimo 4 atti a turno e 8 Stati per atto; il ruolo strategist si applica alle potenze che decidono a regole; i profili possono avere anche `rpd`, `responseFormat` e `apiKeyEnv` (nome della variabile con la chiave, mai la chiave). Parametro del ragionamento minimo di Gemini: `reasoning_effort` (`none` per i modelli 2.5, `minimal`/`low` per i 3).
+
 **Principio**: l'LLM non decide mai un esito. Propone **intenzioni** (direttive) o scrive **testi**; il motore li valida, li limita, li registra, e il replay li rilegge senza LLM.
 
 | Ruolo | Cosa fa | Quando |
