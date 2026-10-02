@@ -249,7 +249,35 @@ export const LlmCall = z.object({
   id: z.string(), turn: Turn, role: AgentRole, factionId: FactionId.optional(), model: z.string(), promptHash: z.string(),
   request: z.unknown(), response: z.unknown(), ok: z.boolean(), error: z.string().optional(),
   tokens: z.object({ in: z.number(), out: z.number() }), latencyMs: z.number(),
+  /** la risposta viene dalla cache della campagna (stessa richiesta, `promptHash` uguale): nessuna chiamata al modello */
+  cached: z.boolean().optional(),
 });
+
+/**
+ * Contatori delle chiamate LLM di una campagna (`llm-usage.json`, docs/wargame/AGENTS.md «Budget»): per turno e per giorno (UTC).
+ * `calls` sono le richieste arrivate a un modello (anche quelle risposte con 429); `admitted` le richieste ammesse dal budget del turno
+ * (una richiesta con i suoi ripieghi di modello vale 1); `skipped` quelle non fatte (budget finito, limite al minuto o al giorno, tutti i modelli in 429).
+ */
+export const LlmCounters = z.object({
+  calls: z.number().int().default(0), admitted: z.number().int().default(0),
+  tokensIn: z.number().int().default(0), tokensOut: z.number().int().default(0),
+  rate429: z.number().int().default(0), fallbacks: z.number().int().default(0), skipped: z.number().int().default(0),
+  cacheHits: z.number().int().default(0), errors: z.number().int().default(0),
+});
+export const LlmTurnCounters = LlmCounters.extend({
+  /** chiamate per ruolo (i repair contano sotto `repair`) */
+  byRole: z.record(z.string(), z.number().int()).default({}),
+  /** chiamate non fatte per priorità (0–5) */
+  skippedByPriority: z.record(z.string(), z.number().int()).default({}),
+});
+export const LlmUsage = z.object({
+  schemaVersion: z.literal(1),
+  turns: z.record(z.string(), LlmTurnCounters).default({}),
+  days: z.record(z.string(), LlmCounters).default({}),
+});
+export type LlmCounters = z.infer<typeof LlmCounters>;
+export type LlmTurnCounters = z.infer<typeof LlmTurnCounters>;
+export type LlmUsage = z.infer<typeof LlmUsage>;
 
 const Section = z.object({ heading: z.string(), body: z.string() });
 export const BRIEFING_HEADINGS = ['Quadro strategico', 'Tracce e movimenti', 'Allarmi intelligence', 'Energia e rotte', 'Stato FOED e prontezza'] as const;

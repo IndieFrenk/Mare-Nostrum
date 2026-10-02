@@ -3,10 +3,13 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
 import { fillFromScenario, migrate, migrateDiplomacy } from './migrations/index.js';
-import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
+import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, LlmUsage, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
 const PhaseTimingSchema = z.object({ turn: z.number(), phase: z.string(), ms: z.number() });
+/** Una risposta del modello in cache (`llm-cache.jsonl`): `drop` cancella la voce (risposta poi scartata dal validatore). */
+export const LlmCacheRow = z.object({ h: z.string(), role: z.string().optional(), model: z.string().optional(), text: z.string().optional(), tokens: z.object({ in: z.number(), out: z.number() }).optional(), drop: z.boolean().optional() });
+export type LlmCacheRow = z.infer<typeof LlmCacheRow>;
 
 /** Interfaccia astratta: il motore dipende solo da questa (swap futuro verso SQLite). */
 export interface Store {
@@ -33,6 +36,11 @@ export interface Store {
   /** tempo (ms) di ogni fase del motore, una riga per fase in `timings.jsonl` */
   appendTimings(id: string, rows: PhaseTiming[]): Promise<void>;
   getTimings(id: string): Promise<PhaseTiming[]>;
+  /** contatori delle chiamate LLM (`llm-usage.json`) e cache delle risposte per `promptHash` (`llm-cache.jsonl`) */
+  getLlmUsage(id: string): Promise<LlmUsage | null>;
+  saveLlmUsage(id: string, u: LlmUsage): Promise<void>;
+  getLlmCache(id: string): Promise<LlmCacheRow[]>;
+  appendLlmCache(id: string, rows: LlmCacheRow[]): Promise<void>;
   getMemory(id: string, faction: string): Promise<AgentMemory | null>;
   saveMemory(id: string, m: AgentMemory): Promise<void>;
   getNarrative(id: string, turn: number): Promise<TurnNarrative | null>;
@@ -139,6 +147,10 @@ export class JsonStore implements Store {
   saveWorldDecision(id: string, d: WorldDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, '_world.json'), d, S.WorldDecision); }
   appendTimings(id: string, rows: PhaseTiming[]) { return this.append(this.dir(id, 'timings.jsonl'), rows, PhaseTimingSchema); }
   getTimings(id: string) { return this.readLines(this.dir(id, 'timings.jsonl'), PhaseTimingSchema); }
+  getLlmUsage(id: string) { return this.read(this.dir(id, 'llm-usage.json'), S.LlmUsage); }
+  saveLlmUsage(id: string, u: LlmUsage) { return this.write(this.dir(id, 'llm-usage.json'), u, S.LlmUsage); }
+  getLlmCache(id: string) { return this.readLines(this.dir(id, 'llm-cache.jsonl'), LlmCacheRow); }
+  appendLlmCache(id: string, rows: LlmCacheRow[]) { return this.append(this.dir(id, 'llm-cache.jsonl'), rows, LlmCacheRow); }
   getMemory(id: string, f: string) { return this.read(this.dir(id, 'memory', `${f}.json`), S.AgentMemory); }
   async saveMemory(id: string, m: AgentMemory) {
     await this.write(this.dir(id, 'memory', `${m.factionId}.json`), m, S.AgentMemory);
@@ -223,6 +235,9 @@ export class JsonStore implements Store {
     await fs.mkdir(this.dir(newId), { recursive: true });
     await copy(this.dir(id), this.dir(newId));
     await fs.rm(this.dir(newId, 'memory'), { recursive: true, force: true }).catch(() => {});
+    // i contatori delle chiamate LLM dei turni successivi al punto di ramo non valgono per il ramo (il budget del turno fromTurn+1 riparte da zero)
+    const usage = await this.getLlmUsage(newId);
+    if (usage) await this.saveLlmUsage(newId, { ...usage, turns: Object.fromEntries(Object.entries(usage.turns).filter(([t]) => Number(t) <= fromTurn)) });
     const srcHist = this.dir(id, 'memory', 'history');
     if (existsSync(srcHist)) {
       const latest = new Map<string, string>();

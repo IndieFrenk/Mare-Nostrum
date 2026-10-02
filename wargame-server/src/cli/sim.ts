@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { config } from '../config.js';
 import { Engine } from '../engine/turn-machine.js';
+import { budgetFor } from '../index.js';
 import { LlmAgents } from '../agents/orchestrator.js';
 import { MockLLMProvider } from '../agents/mock-provider.js';
 import { OpenAiCompatProvider } from '../agents/llm-client.js';
@@ -41,7 +42,7 @@ async function main() {
     process.exit(same ? 0 : 1);
   }
   const provider = values.mock ? new MockLLMProvider() : new OpenAiCompatProvider();
-  const engine = new Engine(store, new LlmAgents(provider));
+  const engine = new Engine(store, new LlmAgents(provider, budgetFor(provider)));
   engine.onProgress = (_, m) => { if (m.agent) console.log(`  · ${m.agent}: ${m.status}`); };
   const mode = values.mode === 'llm' || values.mode === 'rules' ? values.mode : undefined;
   const c = await engine.createCampaign({ scenarioId: values.scenario!, name: `Sim ${new Date().toISOString()}`, seed: values.seed, ...(mode ? { config: { factionMode: mode } } : {}) });

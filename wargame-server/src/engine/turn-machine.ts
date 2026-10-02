@@ -60,6 +60,12 @@ export interface AgentsPort {
   /** Bozza di lettera per il giocatore (non cambia lo stato). */
   draftLetter(job: LetterJob): Promise<LetterResult>;
   drainLlmCalls(): LlmCall[];
+  /** Il motore consegna lo store: i contatori e la cache delle chiamate LLM stanno nel registro della campagna (facoltativo: replay e agenti finti non ne hanno). */
+  attach?(store: JsonStore): void;
+  /** Aspetta le scritture dei contatori LLM in corso (a fine fase). */
+  settle?(): Promise<void>;
+  /** Chiamate che il motore chiederà più avanti nel turno, per priorità (0–5): le priorità più basse lasciano loro il posto nel budget. */
+  expect?(campaign: Campaign, turn: number, demand: Partial<Record<0 | 1 | 2 | 3 | 4 | 5, number>>): Promise<void> | void;
   /** Solo in replay: la decisione registrata, per verificare che quella ricalcolata a regole sia identica. */
   recordedDecision?(turn: number, factionId: string): Promise<AgentDecision | null>;
   /** Solo in replay: le decisioni registrate del livello C (IA mondiale) del turno. */
@@ -93,7 +99,7 @@ export function deciders(s: WorldState, c: Campaign): { llm: string[]; rules: st
 
 export class Engine {
   onProgress: (campaignId: string, msg: Record<string, unknown>) => void = () => {};
-  constructor(readonly store: JsonStore, readonly agents: AgentsPort) {}
+  constructor(readonly store: JsonStore, readonly agents: AgentsPort) { agents.attach?.(store); }
 
   async createCampaign(o: CreateOpts): Promise<Campaign> {
     const sc = loadScenario(o.scenarioId);
@@ -136,6 +142,7 @@ export class Engine {
     for (const t of [...new Set(rolls.map((r) => r.turn))]) await this.store.appendRolls(c.id, t, rolls.filter((r) => r.turn === t));
     await this.store.appendLedger(c.id, ledger);
     await this.store.appendLlmCalls(c.id, ctx.turn, this.agents.drainLlmCalls());
+    await this.agents.settle?.();
     this.flushed.set(ctx, { e: ctx.events.length, r: ctx.rng.rolls.length, l: ctx.ledger.length });
     await this.store.saveState(c.id, ctx.state, snapshot ? ctx.turn : undefined);
     Object.assign(c, { rngCursor: ctx.rng.cursor, currentTurn: ctx.turn, date: ctx.state.date, phase: ctx.phase, updatedAt: new Date().toISOString() });
@@ -452,6 +459,7 @@ export class Engine {
     const knowledge = await this.knowledge(id);
     const parsed = await this.agents.parseOrders({ campaign: c, text, knowledge });
     await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
+    await this.agents.settle?.();
     return finishParsed({ state: await this.store.getState(id), scenario: loadScenario(c.scenarioId), factionId: c.playerFaction, knowledge, turnLength: c.turnLength, text, parsed });
   }
 
@@ -467,6 +475,7 @@ export class Engine {
       { gist: b.gist.slice(0, LETTER_LIMITS.gist), tone: b.tone, replyTo });
     const r = await this.agents.draftLetter(job);
     await this.store.appendLlmCalls(id, c.currentTurn, this.agents.drainLlmCalls());
+    await this.agents.settle?.();
     return { target: b.target, ...(replyTo ? { inReplyTo: replyTo.id } : {}), ...r };
   }
 
