@@ -305,7 +305,8 @@ export class LlmBudget {
         const model = ep.model ?? req.model; const key = `${ep.key}|${model}`;
         const now = this.clock.now();
         const cool = (this.cooling.get(key) ?? 0) - now;
-        if (cool > 0) { consider(cool, false); continue; }
+        // un modello in pausa dopo un 429 non si aspetta: il provider ha detto che la quota è finita, si passa oltre (o si usa il testo deterministico)
+        if (cool > 0) { saw429 = true; continue; }
         const lim = this.limiter(key, ep); const w = lim.check(now);
         if (w.wait > 0) { consider(w.wait, w.daily); continue; }
         lim.take(now); sent.n++; tc.calls++; dc.calls++;
