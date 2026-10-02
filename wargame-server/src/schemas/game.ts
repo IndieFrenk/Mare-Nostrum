@@ -24,6 +24,8 @@ export const Campaign = z.object({
       order_parser: LlmRoleConfig, reflection: LlmRoleConfig, repair: LlmRoleConfig,
       /** facoltativo: le campagne create prima delle lettere usano il modello di faction_major */
       diplomat: LlmRoleConfig.optional(),
+      /** facoltativi (settore 11): direttive strategiche delle grandi potenze e frasi delle cancellerie; le campagne vecchie usano il modello di faction_major */
+      strategist: LlmRoleConfig.optional(), chancery: LlmRoleConfig.optional(),
     }), maxConcurrentAgents: z.number().int().min(1),
     /**
      * chi decide le mosse delle fazioni non umane: `rules` = decisore a regole del motore (engine/policy.ts), `llm` = agenti LLM

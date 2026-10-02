@@ -1,10 +1,8 @@
 import { parseArgs } from 'node:util';
 import { config } from '../config.js';
 import { Engine } from '../engine/turn-machine.js';
-import { budgetFor } from '../index.js';
+import { llmFromEnv, budgetFor } from '../index.js';
 import { LlmAgents } from '../agents/orchestrator.js';
-import { MockLLMProvider } from '../agents/mock-provider.js';
-import { OpenAiCompatProvider } from '../agents/llm-client.js';
 import { ReplayAgents } from '../agents/replay.js';
 import { JsonStore } from '../store/json-store.js';
 import type { Campaign, LlmCall } from '../schemas/index.js';
@@ -41,8 +39,8 @@ async function main() {
     console.log(`replay ${r.campaign.id} (fazioni: ${r.campaign.config.factionMode}): turni 1-${last}, stato ${same ? 'IDENTICO' : 'DIVERGENTE'}`);
     process.exit(same ? 0 : 1);
   }
-  const provider = values.mock ? new MockLLMProvider() : new OpenAiCompatProvider();
-  const engine = new Engine(store, new LlmAgents(provider, budgetFor(provider)));
+  const { provider, routing } = llmFromEnv({ mock: !!values.mock });
+  const engine = new Engine(store, new LlmAgents(provider, budgetFor(provider, routing)));
   engine.onProgress = (_, m) => { if (m.agent) console.log(`  · ${m.agent}: ${m.status}`); };
   const mode = values.mode === 'llm' || values.mode === 'rules' ? values.mode : undefined;
   const c = await engine.createCampaign({ scenarioId: values.scenario!, name: `Sim ${new Date().toISOString()}`, seed: values.seed, ...(mode ? { config: { factionMode: mode } } : {}) });

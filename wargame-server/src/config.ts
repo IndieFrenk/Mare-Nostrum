@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadProfile, profileModels } from './agents/profiles.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // wargame-server/.env (vedi .env.example): le variabili già impostate nell'ambiente hanno la precedenza
@@ -38,23 +39,26 @@ export const factionModeDefault = (): FactionMode => (process.env.WARGAME_FACTIO
 /** Ruoli che in modalità `rules` non chiamano più l'LLM (le decisioni e la memoria delle fazioni le fa il motore). */
 export const RULES_FREE_ROLES = ['faction_major', 'faction_minor', 'reflection'] as const;
 
-export const AGENT_ROLES = ['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat'] as const;
+export const AGENT_ROLES = ['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat', 'strategist', 'chancery'] as const;
 type RoleCfg = { model: string; temperature: number; maxTokens: number; timeoutMs: number };
 
 /**
  * Modello per ruolo agente (alias/combo di OmniRoute), copiato nella campagna alla creazione.
- * LLM_MODEL = default per tutti; LLM_MODEL_<RUOLO> = override (es. LLM_MODEL_FACTION_MAJOR).
+ * LLM_MODEL = default per tutti; LLM_MODEL_<RUOLO> = override (es. LLM_MODEL_FACTION_MAJOR), che vince anche sul profilo.
  * Il ruolo diplomat (lettere) senza LLM_MODEL_DIPLOMAT usa il modello di faction_major.
+ * Con LLM_PROFILE (agents/profiles.ts) il modello di ogni ruolo è il primo del suo elenco nel profilo, al posto di LLM_MODEL.
  */
 export function llmDefaults(): Record<(typeof AGENT_ROLES)[number], RoleCfg> {
   const env = process.env;
   const num = (k: string, d: number) => (env[k] ? Number(env[k]) : d);
+  const profile = loadProfile(env);
+  const fromProfile = profile ? profileModels(profile) : null;
   return Object.fromEntries(AGENT_ROLES.map((r) => {
     const R = r.toUpperCase();
     return [r, {
-      model: env[`LLM_MODEL_${R}`] ?? (r === 'diplomat' ? env.LLM_MODEL_FACTION_MAJOR : undefined) ?? env.LLM_MODEL ?? 'default',
-      temperature: num(`LLM_TEMPERATURE_${R}`, r === 'gm_narrator' ? 0.7 : r === 'diplomat' ? 0.6 : r.startsWith('faction') ? 0.5 : 0.2),
-      maxTokens: num(`LLM_MAX_TOKENS_${R}`, r.startsWith('faction') ? 3000 : r === 'diplomat' ? 1200 : 2000),
+      model: env[`LLM_MODEL_${R}`] ?? (fromProfile ? fromProfile[r] : (r === 'diplomat' ? env.LLM_MODEL_FACTION_MAJOR : undefined) ?? env.LLM_MODEL) ?? 'default',
+      temperature: num(`LLM_TEMPERATURE_${R}`, r === 'gm_narrator' ? 0.7 : r === 'diplomat' || r === 'chancery' ? 0.6 : r === 'strategist' ? 0.4 : r.startsWith('faction') ? 0.5 : 0.2),
+      maxTokens: num(`LLM_MAX_TOKENS_${R}`, r.startsWith('faction') ? 3000 : r === 'diplomat' ? 1200 : r === 'strategist' ? 1000 : r === 'chancery' ? 1200 : 2000),
       timeoutMs: num('LLM_TIMEOUT_MS', 180_000),
     }];
   })) as Record<(typeof AGENT_ROLES)[number], RoleCfg>;

@@ -1,0 +1,36 @@
+{
+  "name": "omniroute",
+  "description": "OmniRoute con un solo LLM_BASE_URL e due combo: wargame-strong (Gemini Flash → Mistral → qwen locale) per lettere, narratore, direttive e potenze, wargame-light per il resto. Il ripiego lo fa la combo; rpm omesso = LLM_RPM, da impostare al limite più basso tra i provider della combo. Chiave (se serve) in LLM_API_KEY.",
+  "roles": {
+    "default": [
+      {
+        "baseUrl": "${LLM_BASE_URL:-http://localhost:20128/v1}",
+        "model": "wargame-light"
+      }
+    ],
+    "faction_major": [
+      {
+        "baseUrl": "${LLM_BASE_URL:-http://localhost:20128/v1}",
+        "model": "wargame-strong"
+      }
+    ],
+    "gm_narrator": [
+      {
+        "baseUrl": "${LLM_BASE_URL:-http://localhost:20128/v1}",
+        "model": "wargame-strong"
+      }
+    ],
+    "diplomat": [
+      {
+        "baseUrl": "${LLM_BASE_URL:-http://localhost:20128/v1}",
+        "model": "wargame-strong"
+      }
+    ],
+    "strategist": [
+      {
+        "baseUrl": "${LLM_BASE_URL:-http://localhost:20128/v1}",
+        "model": "wargame-strong"
+      }
+    ]
+  }
+}

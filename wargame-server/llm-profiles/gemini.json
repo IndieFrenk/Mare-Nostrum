@@ -1,0 +1,86 @@
+{
+  "name": "gemini",
+  "description": "Google AI Studio (endpoint OpenAI-compatibile): Flash per lettere, narratore e direttive, Flash-Lite per il resto; ognuno è il ripiego dell'altro su 429. Chiave in GEMINI_API_KEY (.env). Limiti del piano gratuito da verificare in AI Studio: LLM_RPD e gli rpm qui sotto vanno adattati.",
+  "roles": {
+    "default": [
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash-lite",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 15,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 10,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    ],
+    "gm_narrator": [
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 10,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash-lite",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 15,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    ],
+    "diplomat": [
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 10,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash-lite",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 15,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    ],
+    "strategist": [
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 10,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.5-flash-lite",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 15,
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "name": "locale",
+  "description": "Ollama sul PC di casa, come prima: qwen3.5 9B per le potenze, le lettere, il narratore e le direttive; 4B per il resto. Ragionamento spento, nessun limite di richieste.",
+  "roles": {
+    "default": [
+      {
+        "baseUrl": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
+        "model": "wg-qwen3.5-4b",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 0,
+        "rpd": 0
+      }
+    ],
+    "faction_major": [
+      {
+        "baseUrl": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
+        "model": "wg-qwen3.5-9b",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 0,
+        "rpd": 0
+      }
+    ],
+    "gm_narrator": [
+      {
+        "baseUrl": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
+        "model": "wg-qwen3.5-9b",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 0,
+        "rpd": 0
+      }
+    ],
+    "diplomat": [
+      {
+        "baseUrl": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
+        "model": "wg-qwen3.5-9b",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 0,
+        "rpd": 0
+      }
+    ],
+    "strategist": [
+      {
+        "baseUrl": "${OLLAMA_BASE_URL:-http://localhost:11434/v1}",
+        "model": "wg-qwen3.5-9b",
+        "extraBody": {
+          "reasoning_effort": "none"
+        },
+        "rpm": 0,
+        "rpd": 0
+      }
+    ]
+  }
+}

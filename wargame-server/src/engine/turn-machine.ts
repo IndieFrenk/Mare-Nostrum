@@ -73,8 +73,20 @@ export interface AgentsPort {
 }
 
 type LlmRoleConfig = NonNullable<Campaign['config']['llm']['diplomat']>;
-/** Configurazione LLM di un ruolo (diplomat assente nelle campagne vecchie → quella di faction_major). */
-export const roleConfig = (c: Campaign, role: AgentRole): LlmRoleConfig => c.config.llm[role] ?? c.config.llm.faction_major;
+/**
+ * Configurazione LLM di un ruolo. Nelle campagne create prima del ruolo (diplomat, strategist, chancery) vale quella di faction_major, con
+ * temperatura e tetto di token predefiniti del ruolo (e il suo modello se l'ambiente ne indica uno: LLM_MODEL_<RUOLO> o il profilo).
+ */
+export const roleConfig = (c: Campaign, role: AgentRole): LlmRoleConfig => {
+  const own = c.config.llm[role];
+  if (own) return own;
+  const base = c.config.llm.faction_major;
+  if (role === 'strategist' || role === 'chancery') {
+    const d = llmDefaults()[role];
+    return { ...base, temperature: d.temperature, maxTokens: d.maxTokens, ...(d.model !== 'default' ? { model: d.model } : {}) };
+  }
+  return base;
+};
 
 export class GameError extends Error { constructor(public code: string, message: string, public details?: unknown) { super(message); } }
 
