@@ -9,6 +9,15 @@
   "asOf": {
    "type": "string"
   },
+  "sourceLegend": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "string"
+   }
+  },
   "nations": {
    "type": "array",
    "items": {
@@ -227,6 +236,7 @@
  "required": [
   "schemaVersion",
   "asOf",
+  "sourceLegend",
   "nations"
  ]
 }

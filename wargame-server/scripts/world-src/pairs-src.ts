@@ -69,7 +69,7 @@ const P: [string, string, number, number, string][] = [
   ['USA', 'ISR', 55, 55, 'Alleanza speciale'],
   ['USA', 'GBR', 45, 45, 'Relazione speciale'],
   ['USA', 'CAN', 35, 30, 'Vicinato e commercio integrato'],
-  ['USA', 'AUS', 35, 35, 'ANZUS'],
+  ['USA', 'AUS', 35, 35, 'Trattato ANZUS'],
   ['USA', 'JPN', 35, 35, 'Trattato di sicurezza'],
   ['USA', 'KOR', 30, 30, 'Alleanza di difesa'],
   ['USA', 'PHL', 25, 25, 'Trattato di difesa reciproca'],

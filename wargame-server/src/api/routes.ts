@@ -5,6 +5,7 @@ import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody } from '../sch
 import { letterVisibleTo } from '../engine/knowledge.js';
 import { cmoText } from '../engine/cmo.js';
 import { listScenarios, loadScenario } from '../engine/scenario.js';
+import { worldData } from '../engine/world-data.js';
 import { factionModeOf, GameError, type Engine } from '../engine/turn-machine.js';
 import { LockError } from '../store/json-store.js';
 import { layer } from './layers.js';
@@ -63,6 +64,23 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
   });
 
   app.get(`${P}/scenarios`, async () => listScenarios());
+
+  /**
+   * Registro dei 197 Stati (dati pubblici dello scenario, niente nebbia): elenco compatto e scheda completa con le istituzioni
+   * e le coppie storiche. Sono dati statici (scenarios/_world), non stato di gioco.
+   */
+  app.get(`${P}/nations`, async () => worldData().summaries());
+  app.get<{ Params: { iso3: string } }>(`${P}/nations/:iso3`, async (req) => {
+    const w = worldData();
+    const n = w.nation(req.params.iso3.toUpperCase());
+    if (!n) throw new GameError('NOT_FOUND', `Stato sconosciuto: ${req.params.iso3}`);
+    const pairs = w.pairs.filter(([a, b]) => a === n.iso3 || b === n.iso3).map(([a, b, value, label]) => (a === n.iso3 ? { dir: 'out' as const, with: b, value, label } : { dir: 'in' as const, with: a, value, label }));
+    return {
+      ...n, sourceLegend: w.sourceLegend, asOf: w.asOf,
+      institutions: n.memberships.map((id) => w.institution(id)!).map((i) => ({ id: i.id, name: i.name, nameIt: i.nameIt, kind: i.kind, decision: i.decision, cohesion: i.cohesion, members: i.members.length })),
+      pairs,
+    };
+  });
   app.get(`${P}/campaigns`, async () => store.listCampaigns());
   app.post<{ Body: unknown }>(`${P}/campaigns`, async (req) => {
     const b = z.object({ scenarioId: z.string().default('med-2026'), name: z.string().min(1), seed: z.string().optional(), turnLength: z.enum(['week', 'month']).optional(), debugGodView: z.boolean().optional(), cmoOnRequest: z.boolean().optional() }).parse(req.body);
