@@ -3,7 +3,7 @@ import type { TurnCtx } from './context.js';
 import { evaluate } from './conditions.js';
 import { diploActs } from './opinion.js';
 
-const HOSTILE = /^(strike|sanzioni|BLOCKADE|EXCLUSION_ZONE|dimostrazione|scontro)/;
+const HOSTILE = /^(strike|sanzioni|BLOCKADE|EXCLUSION_ZONE|dimostrazione|scontro|ultimatum|embargo sulle armi|rottura delle relazioni)/;
 
 /** DEBRIEF: le minacce di due turni fa senza seguito ostile verso il bersaglio costano credibilità. */
 export function checkThreats(ctx: TurnCtx, past: GameEvent[]) {

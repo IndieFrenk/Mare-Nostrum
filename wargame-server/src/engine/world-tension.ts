@@ -46,6 +46,7 @@ export function updateWorldTension(ctx: TurnCtx, turnEvents: GameEvent[]) {
     { label: 'strike', n: count(/^strike su /), each: P.incident.strike },
     { label: 'blocchi navali', n: count(/^(BLOCKADE|EXCLUSION_ZONE) in /), each: P.incident.blockade },
     { label: 'minacce', n: count(/^(minaccia:|lettera \(threatening\))/), each: P.incident.threat },
+    { label: 'ultimatum scaduti', n: turnEvents.filter((e) => e.turn === ctx.turn && e.type === 'ULTIMATUM_EXPIRED').length, each: P.incident.ultimatum },
   ].filter((x) => x.n > 0);
   const boost = Math.min(P.maxIncidentBoost, incidents.reduce((a, x) => a + x.n * x.each, 0));
   const to = r1(clamp(from + toCrises + boost, 0, 100));
