@@ -38,12 +38,17 @@ export class ReplayAgents implements AgentsPort {
     return Promise.all(jobs.map(async (j) => {
       const n = used.get(j.factionId) ?? 0; used.set(j.factionId, n + 1);
       const d = await this.store.getDecision(this.sourceId, j.knowledge.turn, j.factionId);
-      const a = d?.orders.diplomacy.filter((x) => x.kind === 'LETTER')[n];
+      // gli Stati del mondo non hanno una decisione propria: le loro lettere stanno nel file del livello C
+      const w = d ? null : await this.store.getWorldDecision(this.sourceId, j.knowledge.turn);
+      const a = (d ? d.orders.diplomacy : (w?.actions ?? []).filter((x) => x.actor === j.factionId).map((x) => x.action)).filter((x) => x.kind === 'LETTER')[n];
       if (!a || a.kind !== 'LETTER') throw new Error(`lettera mancante ${j.factionId} → ${j.to} T${j.knowledge.turn}`);
-      const info = d!.letters.find((l) => l.actionId === a.id);
+      const info = (d ? d.letters : w!.letters).find((l) => l.actionId === a.id);
       return { subject: a.subject, body: a.body, tone: a.tone, source: info?.source ?? (a.model === 'template' ? 'template' : 'ai'), model: a.model ?? 'replay', errors: info?.errors ?? [] };
     }));
   }
+
+  /** Decisioni del livello C registrate: il motore le ricalcola (stesso dado) e controlla che siano identiche. */
+  recordedWorld(turn: number) { return this.store.getWorldDecision(this.sourceId, turn); }
 
   /** Decisione registrata: il motore ricalcola quelle a regole (stesso dado) e controlla che siano identiche a queste. */
   recordedDecision(turn: number, factionId: string) { return this.store.getDecision(this.sourceId, turn, factionId); }

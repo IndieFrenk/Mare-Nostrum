@@ -1,6 +1,6 @@
 import type { TurnCtx } from './context.js';
 import { weeklyRent } from './diplo-actions.js';
-import { weeksOfTurn } from './opinion.js';
+import { buildModifier, weeksOfTurn } from './opinion.js';
 import { PARAMS } from './params.js';
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -38,8 +38,14 @@ export function diplomaticTurn(ctx: TurnCtx) {
   }
   if (Object.keys(deltas).length) ctx.emit('CAPITAL_CHANGED', 'world', { deltas, rent: true, weeks }, { visibility: [] });
 
+  const batch: ReturnType<typeof buildModifier>[] = [];
   for (const i of [...(s.diplomacy?.improving ?? [])].sort((a, b) => `${a.actor}|${a.target}`.localeCompare(`${b.actor}|${b.target}`))) {
     if (i.since >= ctx.turn) continue; // appena avviata: il primo +2 e il primo CD sono già stati dati dall'azione
+    // gli Stati del mondo (senza fazione) non hanno un capitale: la loro agenda è a tetto, il miglioramento continua senza costo e in un lotto solo
+    if (!s.factions[i.actor]) {
+      batch.push(buildModifier(s, { kind: 'improve', label: PARAMS.opinion.modifiers.improve!.label, from: i.target, to: i.actor, value: P.improve.perTurn, turn: ctx.turn, act: `IM-${ctx.turn}`, causeRef: `E${ctx.turn}-improve`, visibility: 'public' }));
+      continue;
+    }
     if ((s.diplomacy?.capital[i.actor] ?? 0) < P.improve.costPerTurn) {
       ctx.emit('DIPLOMACY_CHANGED', i.actor, { change: { op: 'improve_stop', actor: i.actor, target: i.target }, reason: 'capitale diplomatico esaurito' }, { visibility: [i.actor], targets: [i.target] });
       continue;
@@ -47,6 +53,7 @@ export function diplomaticTurn(ctx: TurnCtx) {
     spendCapital(ctx, i.actor, P.improve.costPerTurn, `migliorare le relazioni con ${i.target}`);
     ctx.relate(i.actor, i.target, P.improve.perTurn, 0, `migliorare le relazioni con ${i.target}`, { propagate: false, detente: true });
   }
+  if (batch.length) ctx.emit('OPINION_MODIFIER', 'world', { modifiers: batch }, { visibility: 'public' });
 
   const d = s.diplomacy;
   if (!d) return;

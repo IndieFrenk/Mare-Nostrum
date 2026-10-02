@@ -1,7 +1,11 @@
-import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
+import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldDecision, WorldState, Directive } from '../schemas/index.js';
 import { isDeepStrictEqual } from 'node:util';
 import { AgentDecision as AgentDecisionSchema, FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
 import { leaderOf } from './diplomacy.js';
+import { opinionLookup, tensionOf } from './opinion.js';
+import { buildDigest, type WorldDigest } from './world-digest.js';
+import { stateProfile, worldAiTurn, type WorldAiOutput } from './world-ai.js';
+import { worldData } from './world-data.js';
 import { letterTriggers, type LetterTriggerKind } from './letter-triggers.js';
 import type { JsonStore } from '../store/json-store.js';
 import { adjudicate } from './adjudication.js';
@@ -24,22 +28,25 @@ import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
 import { finishParsed, type ParsedDirective } from './parse-review.js';
 import { AGENT_ROLES, cadenceDefaults, factionModeDefault, llmDefaults, type FactionMode } from '../config.js';
+import { PARAMS } from './params.js';
 import { doctrineDecision, rulesDecision } from '../agents/faction-agent.js';
 import { quickMemory, rulesMemory } from '../agents/reflection.js';
 import { incidentsFrom } from './knowledge.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
 /** Una lettera da scrivere (una chiamata al ruolo diplomat): il motore sceglie chi scrive a chi, l'LLM solo testo e tono. */
+/** Ciò che il ruolo diplomat sa del mittente: la Knowledge di una fazione o, per uno Stato del mondo, un estratto pubblico (niente file per Stato). */
+export type LetterKnowledge = Pick<FactionKnowledge, 'turn' | 'knownCrises' | 'knownAgreements' | 'beliefs' | 'letters'> & { ownFaction: { name: string } };
 export interface LetterJob {
   campaign: Campaign; factionId: string; to: string; kind: 'reply' | 'initiative' | 'draft';
-  knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string;
+  knowledge: LetterKnowledge; memory: AgentMemory | null; profile: string;
   fromTitle: string; toTitle: string; date: string;
   /** fiducia/tensione del mittente verso il destinatario (la sua riga della matrice) */
   relation: { trust: number; tension: number } | null;
   intent?: string; replyTo?: DiploLetter; gist?: string; tone?: LetterTone;
 }
 export interface LetterResult { subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
-export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario }
+export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario; /** direttiva strategica (§11), facoltativa: oggi sempre assente = nessun effetto */ directive?: Directive }
 /** Porta verso gli agenti: il motore non conosce LLM, solo questo contratto. */
 export interface AgentsPort {
   briefing(i: { campaign: Campaign; knowledge: FactionKnowledge; facts: Fact[] }): Promise<{ briefing: TurnNarrative['briefing']; reports: IntelReport[] }>;
@@ -55,6 +62,8 @@ export interface AgentsPort {
   drainLlmCalls(): LlmCall[];
   /** Solo in replay: la decisione registrata, per verificare che quella ricalcolata a regole sia identica. */
   recordedDecision?(turn: number, factionId: string): Promise<AgentDecision | null>;
+  /** Solo in replay: le decisioni registrate del livello C (IA mondiale) del turno. */
+  recordedWorld?(turn: number): Promise<WorldDecision | null>;
 }
 
 type LlmRoleConfig = NonNullable<Campaign['config']['llm']['diplomat']>;
@@ -148,6 +157,7 @@ export class Engine {
       const progress = (msg: Record<string, unknown>) => this.onProgress(id, { turn: ctx.turn, ...msg });
       for (;;) {
         progress({ phase: ctx.phase });
+        const phase = ctx.phase; const t0 = performance.now();
         switch (ctx.phase) {
           case 'CLOSED':
             ctx.phase = 'OPEN';
@@ -167,7 +177,7 @@ export class Engine {
           case 'ADJUDICATION': {
             await this.restoreContacts(ctx);
             const orders = (await Promise.all(Object.keys(ctx.state.factions).sort().map((f) => this.store.getOrders(id, ctx.turn, f)))).filter((o): o is FactionOrders => !!o);
-            const rejected = adjudicate(ctx, orders);
+            const rejected = adjudicate(ctx, orders, await this.store.getWorldDecision(id, ctx.turn));
             if (rejected.length) progress({ rejected });
             await this.store.appendLetters(id, ctx.turn, ctx.events.filter((e) => e.type === 'LETTER_SENT' && e.turn === ctx.turn).map((e) => (e.payload as { letter: DiploLetter }).letter));
             for (const e of Object.values(ctx.state.engagements).filter((e) => e.turn === ctx.turn && e.cmoPackage)) await this.store.saveCmo(id, ctx.turn, e.id, { package: e.cmoPackage });
@@ -179,6 +189,7 @@ export class Engine {
             ctx.phase = 'DEBRIEF'; break;
           case 'DEBRIEF': await this.debrief(ctx, c); ctx.phase = 'CLOSED'; break;
         }
+        await this.store.appendTimings(id, [{ turn: ctx.turn, phase, ms: Math.round(performance.now() - t0) }]);
         if (ctx.phase === 'CLOSED') {
           ctx.emit('TURN_CLOSED', 'world', { rngCursor: ctx.rng.cursor });
           await this.flush(ctx, c, true);
@@ -255,11 +266,66 @@ export class Engine {
     });
     const called = withAi.filter((i) => withLlm(i.factionId));
     const decisions = [...byRules, ...skipped, ...(called.length ? await this.agents.decideAll(called, (factionId, status) => progress({ agent: factionId, status })) : [])];
+    // IA mondiale (livello C, engine/world-ai.ts): dopo le fazioni, con lo stesso dado registrato; un digest pubblico e un solo file di decisioni per turno
+    const { digest, out: world } = await this.worldAi(ctx, c);
+    progress({ agent: 'MONDO', status: `IA mondiale: ${world.actions.length} azioni, ${world.reactions.length} reazioni` });
     await this.letters(ctx, c, decisions, inputs, progress);
+    const worldLetters = await this.worldLetters(ctx, c, world, progress);
     for (const d of decisions.sort((a, b) => a.factionId.localeCompare(b.factionId))) {
       await this.store.saveDecision(c.id, d);
       await this.store.saveOrders(c.id, d.orders);
     }
+    await this.store.saveWorldDecision(c.id, {
+      schemaVersion: 1, turn: ctx.turn, digest: { events: digest.events, votes: digest.votes },
+      actions: [...world.actions, ...worldLetters.actions], reactions: world.reactions, blockSanctions: world.blockSanctions, rationale: world.rationale,
+      letters: worldLetters.meta, stats: world.stats,
+    });
+  }
+
+  /** Il digest pubblico del turno precedente e le decisioni del livello C; in replay controlla che siano identiche a quelle registrate. */
+  private async worldAi(ctx: TurnCtx, c: Campaign): Promise<{ digest: WorldDigest; out: WorldAiOutput }> {
+    const prev = ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : [];
+    const digest = buildDigest(prev, ctx.turn - 1);
+    const playerLettersPrev = ctx.turn > 1 ? (await this.store.getLetters(c.id, ctx.turn - 1)).filter((l) => l.from === c.playerFaction) : [];
+    const out = worldAiTurn({ state: ctx.state, digest, player: c.playerFaction, rng: ctx.rng, playerLettersPrev });
+    const saved = await this.agents.recordedWorld?.(ctx.turn);
+    if (saved) {
+      const fp = (w: { actions: unknown[]; reactions: unknown; blockSanctions: unknown; rationale: unknown; stats: unknown }) => JSON.stringify({ a: (w.actions as { action: { kind: string } }[]).filter((x) => x.action.kind !== 'LETTER'), r: w.reactions, b: w.blockSanctions, t: w.rationale, s: w.stats });
+      if (fp(saved) !== fp(out)) throw new GameError('REPLAY_DIVERGENT', `decisioni dell'IA mondiale al turno ${ctx.turn} diverse da quelle registrate`);
+    }
+    return { digest, out };
+  }
+
+  /**
+   * Lettere degli Stati del mondo al giocatore (risposte a sue lettere e inneschi forti), al massimo `PARAMS.worldAi.letters.maxPerTurn` a turno:
+   * il motore sceglie chi scrive, il ruolo diplomat solo testo e tono (come per le fazioni). Diventano azioni LETTER dello Stato nel file del livello C.
+   */
+  private async worldLetters(ctx: TurnCtx, c: Campaign, world: WorldAiOutput, progress: (m: Record<string, unknown>) => void): Promise<{ actions: WorldDecision['actions']; meta: WorldDecision['letters'] }> {
+    const s = ctx.state; const player = c.playerFaction;
+    const picks = world.letterTriggers.slice(0, PARAMS.worldAi.letters.maxPerTurn);
+    if (!picks.length) return { actions: [], meta: [] };
+    const op = opinionLookup(s);
+    const recent = (ctx.turn > 1 ? await this.store.getLetters(c.id, ctx.turn - 1) : []);
+    const jobs = picks.map((p): LetterJob => {
+      const n = worldData().nation(p.iso)!;
+      const open = Object.values(s.crises).filter((x) => x.status !== 'resolved' && x.involved.includes(p.iso));
+      return {
+        campaign: c, factionId: p.iso, to: player, kind: p.kind,
+        knowledge: { turn: s.turn, ownFaction: { name: n.nameIt }, knownCrises: open, knownAgreements: Object.values(s.agreements).filter((a) => a.parties.includes(p.iso) && a.visibility === 'public'), beliefs: {}, letters: recent.filter((l) => l.from === p.iso || l.to === p.iso) },
+        memory: null, profile: stateProfile(n), fromTitle: leaderOf(s, p.iso).title, toTitle: leaderOf(s, player).title, date: s.date,
+        relation: { trust: op(p.iso, player), tension: Math.round(tensionOf(s, p.iso, player) * 10) / 10 },
+        gist: p.gist, tone: p.tone, ...(p.replyTo ? { replyTo: p.replyTo } : {}),
+      };
+    });
+    const results = await this.agents.writeLetters(jobs, (factionId, status) => progress({ agent: factionId, status }));
+    const actions: WorldDecision['actions'] = []; const meta: WorldDecision['letters'] = [];
+    picks.forEach((p, i) => {
+      const r = results[i]!;
+      const action: LetterAction = { id: `${p.iso}-${ctx.turn}-L${i + 1}`, kind: 'LETTER', target: player, subject: r.subject, body: r.body, tone: r.tone, visibility: 'private', ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), model: r.model };
+      actions.push({ actor: p.iso, action });
+      meta.push({ actionId: action.id, actor: p.iso, to: player, kind: p.kind, ...(p.trigger ? { trigger: p.trigger } : {}), ...(p.replyTo ? { inReplyTo: p.replyTo.id } : {}), source: r.source, model: r.model, errors: r.errors });
+    });
+    return { actions, meta };
   }
 
   private letterJob(c: Campaign, s: WorldState, i: { factionId: string; knowledge: FactionKnowledge; memory: AgentMemory | null; profile: string }, to: string, kind: LetterJob['kind'], extra: Partial<LetterJob> = {}): LetterJob {

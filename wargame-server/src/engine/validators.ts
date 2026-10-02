@@ -86,7 +86,7 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
     for (const t of new Set(targetsOf(d))) {
       if (!isActor(s, t)) errors.push(`${d.id}: destinatario ${t} sconosciuto (non è una fazione)`);
       else if (t === factionId && d.kind !== 'LETTER' && d.kind !== 'MEDIATE' && !(d.kind === 'PROPOSE_AGREEMENT' && !d.target.includes(factionId))) errors.push(`${d.id}: ${d.kind} non può essere rivolto alla propria fazione`);
-      else if (!s.factions[t] && ['LETTER', 'ENERGY_DEAL', 'AID'].includes(d.kind)) errors.push(`${d.id}: ${d.kind} si rivolge solo a una fazione (${t} è uno Stato senza fazione)`);
+      else if (!s.factions[t] && ['ENERGY_DEAL', 'AID'].includes(d.kind)) errors.push(`${d.id}: ${d.kind} si rivolge solo a una fazione (${t} è uno Stato senza fazione)`);
     }
     // catalogo (§7): ricarica, rapporti, prerequisiti e capitale diplomatico (somma dei costi della bozza)
     for (const e of checkAction(s, factionId, d)) errors.push(`${d.id}: ${e}`);

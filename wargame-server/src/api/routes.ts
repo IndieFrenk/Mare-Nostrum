@@ -188,12 +188,14 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
     bus.on(req.params.id, send);
     req.raw.on('close', () => bus.off(req.params.id, send));
   });
+  /** tempo di ogni fase del motore (ms), per misurare i turni */
+  app.get<Id>(`${P}/campaigns/:id/timings`, async (req) => store.getTimings(req.params.id));
   app.get<Id & { Querystring: { turn?: string; faction?: string } }>(`${P}/campaigns/:id/postmortem`, async (req) => {
     const c = await godAllowed(req.params.id);
     const t = Number(req.query.turn ?? c.currentTurn);
     const factions = req.query.faction ? [req.query.faction] : Object.keys((await store.getState(c.id)).factions);
     const decisions = (await Promise.all(factions.map((f) => store.getDecision(c.id, t, f)))).filter(Boolean);
     const tree = (await store.listCampaigns()).filter((x) => x.id === c.id || x.parent?.campaignId === c.id || c.parent?.campaignId === x.id);
-    return { turn: t, decisions, rolls: await store.getRolls(c.id, t), events: await store.getEvents(c.id, t), state: await store.getState(c.id, t).catch(() => store.getState(c.id)), branches: tree };
+    return { turn: t, decisions, world: await store.getWorldDecision(c.id, t), rolls: await store.getRolls(c.id, t), events: await store.getEvents(c.id, t), state: await store.getState(c.id, t).catch(() => store.getState(c.id)), branches: tree };
   });
 }

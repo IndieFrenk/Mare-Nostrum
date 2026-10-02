@@ -6,6 +6,7 @@ import { DIPLO_CATALOG, actionCost, cooldownsAfter, legacyForumOf } from './dipl
 import { spendCapital } from './diplo-turn.js';
 import { resolveResolution } from './institutions.js';
 import { PARAMS } from './params.js';
+import { worldData } from './world-data.js';
 
 function message(ctx: TurnCtx, from: string, to: string, text: string, channel: 'official' | 'backchannel', actionRef: string) {
   if (!ctx.state.factions[to]) return; // gli Stati del mondo non hanno una casella di posta: rispondono con acceptance() o con la loro agenda
@@ -39,7 +40,9 @@ export function salutation(title: string): string {
 /** Carica e città di una fazione per intestazione e firma (mai nomi di persona). */
 export function leaderOf(s: WorldState, f: string) {
   const x = s.factions[f];
-  return { title: x?.leaderTitle || `Il Capo di Stato (${x?.name ?? f})`, capital: x?.capital || x?.name || f };
+  // gli Stati del mondo (senza fazione) hanno la carica e la capitale dal registro
+  const n = x ? undefined : worldData().nation(f);
+  return { title: x?.leaderTitle || n?.leaderTitle || `Il Capo di Stato (${x?.name ?? n?.nameIt ?? f})`, capital: x?.capital || n?.capital || x?.name || f };
 }
 
 /** La lettera come viene archiviata: intestazioni dal mondo, fonte dall'ordine. */
@@ -67,6 +70,8 @@ function resolveLetter(ctx: TurnCtx, actor: string, a: LetterAction) {
 /** «Trattato attivo» (+10, permanente finché l'accordo è in vigore): ogni parte verso il proponente e il proponente verso ognuna. */
 function treatyModifiers(ctx: TurnCtx, ag: Agreement) {
   const [proposer, ...others] = ag.parties;
+  // tra due Stati del mondo (nessuna fazione) il trattato è nel registro degli accordi ma non pesa sull'opinione: lo stato resterebbe a crescere di centinaia di modificatori
+  if (!ctx.state.factions[proposer!] && !others.some((o) => ctx.state.factions[o])) return;
   const def = PARAMS.opinion.modifiers.treaty!;
   for (const o of others.slice(0, 8)) {
     if (!proposer || o === proposer) continue;
@@ -97,7 +102,8 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
   const cause = { causedBy: { orderId: a.id } };
   // costo in CD e ricarica: valgono per ogni azione del catalogo (il validatore ha già controllato che il capitale basti)
   spendCapital(ctx, actor, actionCost(s, actor, a), DIPLO_CATALOG[a.kind].label, a.id);
-  const cds = cooldownsAfter(s, actor, a);
+  // (gli Stati del mondo non hanno ricariche: agiscono a turni sfalsati e un trattato non si ripropone mentre c'è)
+  const cds = s.factions[actor] ? cooldownsAfter(s, actor, a) : {};
   if (Object.keys(cds).length) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'cooldown', keys: cds } }, { visibility: [actor], ...cause });
   switch (a.kind) {
     case 'LETTER': resolveLetter(ctx, actor, a); break;
@@ -166,8 +172,10 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       const agreement: Agreement = { ...base, status };
       ctx.emit('AGREEMENT_CHANGED', actor, { agreement, ...(verdicts.length ? { acceptance: verdicts } : {}) }, { targets: a.target, visibility: agreement.visibility === 'public' ? 'public' : agreement.parties, ...cause });
       for (const t of factionsToAsk) message(ctx, actor, t, `Proposta di accordo ${agreement.type}: ${agreement.terms} [${agreement.id}]`, agreement.visibility === 'public' ? 'official' : 'backchannel', a.id);
+      // tra due Stati del mondo (nessuna fazione) la risposta non pesa sull'opinione: nessuno la osserva e lo stato crescerebbe di centinaia di modificatori
+      const observed = !!s.factions[actor] || verdicts.some((v) => !!s.factions[v.target]) || factionsToAsk.length > 0;
       for (const v of verdicts) {
-        ctx.relate(v.target, actor, v.accept ? 8 : -4, v.accept ? -5 : 2, `risposta ad accordo ${agreement.id}: ${v.accept ? 'accept' : 'reject'}`, { propagate: false, detente: v.accept });
+        if (observed) ctx.relate(v.target, actor, v.accept ? 8 : -4, v.accept ? -5 : 2, `risposta ad accordo ${agreement.id}: ${v.accept ? 'accept' : 'reject'}`, { propagate: false, detente: v.accept });
         if (!v.accept) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'cooldown', keys: { [rejKey(actor, v.target, agreement.type)]: ctx.turn + PARAMS.acceptance.rejectedTurns } } }, { visibility: [actor, v.target], ...cause });
       }
       if (status === 'active') { treatyModifiers(ctx, agreement); deescalateByAgreement(ctx, agreement); }

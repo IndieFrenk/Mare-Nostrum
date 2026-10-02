@@ -35,7 +35,7 @@ export const DIPLO_CATALOG: Record<DiploKind, ActionSpec> = {
   THREAT: { label: 'Minaccia', cost: 3, cooldown: 2, coercive: true, targets: 'actor', effects: 'opinione −6, tensione +10, alleati del destinatario 30%; minaccia da verificare (credibilità)' },
   REASSURANCE: { label: 'Rassicurazione', cost: 1, cooldown: 1, targets: 'actor', effects: 'opinione +3, tensione −5; raffredda le crisi comuni' },
   BACKCHANNEL: { label: 'Canale riservato', cost: 1, cooldown: 1, targets: 'actor', effects: 'opinione +2, tensione −2, riservato; raffredda le crisi comuni' },
-  LETTER: { label: 'Lettera', cost: 1, cooldown: 0, targets: 'faction', effects: 'dal tono: da +3 (conciliante) a −5 (minacciosa); una minacciosa è una minaccia da verificare' },
+  LETTER: { label: 'Lettera', cost: 1, cooldown: 0, targets: 'actor', effects: 'dal tono: da +3 (conciliante) a −5 (minacciosa); una minacciosa è una minaccia da verificare' },
   IMPROVE_RELATIONS: { label: 'Migliorare le relazioni', cost: 1, cooldown: 0, targets: 'actor', effects: 'continuativa: 1 CD a turno, +2 a turno all\'opinione del destinatario fino a +30; occupa uno slot (2–4 secondo la potenza)' },
   STOP_IMPROVE: { label: 'Smettere di migliorare le relazioni', cost: 0, cooldown: 0, targets: 'actor', effects: 'libera lo slot; il vantaggio accumulato decade di 0,5 a settimana' },
   PROPOSE_AGREEMENT: { label: 'Proposta di trattato', cost: (a) => (a.kind === 'PROPOSE_AGREEMENT' ? AGREEMENT_COST[a.agreement.type] ?? 3 : 3), cooldown: 2, targets: 'actor', effects: 'gli Stati del mondo rispondono subito con acceptance(), le fazioni nel turno dopo; le accettate danno «Trattato attivo» +10' },

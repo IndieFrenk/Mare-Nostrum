@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { LETTER_LIMITS, LetterTone, type AgentMemory, type FactionKnowledge, type LlmCall } from '../schemas/index.js';
-import { roleConfig, type LetterJob, type LetterResult } from '../engine/turn-machine.js';
+import { LETTER_LIMITS, LetterTone, type AgentMemory, type LlmCall } from '../schemas/index.js';
+import { roleConfig, type LetterJob, type LetterKnowledge, type LetterResult } from '../engine/turn-machine.js';
 import type { LlmProvider } from './llm-client.js';
 import { template } from './prompts.js';
 import { callStructured, numbersNotInFacts } from './repair.js';
@@ -23,7 +23,7 @@ export function italianDate(iso: string) {
 }
 
 /** Situazione compatta del mittente (solo la sua Knowledge): è anche l'elenco dei numeri che la lettera può citare. */
-export function letterSituation(k: FactionKnowledge, to: string) {
+export function letterSituation(k: LetterKnowledge, to: string) {
   return JSON.stringify({
     crisi: k.knownCrises.map((c) => ({ titolo: c.title, escalation: c.escalation, attori: c.involved })),
     accordiCon: k.knownAgreements.filter((a) => a.parties.includes(to)).map((a) => ({ tipo: a.type, stato: a.status, termini: a.terms })),

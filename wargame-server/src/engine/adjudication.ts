@@ -1,8 +1,9 @@
-import type { FactionOrders, Order, WorldState } from '../schemas/index.js';
+import type { FactionOrders, Order, WorldDecision, WorldState } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { detectInteractions, openEngagement } from './combat.js';
 import { checkRedLines } from './crises.js';
 import { resolveDiplomacy, resolveStatement, violateTreaties } from './diplomacy.js';
+import { applyWorldDecision } from './world-apply.js';
 import { legitimacyCost } from './legitimacy.js';
 import { moveUnit, returnToBase } from './movement.js';
 import { PARAMS } from './params.js';
@@ -12,7 +13,7 @@ import { validateOrders } from './validators.js';
 const ACTIONS = new Set(['STRIKE', 'SOF_OP', 'CYBER_OP']);
 
 /** Esecuzione simultanea: diplomazia → acquisti → movimenti → azioni → interazioni → linee rosse. */
-export function adjudicate(ctx: TurnCtx, all: FactionOrders[]) {
+export function adjudicate(ctx: TurnCtx, all: FactionOrders[], world: WorldDecision | null = null) {
   const orders = [...all].sort((a, b) => a.factionId.localeCompare(b.factionId));
   const rejected: { factionId: string; id: string; errors: string[] }[] = [];
   const ok = (o: FactionOrders, body: Partial<FactionOrders>, id: string) => {
@@ -25,6 +26,8 @@ export function adjudicate(ctx: TurnCtx, all: FactionOrders[]) {
     for (const d of o.diplomacy) if (ok(o, { diplomacy: [d] }, d.id)) resolveDiplomacy(ctx, o.factionId, d);
     for (const st of o.statements) resolveStatement(ctx, o.factionId, st);
   }
+  // IA mondiale (livello C): reazioni, sanzioni di blocco e agenda lenta degli Stati senza fazione, dopo le fazioni
+  if (world) rejected.push(...applyWorldDecision(ctx, world));
   for (const o of orders) {
     const seen = new Map<string, number>();
     for (const p of o.procurement) if (ok(o, { procurement: [p] }, p.id)) { const n = seen.get(p.itemId) ?? 0; placeOrder(ctx, o.factionId, p, n); seen.set(p.itemId, n + 1); }

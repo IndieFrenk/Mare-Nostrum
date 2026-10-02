@@ -3,7 +3,10 @@ import { acceptance } from './acceptance.js';
 import { DIPLO_CATALOG, actionCost, improveSlots, weeklyRent } from './diplo-actions.js';
 import { diploActs, opinionBand, opinionOf, tensionOf } from './opinion.js';
 import { hashString } from './rng.js';
+import { worldData } from './world-data.js';
 
+/** tipi di accordo che una fazione conosce anche se non ne è parte (sicurezza: cambiano gli equilibri); i commerciali, migratori ed energetici altrui no */
+const SECURITY_TYPES = new Set<string>(['defense', 'ceasefire', 'non_aggression', 'guarantee', 'defense_cooperation', 'military_access', 'basing', 'arms_sale', 'intel_sharing']);
 const INTENT = ['guerra aperta', 'confronto armato limitato', 'coercizione', 'competizione', 'cooperazione'];
 
 /** Rimuove ogni riferimento alla verità di terra prima che il contatto lasci il motore. */
@@ -76,13 +79,17 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
     beliefs,
     knownCrises: Object.values(s.crises).filter((c) => c.status !== 'latent' || c.involved.includes(factionId))
       .map((c) => ({ ...c, escalation: Math.round(c.escalation), history: c.history.slice(-3) })),
-    knownAgreements: Object.values(s.agreements).filter((a) => a.visibility === 'public' || a.visibility.includes(factionId) || a.parties.includes(factionId)),
+    // gli accordi propri e quelli riservati a lei; dei pubblici solo quelli di sicurezza con almeno una fazione tra le parti (centinaia di accordi
+    // commerciali tra Stati del mondo sono rumore: appesantirebbero ogni Knowledge a ogni turno)
+    knownAgreements: Object.values(s.agreements).filter((a) => a.parties.includes(factionId) || (a.visibility !== 'public' && a.visibility.includes(factionId))
+      || (a.visibility === 'public' && SECURITY_TYPES.has(a.type) && a.parties.some((p) => !!s.factions[p]))),
     inbox: extra.inbox.filter((m) => m.to === factionId),
     publicNews: extra.news,
     letters: (extra.letters ?? []).filter((l) => letterVisibleTo(l, factionId) && l.turn >= s.turn - 3),
     incidents: incidentsFrom(extra.prevEvents ?? [], factionId),
     ownRelations: ownRelations(s, factionId),
     diplomacy: ownDiplomacy(s, factionId),
+    world: worldView(extra.prevEvents ?? [], factionId),
   };
 }
 
@@ -119,4 +126,24 @@ export function ownDiplomacy(s: WorldState, f: string): NonNullable<FactionKnowl
     proposals: Object.values(s.agreements).filter((a) => a.status === 'proposed' && a.parties.includes(f) && a.parties[0] !== f).sort((a, b) => a.id.localeCompare(b.id))
       .map((a) => ({ agreementId: a.id, from: a.parties[0]!, type: a.type, ...(({ score, accept, reasons }) => ({ score, accept, reasons }))(acceptance(s, f, { type: a.type, parties: a.parties }, a.parties[0]!)) })),
   };
+}
+
+/**
+ * Le reazioni del mondo che riguardano la fazione (come attore o vittima di un atto grave) e le votazioni in cui è proponente o bersaglio, dagli
+ * eventi pubblici del turno precedente (`INTERNATIONAL_REACTIONS`, `INSTITUTION_VOTE`). Mai quelle che non la riguardano.
+ */
+export function worldView(events: GameEvent[], f: string): NonNullable<FactionKnowledge['world']> {
+  const pop = (iso: string) => worldData().nation(iso)?.population ?? 0;
+  const top = (l: string[]) => [...l].sort((a, b) => pop(b) - pop(a) || a.localeCompare(b)).slice(0, 5);
+  const reactions: NonNullable<FactionKnowledge['world']>['reactions'] = [];
+  const votes: NonNullable<FactionKnowledge['world']>['votes'] = [];
+  for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+    if (e.visibility !== 'public') continue;
+    const p = e.payload as Record<string, any>;
+    if (e.type === 'INTERNATIONAL_REACTIONS' && p.kind !== 'block_sanctions' && (p.actor === f || p.victim === f))
+      reactions.push({ turn: e.turn, eventId: String(p.eventRef), kind: String(p.kind), actor: p.actor, victim: p.victim, condemn: p.condemn.length, support: p.support.length, silent: p.silent.length, topCondemners: top(p.condemn), topSupporters: top(p.support) });
+    if (e.type === 'INSTITUTION_VOTE' && (p.proposer === f || p.target === f))
+      votes.push({ turn: e.turn, forum: String(p.forum), subject: String(p.subject ?? '').slice(0, 120), proposer: p.proposer, ...(p.target ? { target: p.target } : {}), passed: !!p.passed, yes: p.yes.length, no: p.no.length, abstain: p.abstain.length });
+  }
+  return { reactions, votes };
 }
