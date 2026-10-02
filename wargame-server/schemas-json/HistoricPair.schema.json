@@ -1,0 +1,26 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "array",
+ "prefixItems": [
+  {
+   "type": "string",
+   "pattern": "^[A-Z]{3}$"
+  },
+  {
+   "type": "string",
+   "pattern": "^[A-Z]{3}$"
+  },
+  {
+   "type": "number",
+   "minimum": -100,
+   "maximum": 100
+  },
+  {
+   "type": "string",
+   "minLength": 3
+  }
+ ],
+ "items": false,
+ "minItems": 4,
+ "maxItems": 4
+}

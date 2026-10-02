@@ -1,0 +1,124 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "schemaVersion": {
+   "type": "number",
+   "const": 1
+  },
+  "asOf": {
+   "type": "string"
+  },
+  "institutions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "minLength": 2
+     },
+     "name": {
+      "type": "string"
+     },
+     "nameIt": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "alliance",
+       "union",
+       "regional",
+       "economic",
+       "security",
+       "un"
+      ]
+     },
+     "members": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      }
+     },
+     "observers": {
+      "default": [],
+      "type": "array",
+      "items": {
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      }
+     },
+     "leaders": {
+      "default": [],
+      "type": "array",
+      "items": {
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      }
+     },
+     "decision": {
+      "type": "string",
+      "enum": [
+       "consensus",
+       "unanimity",
+       "majority",
+       "qmv",
+       "unsc"
+      ]
+     },
+     "cohesion": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     },
+     "effects": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "enum": [
+        "collective_defense",
+        "common_sanctions",
+        "single_market",
+        "veto_members",
+        "non_binding",
+        "energy_quotas",
+        "joint_command"
+       ]
+      }
+     },
+     "terms": {
+      "type": "object",
+      "propertyNames": {
+       "type": "string",
+       "pattern": "^[A-Z]{3}$"
+      },
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "notes": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "nameIt",
+     "kind",
+     "members",
+     "decision",
+     "cohesion",
+     "effects"
+    ]
+   }
+  }
+ },
+ "required": [
+  "schemaVersion",
+  "asOf",
+  "institutions"
+ ]
+}
