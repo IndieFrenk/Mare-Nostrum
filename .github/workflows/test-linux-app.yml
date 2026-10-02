@@ -26,6 +26,8 @@ env:
 
 jobs:
   test-linux-app:
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: github.repository == 'koala73/worldmonitor'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:

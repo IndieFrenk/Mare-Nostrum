@@ -47,6 +47,8 @@ jobs:
         run: npm test
 
   deploy:
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: github.repository == 'koala73/worldmonitor'
     name: Wrangler deploy
     needs: unit-test
     runs-on: ubuntu-latest

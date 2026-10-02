@@ -102,7 +102,7 @@ describe('Railway reconcile control deployment workflow', () => {
     });
     assert.equal(workflow.jobs.deploy.environment.name, 'railway-reconcile-control-production');
     assert.equal(workflow.jobs.deploy.environment.deployment, false);
-    assert.equal(workflow.jobs.deploy.if, "github.ref == 'refs/heads/main'");
+    assert.equal(workflow.jobs.deploy.if, "${{ github.repository == 'koala73/worldmonitor' && (github.ref == 'refs/heads/main') }}");
     for (const jobName of ['unit-test', 'deploy']) {
       assert.equal(workflow.jobs[jobName]['timeout-minutes'], 15);
       const checkout = workflow.jobs[jobName].steps.find((step) => step.uses?.startsWith('actions/checkout@'));

@@ -16,6 +16,8 @@ permissions:
 
 jobs:
   audit:
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: github.repository == 'koala73/worldmonitor'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
