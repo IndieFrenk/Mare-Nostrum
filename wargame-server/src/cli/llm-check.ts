@@ -7,8 +7,8 @@ import { extractJson, OpenAiCompatProvider, RateLimitError, type LlmProvider } f
 import { loadProfile, profileRouting, roleChain } from '../agents/profiles.js';
 
 const Probe = z.object({ ok: z.boolean(), fazione: z.string() });
-const cfg = llmDefaults();
-const profile = loadProfile();
+let cfg: ReturnType<typeof llmDefaults>; let profile: ReturnType<typeof loadProfile>;
+try { cfg = llmDefaults(); profile = loadProfile(); } catch (e) { console.error(`✗ ${(e as Error).message}`); process.exit(1); }
 
 /** Modelli elencati da {base}/models: `names` null se il server risponde ma non li elenca, `ok` falso se non risponde. */
 async function listed(base: string, key: string | undefined): Promise<{ ok: boolean; names: string[] | null }> {

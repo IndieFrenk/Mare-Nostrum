@@ -16,12 +16,12 @@ const Out = z.object({ statements: z.array(z.object({ iso: z.string(), position:
 const SCHEMA = z.toJSONSchema(z.object({ statements: z.array(z.object({ iso: z.string().max(3), position: z.enum(['condemn', 'support', 'silence']), text: z.string().max(260) })).max(PARAMS.chancery.maxStates) }), { io: 'input' }) as Record<string, unknown>;
 
 /** Prompt e fatti ammessi (uguali nel gioco e nel banco dei modelli). */
-export function chanceryPrompt(job: Pick<ChanceryJob, 'event' | 'states' | 'actorName' | 'victimName'>) {
+export function chanceryPrompt(job: Pick<ChanceryJob, 'event' | 'states' | 'actorName' | 'victimName' | 'turn'> & { campaign: { date: string } }) {
   const e = job.event;
   return {
     system: template('chancery', {}),
     user: template('chancery-user', {
-      kind: e.kind, actor: job.actorName, victim: job.victimName, zone: e.zoneId ? ` (zona ${e.zoneId})` : '', text: e.text,
+      kind: e.kind, turn: String(job.turn), date: job.campaign.date, actor: job.actorName, victim: job.victimName, zone: e.zoneId ? ` (zona ${e.zoneId})` : '', text: e.text,
       states: job.states.map((s) => `${s.iso} · ${s.name} · ${s.position}${s.role.length ? ` · ${s.role.slice(0, 3).join(', ')}` : ''}`).join('\n'),
     }),
     facts: [e.text, e.id],
