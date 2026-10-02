@@ -20,8 +20,8 @@ WARGAME_MOCK=1 npm run wargame:all    # server :8787 + frontend su http://localh
 ## Comandi dell'interfaccia
 - **Clic su una pedina**: seleziona (pila: apre l'elenco). **Maiusc+clic**: selezione multipla.
 - **Tasto destro su una zona di mare** con unità selezionate: ordine di pattugliamento (tratteggio oro sulla mappa).
-- **Clic su un paese**: scheda con fiducia/tensione, stime e azioni diplomatiche rapide.
-- In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi) e globo/mappa piana. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
+- **Clic su un paese**: per le fazioni, scheda con fiducia/tensione, stime e azioni diplomatiche rapide; per **tutti gli altri Stati del registro** (197 in tutto) scheda in sola lettura con i dati del paese (vedi «Dati del mondo»). Dipendenze e Antartide non rispondono.
+- In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi, **allineamento**) e globo/mappa piana. *Allineamento* colora ogni Stato per polo prevalente (blu Occidente, oro Cina, rosso Russia, grigio non allineato), più intenso = più allineato. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
 
 ## Con modelli reali (OmniRoute)
 Gli agenti parlano con un solo endpoint OpenAI-compatible (OmniRoute); per ogni ruolo scegli un modello, un alias o una combo di OmniRoute.
@@ -101,6 +101,16 @@ Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), l
 - **Registro e replay**: le lettere sono in `letters/turn-N.jsonl`; quelle delle fazioni IA sono azioni `LETTER` nei loro ordini e decisioni, e il replay le rilegge senza LLM.
 - API: `GET /api/wg/campaigns/:id/letters?turn=` (lettere visibili al giocatore) · `POST /api/wg/campaigns/:id/letters/draft {target, gist, tone, inReplyTo?}` (bozza; non cambia lo stato).
 
+## Dati del mondo: 197 Stati
+Il registro di tutti gli Stati (193 ONU + Santa Sede, Palestina, Taiwan e Kosovo) sta in `wargame-server/scenarios/_world/`, comune a tutti gli scenari (piano in `docs/wargame/DIPLOMAZIA.md`). Sono **dati statici**: non entrano nel `WorldState` né negli snapshot, e a runtime il gioco non usa la rete.
+- `nations.json`: capitale, **carica** del capo di Stato (mai un nome di persona), governo, democrazia 0–10, popolazione, PIL, spesa militare, militari, nucleare, `alignment` (Occidente, Cina, Russia; il resto è non allineato), `unIdealPoint` (−1 ordine liberale occidentale … +1 blocco Cina/Russia, solo i votanti all'Assemblea), energia, primi 5 partner commerciali, appartenenze, `factionId` (DZA ↔ ALG, LBY ↔ LBY_GNU; LBY_LNA non ha ISO3) e, per ogni campo stimato, fonte (`sources`) e affidabilità (`confidence`). Kosovo usa il codice XKX.
+- `institutions.json`: 32 istituzioni (NATO, UE, ONU Assemblea generale e Consiglio di sicurezza 2026 con i 15 membri, UA, Lega Araba, CCG, ASEAN, SCO, BRICS, CSTO, OPEC+, OSA, Commonwealth, G7, G20, Consiglio d'Europa, OSCE, OIC, UfM, EMGF…) con regola di decisione, coesione ed effetti.
+- `pairs.json`: coppie con una storia nota. **Direzionali** (`[a, b, valore, etichetta]` = opinione di base di `a` verso `b`): le simmetriche compaiono nei due sensi, le asimmetrie con valori diversi.
+- **Valori stimati**: in questa versione tutti i numeri sono stime a mano di ordine di grandezza (2024) con `confidence` < 0,7; la legenda dei codici di fonte è nell'intestazione di `nations.json`. Il punto ideale ONU e l'allineamento sono giudizi ragionati, non misure.
+- **Rigenerare**: `npm --prefix wargame-server run world:build` (sorgenti leggibili in `wargame-server/scripts/world-src/`: un file per continente, `institutions-src.ts`, `pairs-src.ts`). Con rete aggiorna popolazione e PIL dalla Banca Mondiale (fonte `WB:indicatore:anno`, `confidence` 0,9); `-- --offline` non interroga nulla; `-- --check` confronta con i file nel repo (il test `world-data` fa lo stesso). SIPRI (file Excel) e Wikidata non vengono letti: capitali e appartenenze sono già nelle sorgenti. Se la rete passa da un proxy, Node 24 lo usa con `NODE_USE_ENV_PROXY=1`.
+- **Codice**: `engine/world-data.ts` carica e valida i tre file una volta all'avvio (`nation(iso3)`, `actorOf(iso3)`, `isoOf(factionId)`, `membersOf(id)`, `pairValue(a, b)`); API pubbliche `GET /api/wg/nations` (elenco compatto) e `GET /api/wg/nations/:iso3` (scheda con istituzioni e coppie storiche). Lo schema è in `schemas/nations.ts`.
+- **Mappa**: `scripts/geo-iso-overrides.json` completa gli ISO3 di `countries.geojson` (una ventina di Stati avevano il campo vuoto); `geo:build` lo applica. Resta senza poligono solo Tuvalu; i territori non Stato (Groenlandia, Porto Rico, Antartide…) restano grigi e non cliccabili.
+
 ## Comandi
 | Comando | Cosa fa |
 |---|---|
@@ -108,6 +118,7 @@ Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), l
 | `npm run dev:wargame` | frontend su `/wargame.html` |
 | `npm run build:wargame` | build statica in `dist-wargame/` |
 | `npm --prefix wargame-server run geo:build` | rigenera zone marittime e confini da `geo-src.json` |
+| `npm --prefix wargame-server run world:build` | rigenera i 197 Stati, le istituzioni e le coppie storiche (`-- --offline`, `-- --check`) |
 | `npm run wargame:sim -- --turns 5 --mock [--mode rules\|llm]` | simulazione headless (predefinita la modalità di `WARGAME_FACTION_MODE`) |
 | `npm run wargame:sim -- --replay <id>` | replay da `decisions/` e verifica di determinismo |
 | `npm --prefix wargame-server test` | test del motore, agenti, API |
