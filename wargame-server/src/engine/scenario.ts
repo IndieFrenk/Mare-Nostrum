@@ -23,7 +23,11 @@ export interface Scenario {
   /** alias italiani di zone e fazioni (names.json, facoltativo) per riconoscere i nomi nelle direttive del giocatore */
   names: ScenarioNames;
 }
-export interface ScenarioNames { zones: Record<string, string[]>; factions: Record<string, string[]>; /** alias delle unità per id (le proprie, per chi scrive) */ units: Record<string, string[]> }
+export interface ScenarioNames {
+  zones: Record<string, string[]>; factions: Record<string, string[]>; /** alias delle unità per id (le proprie, per chi scrive) */ units: Record<string, string[]>;
+  /** frasi che nominano un'azione diplomatica (tipo → frasi) e alias delle sedi delle risoluzioni (sede → alias): per la Console Ordini */
+  actions: Record<string, string[]>; forums: Record<string, string[]>;
+}
 
 const cache = new Map<string, Scenario>();
 const readJson = (f: string) => JSON.parse(readFileSync(f, 'utf8'));
@@ -87,7 +91,7 @@ export function loadScenario(id: string): Scenario {
   const profiles = Object.fromEntries(readdirSync(path.join(dir, 'factions')).map((f) => [f.replace(/\.md$/, ''), readFileSync(path.join(dir, 'factions', f), 'utf8')]));
   const geo = Object.fromEntries(readdirSync(path.join(dir, 'geo')).map((f) => [f.replace(/\.geojson$/, ''), readJson(path.join(dir, 'geo', f))]));
   const namesFile = path.join(dir, 'names.json');
-  const names: ScenarioNames = existsSync(namesFile) ? (({ zones = {}, factions = {}, units = {} }) => ({ zones, factions, units }))(readJson(namesFile)) : { zones: {}, factions: {}, units: {} };
+  const names: ScenarioNames = existsSync(namesFile) ? (({ zones = {}, factions = {}, units = {}, actions = {}, forums = {} }) => ({ zones, factions, units, actions, forums }))(readJson(namesFile)) : { zones: {}, factions: {}, units: {}, actions: {}, forums: {} };
   const sc: Scenario = { id, name: meta.name, startDate: meta.startDate, turnLength: meta.turnLength, catalog, world, events: readJson(path.join(dir, 'event-tables.json')).default, profiles, geo, names };
   cache.set(id, sc);
   return structuredClone(sc);

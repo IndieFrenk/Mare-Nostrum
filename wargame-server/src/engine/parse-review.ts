@@ -1,4 +1,5 @@
-import type { FactionKnowledge, Order, OrdersBody, Stance, Unit, WorldState, Zone, ZoneStance } from '../schemas/index.js';
+import type { DiploAction, FactionKnowledge, Order, OrdersBody, Stance, Unit, WorldState, Zone, ZoneStance } from '../schemas/index.js';
+import { DIPLO_CATALOG, actionCost, cooldownUntil } from './diplo-actions.js';
 import { buildLexicon, recognize, type NameHit } from './names.js';
 import { PARAMS } from './params.js';
 import { hashString } from './rng.js';
@@ -53,6 +54,8 @@ export function finishParsed(i: FinishInput): ParsedDraft {
   for (const o of done.orders) orders.military.push({ ...o, id: id() });
   const cyber = completeCyber({ text: i.text, recognized, orders, state: s, factionId });
   for (const o of cyber.orders) orders.military.push({ ...o, id: id() });
+  const diplo = completeDiplomacy({ text: i.text, recognized, orders, state: s, factionId, names: i.scenario.names });
+  for (const o of diplo.orders) orders.diplomacy.push({ ...o, id: id() });
   const v = validateOrders(s, i.scenario.catalog, factionId, orders, refs, i.turnLength);
   // rientri dei logorati e riparazioni dei danneggiati: il motore li aggiunge comunque, non impiegano le unità nominate
   const auto = new Set(stanceOrders.filter((x) => x.stance === 'worn').map((x) => x.orderId));
@@ -60,8 +63,8 @@ export function finishParsed(i: FinishInput): ParsedDraft {
   return {
     orders, zoneStances: i.parsed.zoneStances, recognized, stanceOrders,
     // avvisi, non errori: la bozza resta modificabile; gli errori veri (es. destinatario che non è una fazione) li dà il validatore
-    validation: { ...v, risks: [...review.risks, ...v.risks] },
-    ambiguities: [...i.parsed.ambiguities, ...uninvited, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...cyber.notes, ...review.ambiguities],
+    validation: { ...v, risks: [...review.risks, ...capitalWarnings(s, factionId, orders), ...v.risks] },
+    ambiguities: [...i.parsed.ambiguities, ...uninvited, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...cyber.notes, ...diplo.notes, ...review.ambiguities],
   };
 }
 
@@ -147,6 +150,60 @@ export function completeCyber(i: { text: string; recognized: NameHit[]; orders: 
   const effect = CYBER_EFFECT.find(([re]) => re.test(text))?.[1] ?? 'espionage';
   const order: Order = { id: '', kind: 'CYBER_OP', target, targetRef: effect === 'defense_hardening' ? 'reti nazionali' : 'reti governative', effect };
   return { orders: [order], notes: [`Ordine completato dal motore: CYBER_OP (${effect}) contro ${i.state.factions[target]?.name ?? target} (${target}) (il modello non ha dato l'operazione cyber chiesta): controlla che sia quello che volevi.`] };
+}
+
+/**
+ * Completamento deterministico delle azioni diplomatiche nuove (catalogo `engine/diplo-actions.ts`): il testo contiene una frase che le
+ * nomina (`names.json`: «richiama l'ambasciatore», «ultimatum», «migliora i rapporti con», «porta all'ONU»…), la bozza non ha l'azione e
+ * il testo nomina una sola fazione straniera (o, per le risoluzioni, una sede) → l'azione. Le frasi più lunghe prima («revoca l'embargo
+ * sulle armi» prima di «embargo sulle armi»). Validata e controllata (CD, ricarica) come le altre.
+ */
+export function completeDiplomacy(i: { text: string; recognized: NameHit[]; orders: OrdersBody; state: WorldState; factionId: string; names: Scenario['names'] }): { orders: DiploAction[]; notes: string[] } {
+  const text = plain(i.text);
+  const out: DiploAction[] = []; const notes: string[] = [];
+  if (NEGATION.test(text)) return { orders: out, notes };
+  const targets = [...new Set(i.recognized.filter((h) => h.kind === 'faction' && h.id !== i.factionId && i.state.factions[h.id]?.kind !== 'bloc').map((h) => h.id))];
+  const has = (kind: string) => i.orders.diplomacy.some((d) => d.kind === kind);
+  const hit = (kind: string) => (i.names.actions[kind] ?? []).some((p) => text.includes(plain(p)));
+  const said: string[] = [];
+  for (const kind of Object.keys(i.names.actions).sort((a, b) => Math.max(...(i.names.actions[b] ?? ['']).map((x) => x.length)) - Math.max(...(i.names.actions[a] ?? ['']).map((x) => x.length)))) {
+    if (!hit(kind) || has(kind) || said.some((k) => k.includes(kind) || kind.includes(k))) continue;
+    // la frase più specifica vince: «revoca l'embargo sulle armi» non è anche «embargo sulle armi»
+    if (kind === 'ARMS_EMBARGO' && hit('LIFT_ARMS_EMBARGO')) continue;
+    if (kind === 'IMPROVE_RELATIONS' && hit('STOP_IMPROVE')) continue;
+    if (kind === 'RESOLUTION') {
+      const forum = Object.entries(i.names.forums).map(([f, aliases]) => ({ f, at: Math.min(...aliases.map((a) => { const j = text.indexOf(plain(a)); return j < 0 ? Infinity : j; })) })).filter((x) => x.at < Infinity).sort((a, b) => a.at - b.at)[0]?.f;
+      if (!forum || !(['UNSC', 'UNGA', 'EU_COUNCIL', 'NATO', 'ARAB_LEAGUE', 'AU'] as string[]).includes(forum)) continue;
+      out.push({ id: '', kind: 'RESOLUTION', forum: forum as 'UNSC', subject: i.text.trim().slice(0, 100), topic: 'other', ...(targets.length === 1 ? { target: targets[0]! } : {}) });
+      said.push(kind); notes.push(`Ordine completato dal motore: RESOLUTION in ${forum}${targets.length === 1 ? ` contro ${targets[0]}` : ''} (il modello non l'ha data): controlla sede e tema.`);
+      continue;
+    }
+    if (targets.length !== 1) continue;
+    const target = targets[0]!;
+    if (kind === 'ULTIMATUM') {
+      const turns = Math.max(1, Math.min(4, Number(/entro (\d)\s*(?:turn|settiman)/.exec(text)?.[1] ?? 2)));
+      out.push({ id: '', kind: 'ULTIMATUM', target, demand: i.text.trim().slice(0, 100), deadlineTurns: turns });
+    } else if (['IMPROVE_RELATIONS', 'STOP_IMPROVE', 'RECALL_AMBASSADOR', 'EXPEL_DIPLOMATS', 'BREAK_RELATIONS', 'RESTORE_RELATIONS', 'ARMS_EMBARGO', 'LIFT_ARMS_EMBARGO'].includes(kind)) out.push({ id: '', kind: kind as 'IMPROVE_RELATIONS', target });
+    else continue;
+    said.push(kind); notes.push(`Ordine completato dal motore: ${kind} verso ${target} (il modello non l'ha data): controlla che sia quello che volevi.`);
+  }
+  return { orders: out, notes };
+}
+
+/** Avvisi sul capitale diplomatico della bozza: costo totale in CD e ricariche (gli errori veri li dà il validatore). */
+export function capitalWarnings(s: WorldState, me: string, orders: OrdersBody): string[] {
+  const cds = orders.diplomacy.map((d) => ({ d, cost: actionCost(s, me, d) })).filter((x) => x.cost > 0);
+  if (!cds.length) return [];
+  const have = s.diplomacy?.capital[me] ?? 0;
+  const total = Math.round(cds.reduce((n, x) => n + x.cost, 0) * 10) / 10;
+  const out: string[] = [];
+  if (total > have + 1e-9) out.push(`⚠ Capitale diplomatico: la bozza costa ${total} CD ma ne hai ${Math.round(have * 10) / 10}: le ultime azioni saranno rifiutate. Togli qualcosa o aspetta il turno dopo.`);
+  else if (total > have * 0.75) out.push(`⚠ Capitale diplomatico: la bozza costa ${total} CD su ${Math.round(have * 10) / 10} disponibili.`);
+  for (const { d } of cds) {
+    const until = cooldownUntil(s, me, d);
+    if (until > s.turn) out.push(`⚠ ${DIPLO_CATALOG[d.kind].label} (${d.id}) è in ricarica fino al turno ${until}: sarà rifiutata.`);
+  }
+  return out;
 }
 
 export interface ReviewInput {

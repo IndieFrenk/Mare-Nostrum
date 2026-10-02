@@ -67,6 +67,12 @@ function faction(m: M) {
   const others = legal.factions as string[];
   const target = others[h % Math.max(1, others.length)];
   const diplomacy: M[] = target ? [{ id: 'd1', kind: h % 3 === 0 ? 'DEMARCHE' : 'REASSURANCE', target, message: 'Richiamo alla moderazione nelle aree di crisi.', visibility: 'public' }] : [];
+  // azioni del catalogo (settore 09), con il capitale che hanno: migliorare le relazioni ogni tanto, una risoluzione umanitaria all'AG più di rado
+  const costs = (legal.costiDiplomatici ?? {}) as Record<string, number>;
+  let cd = Number(legal.capitaleDiplomatico ?? 0) - (diplomacy.length ? 1 : 0);
+  const partner = others[(h >> 2) % Math.max(1, others.length)];
+  if (partner && partner !== target && h % 5 === 1 && Number(legal.slotMiglioramento ?? 0) > 0 && cd >= (costs.IMPROVE_RELATIONS ?? 1)) { diplomacy.push({ id: 'd2', kind: 'IMPROVE_RELATIONS', target: partner }); cd -= costs.IMPROVE_RELATIONS ?? 1; }
+  if (h % 11 === 3 && cd >= (costs.RESOLUTION ?? 5)) diplomacy.push({ id: 'd3', kind: 'RESOLUTION', forum: 'UNGA', subject: 'Appello alla moderazione e al rispetto del diritto marittimo', topic: 'maritime' });
   for (const ag of legal.pendingAgreements as string[]) diplomacy.push({ id: `r-${ag}`, kind: 'RESPOND_AGREEMENT', agreementId: ag, response: h % 2 ? 'accept' : 'reject' });
   const lot = (legal.procurement as M[]).find((i) => i.id.startsWith('LOT_'));
   const procurement = lot && legal.ownBases.length && legal.budgetMEur > 300 && h % 3 === 1 ? [{ id: 'p1', itemId: lot.id, qty: 1, destinationBaseId: legal.ownBases[0] }] : [];
@@ -110,6 +116,11 @@ function parser(m: M) {
   // una postura nella zona (il motore mette per prime le unità nominate), e per il rientro alla base niente (JSON troncato:
   // completa il motore). Senza unità nominate: postura se il testo chiede forze in una zona.
   if (zone && stance !== 'withdraw' && (units.length || /presenza|pattugl|dimostr|scort/.test(text))) zoneStances.push({ zoneId: zone, stance, intensity: !units.length && /più|rafforz/.test(text) ? 2 : 1 });
+  // azioni nuove del catalogo: il mock ne dà alcune (le altre le completa il motore, come per il cyber)
+  const target1 = factions.length === 1 ? factions[0] : undefined;
+  if (target1 && /richiam\w* l'ambasciatore/.test(text)) diplomacy.push({ id: 'd-recall', kind: 'RECALL_AMBASSADOR', target: target1 });
+  if (target1 && /ultimatum/.test(text)) diplomacy.push({ id: 'd-ult', kind: 'ULTIMATUM', target: target1, demand: 'Ritirare le forze dalla zona contestata', deadlineTurns: Number(/entro (\d)/.exec(text)?.[1] ?? 2) });
+  if (target1 && /migliora\w* (i rapporti|le relazioni)/.test(text)) diplomacy.push({ id: 'd-imp', kind: 'IMPROVE_RELATIONS', target: target1 });
   const dkind = /rassicur/.test(text) ? 'REASSURANCE' : /minacc/.test(text) ? 'THREAT' : /chied|sollecit|protest/.test(text) ? 'DEMARCHE' : null;
   if (dkind) for (const f of factions) diplomacy.push({ id: `d-${f}`, kind: dkind, target: f, message: 'Richiesta formale del Governo italiano.', visibility: 'public' });
   // aiuti: le frasi diplomatiche i modelli locali le sbagliano di rado; per il cyber nessuna CYBER_OP (la completa il motore)

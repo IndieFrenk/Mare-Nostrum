@@ -1,68 +1,367 @@
 {
-  "_nota": "Alias italiani di zone, fazioni e unità per la Console Ordini (riconoscimento deterministico dei nomi prima dell'LLM). Gli alias di più id non si sostituiscono nel testo. Gli alias delle unità valgono per le unità proprie della fazione che scrive.",
+  "_nota": "Alias italiani di zone, fazioni e unità per la Console Ordini (riconoscimento deterministico dei nomi prima dell'LLM). Gli alias di più id non si sostituiscono nel testo. Gli alias delle unità valgono per le unità proprie della fazione che scrive. `actions`: frasi che nominano un'azione diplomatica (la Console completa la bozza se il modello la dimentica); `forums`: alias delle sedi delle risoluzioni.",
   "zones": {
-    "TIRRENO": ["Mar Tirreno", "Tirreno"],
-    "ADRIATICO": ["Mar Adriatico", "Adriatico"],
-    "IONIO": ["Mar Ionio", "Ionio"],
-    "CANALE_SICILIA": ["Canale di Sicilia", "Stretto di Sicilia", "Canale siciliano"],
-    "MAR_LIBICO": ["Mar Libico", "acque libiche", "Golfo della Sirte", "Golfo di Sirte"],
-    "LIBIA_TERRA": ["entroterra libico", "Libia (entroterra)"],
-    "MED_OCCIDENTALE": ["Mediterraneo occidentale", "Mar di Sardegna", "Baleari"],
-    "EGEO": ["Mar Egeo", "Egeo"],
-    "MEDITERRANEO_ORIENTALE": ["Mediterraneo orientale", "Levante", "acque di Cipro"],
-    "MAR_ROSSO": ["Mar Rosso", "Bab el-Mandeb", "Bab el Mandeb"],
-    "MAR_NERO": ["Mar Nero"],
-    "GOLFO": ["Golfo Persico", "Hormuz", "Stretto di Hormuz"],
-    "SAHEL": ["Sahel"]
+    "TIRRENO": [
+      "Mar Tirreno",
+      "Tirreno"
+    ],
+    "ADRIATICO": [
+      "Mar Adriatico",
+      "Adriatico"
+    ],
+    "IONIO": [
+      "Mar Ionio",
+      "Ionio"
+    ],
+    "CANALE_SICILIA": [
+      "Canale di Sicilia",
+      "Stretto di Sicilia",
+      "Canale siciliano"
+    ],
+    "MAR_LIBICO": [
+      "Mar Libico",
+      "acque libiche",
+      "Golfo della Sirte",
+      "Golfo di Sirte"
+    ],
+    "LIBIA_TERRA": [
+      "entroterra libico",
+      "Libia (entroterra)"
+    ],
+    "MED_OCCIDENTALE": [
+      "Mediterraneo occidentale",
+      "Mar di Sardegna",
+      "Baleari"
+    ],
+    "EGEO": [
+      "Mar Egeo",
+      "Egeo"
+    ],
+    "MEDITERRANEO_ORIENTALE": [
+      "Mediterraneo orientale",
+      "Levante",
+      "acque di Cipro"
+    ],
+    "MAR_ROSSO": [
+      "Mar Rosso",
+      "Bab el-Mandeb",
+      "Bab el Mandeb"
+    ],
+    "MAR_NERO": [
+      "Mar Nero"
+    ],
+    "GOLFO": [
+      "Golfo Persico",
+      "Hormuz",
+      "Stretto di Hormuz"
+    ],
+    "SAHEL": [
+      "Sahel"
+    ]
   },
   "factions": {
-    "ITA": ["Italia"],
-    "USA": ["Stati Uniti", "USA", "America", "Washington", "americani"],
-    "FRA": ["Francia", "Parigi", "francesi"],
-    "TUR": ["Turchia", "Ankara", "turchi"],
-    "RUS": ["Russia", "Mosca", "russi"],
-    "CHN": ["Cina", "Pechino", "cinesi"],
-    "GBR": ["Regno Unito", "Gran Bretagna", "Londra", "britannici", "inglesi"],
-    "GRC": ["Grecia", "Atene", "greci"],
-    "EGY": ["Egitto", "Cairo", "egiziani"],
-    "ISR": ["Israele", "israeliani"],
-    "ALG": ["Algeria", "Algeri", "algerini"],
-    "TUN": ["Tunisia", "Tunisi", "tunisini"],
-    "LBY_GNU": ["Libia", "libici", "Tripoli", "GNU", "governo di Tripoli", "Libia occidentale", "Tripolitania"],
-    "LBY_LNA": ["Libia", "libici", "Haftar", "LNA", "Bengasi", "Cirenaica", "Libia orientale"],
-    "IRN": ["Iran", "Teheran", "iraniani"],
-    "ESP": ["Spagna", "Madrid", "spagnoli"],
-    "MAR": ["Marocco", "Rabat", "marocchini"],
-    "MLT": ["Malta", "La Valletta", "maltesi"],
-    "CYP": ["Cipro", "Nicosia", "ciprioti"],
-    "LBN": ["Libano", "Beirut", "libanesi"],
-    "SYR": ["Siria", "Damasco", "siriani"],
-    "JOR": ["Giordania", "Amman", "giordani"],
-    "SAU": ["Arabia Saudita", "Riad", "Riyad", "sauditi"],
-    "ARE": ["Emirati Arabi Uniti", "Emirati", "EAU", "Abu Dhabi", "emiratini"],
-    "QAT": ["Qatar", "Doha", "qatarini"],
-    "DEU": ["Germania", "Berlino", "tedeschi"],
-    "NATO": ["NATO", "Alleanza Atlantica"],
-    "EU": ["UE", "Unione Europea", "Bruxelles"]
+    "ITA": [
+      "Italia"
+    ],
+    "USA": [
+      "Stati Uniti",
+      "USA",
+      "America",
+      "Washington",
+      "americani"
+    ],
+    "FRA": [
+      "Francia",
+      "Parigi",
+      "francesi"
+    ],
+    "TUR": [
+      "Turchia",
+      "Ankara",
+      "turchi"
+    ],
+    "RUS": [
+      "Russia",
+      "Mosca",
+      "russi"
+    ],
+    "CHN": [
+      "Cina",
+      "Pechino",
+      "cinesi"
+    ],
+    "GBR": [
+      "Regno Unito",
+      "Gran Bretagna",
+      "Londra",
+      "britannici",
+      "inglesi"
+    ],
+    "GRC": [
+      "Grecia",
+      "Atene",
+      "greci"
+    ],
+    "EGY": [
+      "Egitto",
+      "Cairo",
+      "egiziani"
+    ],
+    "ISR": [
+      "Israele",
+      "israeliani"
+    ],
+    "ALG": [
+      "Algeria",
+      "Algeri",
+      "algerini"
+    ],
+    "TUN": [
+      "Tunisia",
+      "Tunisi",
+      "tunisini"
+    ],
+    "LBY_GNU": [
+      "Libia",
+      "libici",
+      "Tripoli",
+      "GNU",
+      "governo di Tripoli",
+      "Libia occidentale",
+      "Tripolitania"
+    ],
+    "LBY_LNA": [
+      "Libia",
+      "libici",
+      "Haftar",
+      "LNA",
+      "Bengasi",
+      "Cirenaica",
+      "Libia orientale"
+    ],
+    "IRN": [
+      "Iran",
+      "Teheran",
+      "iraniani"
+    ],
+    "ESP": [
+      "Spagna",
+      "Madrid",
+      "spagnoli"
+    ],
+    "MAR": [
+      "Marocco",
+      "Rabat",
+      "marocchini"
+    ],
+    "MLT": [
+      "Malta",
+      "La Valletta",
+      "maltesi"
+    ],
+    "CYP": [
+      "Cipro",
+      "Nicosia",
+      "ciprioti"
+    ],
+    "LBN": [
+      "Libano",
+      "Beirut",
+      "libanesi"
+    ],
+    "SYR": [
+      "Siria",
+      "Damasco",
+      "siriani"
+    ],
+    "JOR": [
+      "Giordania",
+      "Amman",
+      "giordani"
+    ],
+    "SAU": [
+      "Arabia Saudita",
+      "Riad",
+      "Riyad",
+      "sauditi"
+    ],
+    "ARE": [
+      "Emirati Arabi Uniti",
+      "Emirati",
+      "EAU",
+      "Abu Dhabi",
+      "emiratini"
+    ],
+    "QAT": [
+      "Qatar",
+      "Doha",
+      "qatarini"
+    ],
+    "DEU": [
+      "Germania",
+      "Berlino",
+      "tedeschi"
+    ],
+    "NATO": [
+      "NATO",
+      "Alleanza Atlantica"
+    ],
+    "EU": [
+      "UE",
+      "Unione Europea",
+      "Bruxelles"
+    ]
   },
   "units": {
-    "ESP-L61": ["Juan Carlos I", "L61"],
-    "ESP-F101": ["Álvaro de Bazán", "Alvaro de Bazan", "F101"],
-    "ESP-S81": ["Isaac Peral", "S81"],
-    "ESP-ALA11": ["Ala 11", "Eurofighter spagnoli"],
-    "MAR-FREMM": ["Mohammed VI", "FREMM marocchina"],
-    "MAR-SIGMA": ["Tarik Ben Ziyad"],
-    "MAR-F16": ["F-16 marocchini"],
-    "MLT-P61": ["P61", "pattugliatore maltese"],
-    "MLT-P62": ["P62"],
-    "SAU-F3000S1": ["Al Riyadh"],
-    "SAU-F3000S2": ["Makkah"],
-    "SAU-TYPHOON": ["Typhoon sauditi"],
-    "ARE-BAYNUNAH": ["Baynunah", "corvetta emiratina"],
-    "ARE-F16": ["F-16 emiratini", "Desert Falcon"],
-    "QAT-ZUBARAH": ["Al Zubarah", "corvetta qatarina"],
-    "QAT-RAFALE": ["Rafale qatarini"],
-    "DEU-K130": ["Ludwigshafen am Rhein", "Ludwigshafen", "F264"],
-    "DEU-F125": ["Sachsen-Anhalt", "F224"]
+    "ESP-L61": [
+      "Juan Carlos I",
+      "L61"
+    ],
+    "ESP-F101": [
+      "Álvaro de Bazán",
+      "Alvaro de Bazan",
+      "F101"
+    ],
+    "ESP-S81": [
+      "Isaac Peral",
+      "S81"
+    ],
+    "ESP-ALA11": [
+      "Ala 11",
+      "Eurofighter spagnoli"
+    ],
+    "MAR-FREMM": [
+      "Mohammed VI",
+      "FREMM marocchina"
+    ],
+    "MAR-SIGMA": [
+      "Tarik Ben Ziyad"
+    ],
+    "MAR-F16": [
+      "F-16 marocchini"
+    ],
+    "MLT-P61": [
+      "P61",
+      "pattugliatore maltese"
+    ],
+    "MLT-P62": [
+      "P62"
+    ],
+    "SAU-F3000S1": [
+      "Al Riyadh"
+    ],
+    "SAU-F3000S2": [
+      "Makkah"
+    ],
+    "SAU-TYPHOON": [
+      "Typhoon sauditi"
+    ],
+    "ARE-BAYNUNAH": [
+      "Baynunah",
+      "corvetta emiratina"
+    ],
+    "ARE-F16": [
+      "F-16 emiratini",
+      "Desert Falcon"
+    ],
+    "QAT-ZUBARAH": [
+      "Al Zubarah",
+      "corvetta qatarina"
+    ],
+    "QAT-RAFALE": [
+      "Rafale qatarini"
+    ],
+    "DEU-K130": [
+      "Ludwigshafen am Rhein",
+      "Ludwigshafen",
+      "F264"
+    ],
+    "DEU-F125": [
+      "Sachsen-Anhalt",
+      "F224"
+    ]
+  },
+  "actions": {
+    "RECALL_AMBASSADOR": [
+      "richiama l'ambasciatore",
+      "richiamare l'ambasciatore",
+      "richiamo dell'ambasciatore",
+      "ritira l'ambasciatore"
+    ],
+    "EXPEL_DIPLOMATS": [
+      "espelli i diplomatici",
+      "espellere i diplomatici",
+      "espulsione dei diplomatici"
+    ],
+    "BREAK_RELATIONS": [
+      "rompi le relazioni",
+      "rompere le relazioni",
+      "rottura delle relazioni",
+      "interrompi le relazioni diplomatiche"
+    ],
+    "RESTORE_RELATIONS": [
+      "ripristina le relazioni",
+      "ripristinare le relazioni",
+      "riapri le relazioni"
+    ],
+    "LIFT_ARMS_EMBARGO": [
+      "revoca l'embargo sulle armi",
+      "togli l'embargo sulle armi",
+      "revocare l'embargo sulle armi"
+    ],
+    "ARMS_EMBARGO": [
+      "embargo sulle armi",
+      "embargo di armi",
+      "embargo sulle forniture di armi"
+    ],
+    "ULTIMATUM": [
+      "ultimatum"
+    ],
+    "STOP_IMPROVE": [
+      "smetti di migliorare i rapporti",
+      "interrompi il miglioramento dei rapporti"
+    ],
+    "IMPROVE_RELATIONS": [
+      "migliora i rapporti con",
+      "migliora le relazioni con",
+      "migliorare i rapporti con",
+      "migliorare le relazioni con",
+      "migliora i rapporti",
+      "migliora le relazioni"
+    ],
+    "RESOLUTION": [
+      "porta all'onu",
+      "porta alle nazioni unite",
+      "porta all'assemblea generale",
+      "porta al consiglio di sicurezza",
+      "portiamo all'onu",
+      "presenta una risoluzione",
+      "proponi una risoluzione"
+    ]
+  },
+  "forums": {
+    "UNSC": [
+      "consiglio di sicurezza",
+      "cds"
+    ],
+    "UNGA": [
+      "assemblea generale",
+      "onu",
+      "nazioni unite"
+    ],
+    "EU_COUNCIL": [
+      "consiglio europeo",
+      "consiglio ue"
+    ],
+    "NATO": [
+      "nato",
+      "articolo 4"
+    ],
+    "ARAB_LEAGUE": [
+      "lega araba"
+    ],
+    "AU": [
+      "unione africana"
+    ]
   }
 }

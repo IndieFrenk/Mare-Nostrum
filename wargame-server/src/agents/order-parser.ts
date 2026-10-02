@@ -24,7 +24,7 @@ const ITEMS: Record<string, number> = { ...PARSER_CAPS, unitIds: 5, assetIds: 2,
  */
 export const PARSER_LENGTHS: Record<string, number> = {
   message: 160, ambiguities: 150, terms: 120, counterTerms: 120, text: 160, subject: 100, objective: 100, scope: 80,
-  audience: 60, targetRef: 40, protect: 40, id: 12, ids: 24,
+  audience: 60, targetRef: 40, protect: 40, demand: 100, id: 12, ids: 24,
 };
 /** chiavi per le munizioni di uno STRIKE (record) */
 const MAX_PROPERTIES = 3;

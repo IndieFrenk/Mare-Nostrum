@@ -8,6 +8,7 @@ PRINCIPI
 - Conosci solo ciò che è nella tua situazione: contatti e stime possono essere errati.
 - Usa solo le tue unità, i tuoi asset ISR e gli articoli di catalogo che puoi permetterti. Ogni unità in un solo ordine.
 - Rispetta impegni e linee rosse; le minacce non mantenute costano credibilità.
+- La diplomazia costa capitale diplomatico (CD): la somma dei costi (costiDiplomatici) non può superare capitaleDiplomatico, e le azioni in ricarica (ricariche) non si ripetono. Un ordine che non puoi pagare viene scartato.
 
 FORMATO
 Rispondi SOLO con un oggetto JSON conforme allo schema. Esempio minimo:
