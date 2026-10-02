@@ -268,6 +268,11 @@ export const PARAMS = {
     agreementTypes: ['trade', 'non_aggression', 'defense_cooperation', 'military_access', 'guarantee', 'intel_sharing', 'ceasefire'] as readonly string[],
     contextTokens: 1200, charsPerToken: 3.4, opinionRows: 10, incidentTurns: 2,
   },
+  /**
+   * Cancellerie (§11, engine/chancery.ts): per ogni atto grave con una reazione, UNA chiamata scrive le frasi di 6–8 Stati; il motore sceglie gli Stati
+   * (membri del CdS, vicini, alleati delle parti) e la posizione di ciascuno. Al massimo `maxCalls` atti a turno (i più gravi); frasi di al massimo `maxWords` parole.
+   */
+  chancery: { minStates: 6, maxStates: 8, maxCalls: 4, maxWords: 30, weights: { unsc: 4, permanent: 1, neighbour: 3, ally: 3, trade: 1, population: 0.3 } },
   /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
   letterTriggers: { tensionJump: 10 },
   /** Console Ordini (engine/parse-review.ts): fiducia da cui una fazione conta come alleata negli avvisi sulle azioni ostili */

@@ -34,6 +34,7 @@ function generate(role: string, m: M): unknown {
     case 'reflection': return reflection(m);
     case 'diplomat': return letter(m);
     case 'strategist': return strategist(m);
+    case 'chancery': return chancery(m);
     default: return {};
   }
 }
@@ -173,5 +174,19 @@ function strategist(m: M) {
     seekAgreements: best && best.opinion > 0 && h % 3 === 1 ? [{ type: 'trade', with: best.x }] : [],
     avoid: [],
     rationale: `Linea per i prossimi turni: ${worst && worst.opinion < 0 ? 'fermezza con i rivali' : 'distensione'} e rapporti più stretti con i partner.`,
+  };
+}
+
+/** Frasi delle cancellerie dal contesto: una per Stato dell'elenco, con la posizione data dal motore, senza cifre né nomi di persone. */
+function chancery(m: M) {
+  const noun: Record<string, string> = { strike: "l'attacco", engagement: 'lo scontro armato', blockade: 'il blocco navale', ultimatum: "l'ultimatum", sanction: 'le sanzioni', multilateral_sanction: 'le sanzioni multilaterali', break: 'la rottura delle relazioni', embargo: "l'embargo sulle armi", cyber: "l'attacco cyber", covert: "l'operazione clandestina" };
+  const n = noun[String(m.event.kind)] ?? "l'accaduto";
+  return {
+    statements: (m.states as M[]).map((s) => ({
+      iso: s.iso, position: s.position,
+      text: s.position === 'condemn' ? `${s.name} deplora ${n} di ${m.actorName} ai danni di ${m.victimName} e chiede il rispetto del diritto internazionale.`
+        : s.position === 'support' ? `${s.name} sostiene la posizione di ${m.actorName} dopo ${n} e chiede moderazione a tutte le parti.`
+        : `${s.name} osserva con cautela gli sviluppi dopo ${n} e invita al dialogo.`,
+    })),
   };
 }

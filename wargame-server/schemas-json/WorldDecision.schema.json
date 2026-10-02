@@ -873,6 +873,81 @@
     ]
    }
   },
+  "statements": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "eventId": {
+      "type": "string"
+     },
+     "iso": {
+      "type": "string"
+     },
+     "position": {
+      "type": "string",
+      "enum": [
+       "condemn",
+       "support",
+       "silence"
+      ]
+     },
+     "text": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "ai",
+       "template"
+      ]
+     }
+    },
+    "required": [
+     "eventId",
+     "iso",
+     "position",
+     "text",
+     "source"
+    ]
+   }
+  },
+  "chancery": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "eventId": {
+      "type": "string"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "ai",
+       "template",
+       "mixed"
+      ]
+     },
+     "model": {
+      "type": "string"
+     },
+     "errors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "required": [
+     "eventId",
+     "source",
+     "model",
+     "errors"
+    ]
+   }
+  },
   "stats": {
    "type": "object",
    "properties": {

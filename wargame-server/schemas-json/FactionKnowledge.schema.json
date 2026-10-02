@@ -1005,6 +1005,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "kind": {
+      "type": "string",
+      "const": "chancery"
      }
     },
     "required": [

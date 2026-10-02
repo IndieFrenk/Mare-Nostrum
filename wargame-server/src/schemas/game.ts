@@ -72,7 +72,9 @@ export const DiploLetter = z.object({
   /** human = scritta (o rivista) dal giocatore; ai = scritta da un LLM; template = lettera-modello di ripiego */
   source: z.enum(['human', 'ai', 'template']), model: z.string().optional(),
 });
-export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()) });
+export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()),
+  /** `chancery`: le frasi delle cancellerie su un atto grave (le aggiunge il motore a fine turno, non il narratore) */
+  kind: z.literal('chancery').optional() });
 
 /**
  * Atto ostile o di pressione che la fazione ha visto nel turno precedente (eventi a lei visibili): minacce, sanzioni, blocchi,
@@ -201,6 +203,15 @@ export const Reaction = z.object({
   condemn: z.array(z.string()), support: z.array(z.string()), silent: z.array(z.string()),
   modifiers: z.array(z.object({ from: z.string(), to: z.string(), kind: z.string(), value: z.number() })),
 });
+/**
+ * Cancellerie (settore 11): la frase di uno Stato su un atto grave. La **posizione** (condanna, sostegno, silenzio) la sceglie il motore dalla reazione;
+ * il ruolo chancery scrive solo il testo (≤ 30 parole) e, se non c'è budget o la frase non passa i controlli, vale la frase-modello della posizione.
+ */
+export const ChanceryPosition = z.enum(['condemn', 'support', 'silence']);
+export const ChanceryStatement = z.object({
+  eventId: z.string(), iso: z.string(), position: ChanceryPosition, text: z.string(), source: z.enum(['ai', 'template']),
+});
+
 /** Una votazione che gli Stati del mondo conoscono (la decisione di un'istituzione: pubblica) */
 export const DigestVote = z.object({
   id: z.string(), turn: Turn, forum: z.string(), institutionId: z.string(), proposer: z.string(), target: z.string().optional(), topic: z.string(), subject: z.string(),
@@ -219,6 +230,9 @@ export const WorldDecision = z.object({
   rationale: z.array(WorldRationale),
   /** lettere scritte nel turno dagli Stati del mondo al giocatore */
   letters: z.array(z.object({ actionId: z.string(), actor: z.string(), to: z.string(), kind: z.enum(['reply', 'initiative']), trigger: z.string().optional(), inReplyTo: z.string().optional(), source: z.enum(['ai', 'template']), model: z.string(), errors: z.array(z.string()) })).default([]),
+  /** frasi delle cancellerie sugli atti gravi del turno (settore 11) e, per atto, chi le ha scritte: modello, frasi-modello o un po' di entrambi */
+  statements: z.array(ChanceryStatement).default([]),
+  chancery: z.array(z.object({ eventId: z.string(), source: z.enum(['ai', 'template', 'mixed']), model: z.string(), errors: z.array(z.string()) })).default([]),
   /** quanti Stati toccava all'agenda, quante azioni candidate e quante tagliate dal tetto globale */
   stats: z.object({ eligible: z.number().int(), candidates: z.number().int(), capped: z.number().int() }),
 });
@@ -333,6 +347,8 @@ export type Directive = z.infer<typeof Directive>;
 export type DirectiveRecord = z.infer<typeof DirectiveRecord>;
 export type GraveEvent = z.infer<typeof GraveEvent>;
 export type Reaction = z.infer<typeof Reaction>;
+export type ChanceryStatement = z.infer<typeof ChanceryStatement>;
+export type ChanceryPosition = z.infer<typeof ChanceryPosition>;
 export type DigestVote = z.infer<typeof DigestVote>;
 export type WorldDecision = z.infer<typeof WorldDecision>;
 export type AgentMemory = z.infer<typeof AgentMemory>;

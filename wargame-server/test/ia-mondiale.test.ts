@@ -87,7 +87,7 @@ describe('IA mondiale: reazioni agli atti gravi', () => {
     ctxEvents.relate('RUS', 'GRC', -25, 25, 'strike su MELLITAH', { incident: true });
     const out = worldAiTurn(input(ctx.state, buildDigest(ctxEvents.events, 1)));
     expect(out.reactions).toHaveLength(1);
-    const world: WorldDecision = { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: [], reactions: out.reactions, blockSanctions: [], rationale: [], letters: [], stats: out.stats };
+    const world: WorldDecision = { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: [], reactions: out.reactions, blockSanctions: [], rationale: [], letters: [], statements: [], chancery: [], stats: out.stats };
     const before = opinionOf(ctx.state, 'RUS', out.reactions[0]!.modifiers.find((m) => m.kind === 'condemnation')!.to).value;
     adjudicate(ctx, [], world);
     const ev = ctx.events.filter((e) => e.type === 'INTERNATIONAL_REACTIONS');
@@ -140,7 +140,7 @@ describe('IA mondiale: sanzioni di blocco', () => {
     const out = run(vote('EU', 'EU_COUNCIL', worldData().membersOf('EU')));
     const b = out.blockSanctions[0]!;
     const stab = ctx.state.factions.RUS!.stability;
-    adjudicate(ctx, [], { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: [], reactions: [], blockSanctions: out.blockSanctions, rationale: [], letters: [], stats: out.stats });
+    adjudicate(ctx, [], { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: [], reactions: [], blockSanctions: out.blockSanctions, rationale: [], letters: [], statements: [], chancery: [], stats: out.stats });
     const ev = ctx.events.filter((e) => e.type === 'INTERNATIONAL_REACTIONS');
     expect(ev).toHaveLength(1);
     expect(ev[0]!.payload).toMatchObject({ kind: 'block_sanctions', victim: 'RUS', adopters: b.adopters });
@@ -191,7 +191,7 @@ describe('IA mondiale: agenda lenta', () => {
     expect(out.rationale.find((r) => r.rule === 'agenda')!.text).toMatch(/Partner prioritario/);
     // le proposte commerciali sono solo verso chi le accetterebbe: nessuna rifiutata
     const ctx = ctxOf((st) => { st.turn = 2; });
-    const rejected = adjudicate(ctx, [], { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: out.actions, reactions: [], blockSanctions: [], rationale: [], letters: [], stats: out.stats });
+    const rejected = adjudicate(ctx, [], { schemaVersion: 1, turn: 2, digest: { events: [], votes: [] }, actions: out.actions, reactions: [], blockSanctions: [], rationale: [], letters: [], statements: [], chancery: [], stats: out.stats });
     expect(rejected).toEqual([]);
     expect(ctx.state.diplomacy!.capital[out.actions[0]!.actor]).toBeUndefined();
   });

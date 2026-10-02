@@ -3,6 +3,7 @@ import { LETTER_LIMITS } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { checkAction, isActor, targetsOf } from './diplo-actions.js';
 import { resolveDiplomacy } from './diplomacy.js';
+import { statementsOf } from './chancery.js';
 import { buildModifier } from './opinion.js';
 import { PARAMS } from './params.js';
 
@@ -32,6 +33,8 @@ export function applyWorldDecision(ctx: TurnCtx, w: WorldDecision): { factionId:
     ctx.emit('INTERNATIONAL_REACTIONS', 'world', {
       eventRef: r.eventId, kind: r.kind, actor: r.actor, victim: r.victim, severity: r.severity, ...(r.zoneId ? { zoneId: r.zoneId } : {}),
       condemn: r.condemn, support: r.support, silent: r.silent, modifiers,
+      // le frasi delle cancellerie (settore 11): posizione scelta dal motore, testo del ruolo chancery o frase-modello
+      statements: statementsOf(w.statements ?? [], r.eventId),
     }, { targets: [r.actor, r.victim], visibility: 'public' });
   }
   for (const b of w.blockSanctions) {

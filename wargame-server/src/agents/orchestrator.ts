@@ -1,7 +1,8 @@
 import type { AgentDecision, Campaign, LlmCall } from '../schemas/index.js';
-import type { AgentsPort, DecideInput, LetterJob, LetterResult, StrategistJob } from '../engine/turn-machine.js';
+import type { AgentsPort, ChanceryJob, ChanceryResult, DecideInput, LetterJob, LetterResult, StrategistJob } from '../engine/turn-machine.js';
 import { LlmBudget, type BudgetStatus, type Priority, type UsageStore } from './budget.js';
 import { loadScenario } from '../engine/scenario.js';
+import { chanceryPrompt, assembleStatements, writeStatements } from './chancery.js';
 import { decide } from './faction-agent.js';
 import { writeBriefing, writeDebriefing, writeNews } from './gm-narrator.js';
 import { analyze } from './intel-analyst.js';
@@ -87,6 +88,22 @@ export class LlmAgents implements AgentsPort {
   }
 
   draftLetter(job: LetterJob) { return writeLetter(this.view(job.campaign, job.campaign.currentTurn, 1), this.log, job); }
+
+  /**
+   * Frasi delle cancellerie (P4): una chiamata per atto grave, in parallelo entro maxConcurrentAgents. Se il budget non basta per tutti gli atti cadono gli
+   * ultimi, che hanno solo le frasi-modello delle posizioni scelte dal motore.
+   */
+  async chancery(jobs: ChanceryJob[]): Promise<ChanceryResult[]> {
+    if (!jobs.length) return [];
+    const c = jobs[0]!.campaign; const turn = jobs[0]!.turn;
+    const admitted = await this.budget.admit(c, turn, jobs.map((j) => { const p = chanceryPrompt(j); return { priority: 4 as const, hash: promptHash(p) }; }));
+    return pool(jobs.map((_, i) => i), c.config.maxConcurrentAgents ?? 2, async (i): Promise<ChanceryResult> => {
+      const j = jobs[i]!;
+      if (admitted[i]) return writeStatements(this.view(c, turn, 4), this.log, j);
+      const { statements } = assembleStatements(j, null, []);
+      return { eventId: j.event.id, statements, source: 'template', model: 'template', errors: ['chiamata LLM non fatta: budget del turno esaurito'] };
+    });
+  }
 
   /** Direttiva strategica (P3): una chiamata, senza ripieghi oltre al repair; senza risposta valida nessuna direttiva. */
   strategize(job: StrategistJob) { return writeDirective(this.view(job.campaign, job.turn, 3), this.log, job); }

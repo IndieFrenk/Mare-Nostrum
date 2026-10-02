@@ -1,5 +1,5 @@
 import type { AgentMemory } from '../schemas/index.js';
-import type { AgentsPort, LetterJob, LetterResult, StrategistJob, StrategistResult } from '../engine/turn-machine.js';
+import type { AgentsPort, ChanceryJob, ChanceryResult, LetterJob, LetterResult, StrategistJob, StrategistResult } from '../engine/turn-machine.js';
 import type { JsonStore } from '../store/json-store.js';
 
 /** Rilegge decisioni, narrativa e memoria salvate: nessuna chiamata LLM. */
@@ -23,7 +23,8 @@ export class ReplayAgents implements AgentsPort {
 
   async debrief({ campaign }: Parameters<AgentsPort['debrief']>[0]) {
     const n = (await this.store.getNarrative(this.sourceId, campaign.currentTurn))!;
-    return { debriefing: n.debriefing!, news: n.news };
+    // le notizie delle cancellerie le rifà il motore dalle frasi registrate: qui non si riprendono due volte
+    return { debriefing: n.debriefing!, news: n.news.filter((x) => x.kind !== 'chancery') };
   }
 
   async reflect({ factionId, campaign, memory }: Parameters<AgentsPort['reflect']>[0]): Promise<AgentMemory> {
@@ -45,6 +46,15 @@ export class ReplayAgents implements AgentsPort {
       const info = (d ? d.letters : w!.letters).find((l) => l.actionId === a.id);
       return { subject: a.subject, body: a.body, tone: a.tone, source: info?.source ?? (a.model === 'template' ? 'template' : 'ai'), model: a.model ?? 'replay', errors: info?.errors ?? [] };
     }));
+  }
+
+  /** Le frasi delle cancellerie registrate nel file del livello C: nessuna chiamata LLM. */
+  async chancery(jobs: ChanceryJob[]): Promise<ChanceryResult[]> {
+    const w = jobs.length ? await this.store.getWorldDecision(this.sourceId, jobs[0]!.turn) : null;
+    return jobs.map((j) => {
+      const info = w?.chancery.find((x) => x.eventId === j.event.id);
+      return { eventId: j.event.id, statements: (w?.statements ?? []).filter((x) => x.eventId === j.event.id), source: info?.source ?? 'template', model: info?.model ?? 'replay', errors: info?.errors ?? [] };
+    });
   }
 
   /** La direttiva registrata (versione limitata dal motore): nessuna chiamata LLM; senza file, nessuna direttiva. */
