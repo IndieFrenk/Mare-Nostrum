@@ -60,6 +60,7 @@ function llmCalls(id: string, t: number): Record<string, number> | null {
 const add = (into: Record<string, number>, from: Record<string, number>) => { for (const [k, v] of Object.entries(from)) into[k] = (into[k] ?? 0) + v; return into; };
 const top = (m: Record<string, number>, n: number) => Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
 const llmTotal: Record<string, number> = {}; const ruleTotal: Record<string, number> = {}; const textTotal: Record<string, number> = {};
+const worldTextTotal: Record<string, number> = {}; const worldKindTotal: Record<string, number> = {}; const phaseTotal: Record<string, number> = {};
 let llmSeen = false;
 
 const turns: J[] = [];
@@ -138,6 +139,18 @@ while (c.currentTurn <= target && c.status === 'active') {
     byText[key] = (byText[key] ?? 0) + 1;
   }
   add(ruleTotal, byRule); add(textTotal, byText);
+  // IA mondiale (livello C): azioni per tipo, reazioni, motivazioni; e il tempo di ogni fase del motore (GET /timings)
+  const world = (pm.world ?? null) as J | null;
+  const worldKinds: Record<string, number> = {};
+  for (const a of ((world?.actions ?? []) as J[])) worldKinds[a.action.kind] = (worldKinds[a.action.kind] ?? 0) + 1;
+  const worldText: Record<string, number> = {};
+  for (const r of ((world?.rationale ?? []) as J[])) { const key = `${r.rule}: ${String(r.text).replace(/\d+(?:[.,]\d+)?/g, 'N')}`; worldText[key] = (worldText[key] ?? 0) + 1; }
+  add(worldTextTotal, worldText); add(worldKindTotal, worldKinds);
+  const phaseMs: Record<string, number> = {};
+  for (const x of (await call('GET', `/campaigns/${c.id}/timings`) as unknown as J[]).filter((x) => x.turn === t)) phaseMs[x.phase] = (phaseMs[x.phase] ?? 0) + x.ms;
+  for (const [ph, ms] of Object.entries(phaseMs)) { phaseTotal[ph] = (phaseTotal[ph] ?? 0) + ms; }
+  const aiAdjMs = (phaseMs.AI_DECISIONS ?? 0) + (phaseMs.ADJUDICATION ?? 0);
+  if (aiAdjMs > 3000) problem(t, `AI_DECISIONS + ADJUDICATION ${aiAdjMs} ms (obiettivo ≤ 3000)`);
   const calls = llmCalls(c.id, t);
   if (calls) { llmSeen = true; add(llmTotal, calls); }
   const repaired = decisions.filter((d) => d.validation.repairAttempts > 0 && !d.validation.fallbackUsed).length;
@@ -186,6 +199,7 @@ while (c.currentTurn <= target && c.status === 'active') {
     unitOrders: { total: unitOrders.length, perFaction: +(unitOrders.length / Math.max(1, decisions.length)).toFixed(2), fromStances: stanceOrders.filter((x) => x.stance !== 'worn').length, worn: stanceOrders.filter((x) => x.stance === 'worn').length, byKind },
     engagements, busyUnits, stances, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
     letters: letterRow,
+    world: world ? { actions: (world.actions as J[]).length, byKind: worldKinds, reactions: (world.reactions as J[]).length, stats: world.stats, letters: (world.letters as J[]).length, topRationale: top(worldText, 3) } : null, phaseMs,
     foed: ita.budget.discretionary, stability: ita.stability, crises: Object.fromEntries(Object.entries(s.crises as Record<string, J>).map(([id, cr]) => [id, cr.escalation])),
   };
   turns.push(row);
@@ -195,6 +209,7 @@ while (c.currentTurn <= target && c.status === 'active') {
   console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
   console.log(`  unità IA impegnate ${busyUnits} · posture emesse ${stances.emitted} / tradotte ${stances.translated} / senza unità ${stances.noUnits}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
+  if (world) console.log(`  fasi (ms): ${Object.entries(phaseMs).filter(([, ms]) => ms > 0).map(([ph, ms]) => `${ph} ${ms}`).join(' · ')} (AI_DECISIONS + ADJUDICATION ${aiAdjMs}) · livello C: ${(world.actions as J[]).length} azioni ${JSON.stringify(worldKinds)}, ${(world.reactions as J[]).length} reazioni, tocca a ${world.stats.eligible} Stati (${world.stats.candidates} candidate, ${world.stats.capped} oltre il tetto), lettere ${(world.letters as J[]).length}`);
   console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} (dagli inneschi del motore ${letterRow.aiTriggered}) · lettere-modello ${letterRow.template.length}`);
   for (const x of [...letterRow.sent.map((l) => `→ ${l}`), ...letterRow.received.map((l) => `← ${l}`)]) console.log(`    ✉ ${x}`);
   if (letterRow.template.length) console.log(`  lettere-modello: ${letterRow.template.join(' | ')}`);
@@ -206,6 +221,7 @@ const report = { campaign: c.id, factionMode: c.config.factionMode ?? null, tota
   cadence: c.config.agentCadence, turns, problems,
   llmCallsByRole: llmSeen ? llmTotal : null, llmCallsPerTurn: llmSeen ? +(Object.values(llmTotal).reduce((a, b) => a + b, 0) / Math.max(1, turns.length)).toFixed(1) : null,
   rulesDecisions: turns.reduce((a, r) => a + r.rulesDecisions, 0), rationaleByRule: ruleTotal, topRationale: top(textTotal, 10),
+  phaseMsPerTurn: Object.fromEntries(Object.entries(phaseTotal).map(([k, v]) => [k, Math.round(v / Math.max(1, turns.length))])), worldActionsPerTurn: +(Object.values(worldKindTotal).reduce((a, b) => a + b, 0) / Math.max(1, turns.length)).toFixed(1), worldActionsByKind: worldKindTotal, worldTopRationale: top(worldTextTotal, 5),
   unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0), aiInitiativesPerTurnFromT2: +initiativeAvg.toFixed(2) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
@@ -213,4 +229,7 @@ writeFileSync(out, JSON.stringify(report, null, 1));
 console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min (${report.secondsPerTurn} s per turno) · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}`);
 console.log(`chiamate LLM per turno: ${report.llmCallsPerTurn ?? 'n/d'} ${report.llmCallsByRole ? JSON.stringify(report.llmCallsByRole) : ''} · decisioni a regole ${report.rulesDecisions} · motivazioni per regola ${JSON.stringify(ruleTotal)}`);
 for (const [x, n] of report.topRationale) console.log(`  ${n}× ${x}`);
+console.log(`tempo per fase (ms per turno): ${JSON.stringify(report.phaseMsPerTurn)} · livello C: ${report.worldActionsPerTurn} azioni per turno ${JSON.stringify(report.worldActionsByKind)}`);
+console.log('le 5 motivazioni più frequenti del livello C:');
+for (const [x, n] of report.worldTopRationale) console.log(`  ${n}× ${x}`);
 console.log(`report ${out}`);

@@ -1,0 +1,26 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "rule": {
+   "type": "string",
+   "enum": [
+    "reaction",
+    "block_sanction",
+    "agenda",
+    "letter",
+    "cap"
+   ]
+  },
+  "actor": {
+   "type": "string"
+  },
+  "text": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "rule",
+  "text"
+ ]
+}

@@ -227,6 +227,16 @@ A ogni turno, solo da eventi **pubblici** e da quanto riguarda lo Stato stesso (
 
 **Prestazioni**: O(Stati × eventi pubblici). Obiettivo: **turno del motore ≤ 3 s** sul server (4 core, senza GPU) con 197 Stati.
 
+**Come è fatto (settore 10).** `engine/world-digest.ts` + `engine/world-ai.ts` + `engine/world-apply.ts`; parametri in `PARAMS.worldAi`. Scelte dove il documento lasciava libertà:
+- **Digest**: atti pubblici gravi da `diploActs()` (nota → tipo, gravità: strike 5, scontro/ultimatum/rottura/sanzioni multilaterali 4, blocco/sanzioni/embargo/cyber/operazione scoperta 3) e dalle `INSTITUTION_VOTE` pubbliche; soglia `reactionSeverity` 3, al massimo 6 atti per turno. Gli atti non pubblici stanno in `involving[attore]` solo per i destinatari.
+- **Reazione** = funzione di una *simpatia* (opinione verso vittima − verso attore, vicinanza sull'asse del voto ONU, coesione dei blocchi in comune): condanna ≥ 0,25, sostegno ≤ −0,25, silenzio in mezzo. Non c'è un tiro. L'attore, la vittima e il giocatore non reagiscono. Modificatori: condanna → l'attore vede peggio chi condanna (−3) e la vittima meglio (+3); sostegno → l'attore vede meglio chi lo sostiene (+3); al massimo 12 per atto, prima le fazioni, solo per i 3 atti più gravi.
+- **Voti**: nessun codice nuovo (settore 09); il collegamento è che le `INSTITUTION_VOTE` entrano nel digest e le sanzioni approvate scatenano l'adeguamento.
+- **Risposte**: già in aggiudicazione (settore 09); gli Stati propongono solo trattati commerciali, e solo se `acceptance()` dice che il partner accetterebbe; i trattati tra due Stati senza fazione non cambiano l'opinione.
+- **Sanzioni di blocco**: istituzioni con effetto `common_sanctions` o `veto_members` vincolano; chi ha votato sì (per il CdS: tutti gli Stati ONU con opinione del bersaglio ≤ 25) adotta con probabilità = coesione; un evento per risoluzione.
+- **Agenda**: ordine di priorità dentro lo Stato STOP_IMPROVE → RECALL_AMBASSADOR → REASSURANCE → commercio → IMPROVE_RELATIONS; poi tetto globale (azioni verso fazioni e giocatore per prime). L'indice è la posizione in ordine di ISO3 tra gli Stati senza fazione; `% 4` sul turno.
+- **Lettere**: solo risposte e inneschi forti (ultimatum italiano, sanzioni subite, accordo accettato); il giocatore può scrivere a ogni Stato.
+- **Livelli A e B**: le soglie sull'opinione sono rinominate e confermate (40 / −20 / 60: alleati 0–13, stretti 0–5, avversari 0–5 sulle fazioni di `med-2026`); isolamento: ≥ 10 Stati e ≥ 30% dei reagenti che condannano un atto della fazione, o una condanna approvata → i profili prudenti cercano la distensione. Direttiva: bonus 15 per punto di peso, malus 30 per `avoid`.
+
 ## 11. Agenti LLM a budget
 
 **Principio**: l'LLM non decide mai un esito. Propone **intenzioni** (direttive) o scrive **testi**; il motore li valida, li limita, li registra, e il replay li rilegge senza LLM.

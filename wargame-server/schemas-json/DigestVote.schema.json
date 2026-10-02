@@ -1,0 +1,66 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "id": {
+   "type": "string"
+  },
+  "turn": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 9007199254740991
+  },
+  "forum": {
+   "type": "string"
+  },
+  "institutionId": {
+   "type": "string"
+  },
+  "proposer": {
+   "type": "string"
+  },
+  "target": {
+   "type": "string"
+  },
+  "topic": {
+   "type": "string"
+  },
+  "subject": {
+   "type": "string"
+  },
+  "passed": {
+   "type": "boolean"
+  },
+  "yes": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "no": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "abstain": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "id",
+  "turn",
+  "forum",
+  "institutionId",
+  "proposer",
+  "topic",
+  "subject",
+  "passed",
+  "yes",
+  "no",
+  "abstain"
+ ]
+}

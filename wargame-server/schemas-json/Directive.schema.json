@@ -1,0 +1,110 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "horizonTurns": {
+   "type": "integer",
+   "minimum": 3,
+   "maximum": 6
+  },
+  "priorities": {
+   "default": [],
+   "maxItems": 4,
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "improve",
+       "court",
+       "deter",
+       "isolate",
+       "contain"
+      ]
+     },
+     "target": {
+      "type": "string",
+      "minLength": 2
+     },
+     "weight": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     }
+    },
+    "required": [
+     "kind",
+     "target",
+     "weight"
+    ]
+   }
+  },
+  "zoneInterestDelta": {
+   "default": {},
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number",
+    "minimum": -0.2,
+    "maximum": 0.2
+   }
+  },
+  "seekAgreements": {
+   "default": [],
+   "maxItems": 2,
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "defense",
+       "energy",
+       "basing",
+       "migration",
+       "ceasefire",
+       "arms_sale",
+       "intel_sharing",
+       "secret",
+       "non_aggression",
+       "guarantee",
+       "military_access",
+       "defense_cooperation",
+       "trade"
+      ]
+     },
+     "with": {
+      "type": "string",
+      "minLength": 2
+     }
+    },
+    "required": [
+     "type",
+     "with"
+    ]
+   }
+  },
+  "avoid": {
+   "default": [],
+   "maxItems": 2,
+   "type": "array",
+   "items": {
+    "type": "string",
+    "minLength": 2
+   }
+  },
+  "rationale": {
+   "default": "",
+   "type": "string",
+   "maxLength": 420
+  }
+ },
+ "required": [
+  "horizonTurns"
+ ]
+}
