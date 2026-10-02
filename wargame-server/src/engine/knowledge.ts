@@ -1,4 +1,6 @@
 import type { Contact, DiploLetter, DiploMessage, FactionKnowledge, GameEvent, Incident, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
+import { acceptance } from './acceptance.js';
+import { DIPLO_CATALOG, actionCost, improveSlots, weeklyRent } from './diplo-actions.js';
 import { diploActs, opinionBand, opinionOf, tensionOf } from './opinion.js';
 import { hashString } from './rng.js';
 
@@ -14,7 +16,7 @@ export const letterVisibleTo = (l: DiploLetter, f: string) => l.visibility === '
 const visibleTo = (e: GameEvent, f: string) => e.visibility === 'public' || e.visibility.includes(f) || e.actor === f;
 /** nota della relazione (scritta da diplomacy.ts, adjudication.ts, combat.ts) → tipo di atto; le propagazioni agli alleati no */
 const NOTE_KINDS: [RegExp, Incident['kind']][] = [
-  [/^minaccia:/, 'threat'], [/^lettera \(threatening\)/, 'threat'], [/^dichiarazione minacciosa/, 'threat'], [/^sanzioni:/, 'sanction'],
+  [/^minaccia:/, 'threat'], [/^lettera \(threatening\)/, 'threat'], [/^dichiarazione minacciosa/, 'threat'], [/^sanzioni:/, 'sanction'], [/^ultimatum:/, 'ultimatum'],
   [/^(BLOCKADE|EXCLUSION_ZONE) in /, 'blockade'], [/^dimostrazione di forza in /, 'show_of_force'], [/^scontro in /, 'engagement'],
   [/^strike su /, 'strike'], [/^attacco cyber attribuito/, 'cyber'], [/^operazione clandestina scoperta/, 'sof'],
 ];
@@ -34,7 +36,11 @@ export function incidentsFrom(events: GameEvent[], factionId: string): Incident[
   for (const e of sorted) {
     if (!visibleTo(e, factionId)) continue;
     const p = e.payload as Record<string, unknown>;
-    if (e.type === 'RED_LINE_CROSSED' && e.actor === factionId) { out.push({ turn: e.turn, kind: 'red_line', from: e.actor, to: e.actor, ref: String(p.redLineId) }); continue; }
+    // la linea rossa superata: la vede chi la possiede e, con un trattato `guarantee`, il suo garante (che risponde come lui)
+    if (e.type === 'RED_LINE_CROSSED') {
+      out.push({ turn: e.turn, kind: 'red_line', from: e.actor, to: e.actor, ref: String(p.redLineId), text: String(p.text ?? ''), response: String(p.response ?? ''), ...(p.zoneId ? { zoneId: String(p.zoneId) } : {}) });
+      continue;
+    }
     const act = acts.get(e.id);
     if (!act) continue;
     const kind = NOTE_KINDS.find(([re]) => re.test(act.note))?.[1];
@@ -76,6 +82,7 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
     letters: (extra.letters ?? []).filter((l) => letterVisibleTo(l, factionId) && l.turn >= s.turn - 3),
     incidents: incidentsFrom(extra.prevEvents ?? [], factionId),
     ownRelations: ownRelations(s, factionId),
+    diplomacy: ownDiplomacy(s, factionId),
   };
 }
 
@@ -92,4 +99,24 @@ export function ownRelations(s: WorldState, f: string): FactionKnowledge['ownRel
       ...(intel.some((a) => a.parties.includes(b)) ? { opinionOfMeExact: theirs } : {}),
     }];
   }));
+}
+
+/**
+ * Il registro diplomatico della fazione: capitale, rendita e slot, miglioramenti in corso, ricariche ancora attive, rapporti ridotti con le
+ * altre, ultimatum e embarghi che la riguardano; e per ogni proposta di trattato ricevuta il suggerimento `acceptance` (solo per il
+ * giocatore: il decisore a regole la usa per rispondere). Mai le ricariche e il capitale degli altri.
+ */
+export function ownDiplomacy(s: WorldState, f: string): NonNullable<FactionKnowledge['diplomacy']> {
+  const d = s.diplomacy;
+  const mine = (k: string) => k.startsWith(`${f}|`);
+  return {
+    capital: Math.round((d?.capital[f] ?? 0) * 10) / 10, rent: weeklyRent(s, f), improvingSlots: improveSlots(s, f), coerciveCost: actionCost(s, f, { id: '', kind: 'SANCTION', target: f, scope: '' }) / (DIPLO_CATALOG.SANCTION.cost as number),
+    improving: (d?.improving ?? []).filter((x) => x.actor === f).map((x) => ({ target: x.target, since: x.since })),
+    cooldowns: Object.fromEntries(Object.entries(d?.cooldowns ?? {}).filter(([k, until]) => mine(k) && until > s.turn).map(([k, until]) => [k.slice(f.length + 1), until])),
+    ties: Object.fromEntries(Object.entries(d?.ties ?? {}).flatMap(([k, st]) => { const [a, b] = k.split('|') as [string, string]; return a === f ? [[b, st]] : b === f ? [[a, st]] : []; })),
+    ultimatums: (d?.ultimatums ?? []).filter((u) => u.from === f || u.to === f),
+    embargoes: (d?.embargoes ?? []).filter((x) => x.startsWith(`${f}>`) || x.endsWith(`>${f}`)),
+    proposals: Object.values(s.agreements).filter((a) => a.status === 'proposed' && a.parties.includes(f) && a.parties[0] !== f).sort((a, b) => a.id.localeCompare(b.id))
+      .map((a) => ({ agreementId: a.id, from: a.parties[0]!, type: a.type, ...(({ score, accept, reasons }) => ({ score, accept, reasons }))(acceptance(s, f, { type: a.type, parties: a.parties }, a.parties[0]!)) })),
+  };
 }

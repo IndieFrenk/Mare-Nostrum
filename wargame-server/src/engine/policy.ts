@@ -1,5 +1,6 @@
 import type { Base, DecisionOutput, DiploAction, FactionKnowledge, FactionPolicy, Incident, Infrastructure, LetterTone, Order, PolicyRule, Rationale, RedLine, Stance, Zone, ZoneStance } from '../schemas/index.js';
 import { LETTER_LIMITS, POLICY_RULES } from '../schemas/index.js';
+import { DIPLO_CATALOG, cooldownKeys, forumMember } from './diplo-actions.js';
 import { PARAMS } from './params.js';
 import { taskZone } from './movement.js';
 import { candidates } from './stances.js';
@@ -37,21 +38,25 @@ const severity = (x: Incident) => (isHostile(x) ? PARAMS.policy.severity[x.kind]
 const ACT: Record<Hostile, { a: string; noun: string }> = {
   threat: { a: 'alla minaccia', noun: 'la minaccia' }, sanction: { a: 'alle sanzioni', noun: 'le sanzioni' },
   blockade: { a: 'al blocco navale', noun: 'il blocco navale' }, engagement: { a: 'allo scontro', noun: 'lo scontro' },
-  strike: { a: 'allo strike', noun: 'lo strike' }, cyber: { a: "all'attacco cyber", noun: "l'attacco cyber" },
+  strike: { a: 'allo strike', noun: 'lo strike' }, ultimatum: { a: "all'ultimatum", noun: "l'ultimatum" }, cyber: { a: "all'attacco cyber", noun: "l'attacco cyber" },
   sof: { a: "all'operazione clandestina", noun: "l'operazione clandestina" },
 };
 const STANCE_IT: Record<Stance, string> = {
   patrol: 'pattugliamento', presence: 'presenza', show_of_force: 'dimostrazione di forza', escort_shipping: 'scorta al traffico',
   blockade: 'blocco', air_defense: 'difesa aerea', withdraw: 'ritiro',
 };
-type DiploKind = 'DEMARCHE' | 'THREAT' | 'REASSURANCE' | 'BACKCHANNEL' | 'SANCTION' | 'PROPOSE_AGREEMENT' | 'UNSC_DRAFT';
+type DiploKind = 'DEMARCHE' | 'THREAT' | 'REASSURANCE' | 'BACKCHANNEL' | 'SANCTION' | 'PROPOSE_AGREEMENT' | 'RESOLUTION'
+  | 'RECALL_AMBASSADOR' | 'RESTORE_RELATIONS' | 'IMPROVE_RELATIONS' | 'STOP_IMPROVE' | 'ULTIMATUM';
 const DIPLO_IT: Record<DiploKind, string> = {
   DEMARCHE: 'démarche', THREAT: 'minaccia formale', REASSURANCE: 'rassicurazione', BACKCHANNEL: 'canale riservato',
-  SANCTION: 'sanzioni', PROPOSE_AGREEMENT: 'proposta di tregua', UNSC_DRAFT: 'bozza di risoluzione al Consiglio di sicurezza',
+  SANCTION: 'sanzioni', PROPOSE_AGREEMENT: 'proposta di tregua', RESOLUTION: 'risoluzione in un\'istituzione',
+  RECALL_AMBASSADOR: "richiamo dell'ambasciatore", RESTORE_RELATIONS: 'ripristino delle relazioni', IMPROVE_RELATIONS: 'miglioramento delle relazioni',
+  STOP_IMPROVE: 'fine del miglioramento delle relazioni', ULTIMATUM: 'ultimatum',
 };
 const RISK: Record<string, number> = {
   show_of_force: 0.5, presence: 0.3, patrol: 0.2, escort_shipping: 0.2, SANCTION: 0.5, THREAT: 0.6, DEMARCHE: 0.2,
-  REASSURANCE: 0.1, BACKCHANNEL: 0.1, PROPOSE_AGREEMENT: 0.1, UNSC_DRAFT: 0.2, CYBER_OP: 0.4,
+  REASSURANCE: 0.1, BACKCHANNEL: 0.1, PROPOSE_AGREEMENT: 0.1, RESOLUTION: 0.2, CYBER_OP: 0.4, RECALL_AMBASSADOR: 0.4, ULTIMATUM: 0.7,
+  RESTORE_RELATIONS: 0.1, IMPROVE_RELATIONS: 0.1, STOP_IMPROVE: 0.1,
 };
 const ruleRank = (r: PolicyRule) => POLICY_RULES.indexOf(r);
 /** posture di ripiego se le unità della fazione non possono fare quella scelta (la prima è la scelta stessa) */
@@ -62,7 +67,8 @@ const FALLBACK: Record<Exclude<Stance, 'withdraw'>, Exclude<Stance, 'withdraw'>[
 
 interface Cand { score: number; rule: PolicyRule; text: string }
 interface StanceCand extends Cand { zoneId: string; stance: Exclude<Stance, 'withdraw'>; intensity: 1 | 2 | 3 }
-interface DiploCand extends Cand { key: string; kind: DiploKind; target: string }
+/** `target` può mancare solo per una RESOLUTION senza bersaglio (la sede e il tema stanno nei campi propri) */
+interface DiploCand extends Cand { key: string; kind: DiploKind; target: string; forum?: 'UNSC' | 'UNGA'; demand?: string }
 interface LetterCand { to: string; gist: string; tone: LetterTone; score: number }
 
 const clamp3 = (n: number) => Math.max(1, Math.min(3, n)) as 1 | 2 | 3;
@@ -113,7 +119,14 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   const extra: Rationale[] = [];
   const threats: DecisionOutput['threats'] = [];
   const addStance = (c: StanceCand) => { if (canDeploy && i.geo.zones[c.zoneId]) stances.push(c); };
-  const addDiplo = (kind: DiploKind, target: string, c: Cand) => { if (kind === 'UNSC_DRAFT' || others.has(target)) diplo.push({ ...c, kind, target, key: kind === 'UNSC_DRAFT' ? 'UNSC' : target }); };
+  /** la sede delle risoluzioni: il Consiglio di sicurezza per i suoi membri, per gli altri l'Assemblea generale */
+  const forumOf = forumMember(me, 'UNSC') ? 'UNSC' as const : 'UNGA' as const;
+  const addDiplo = (kind: DiploKind, target: string, c: Cand, extra: { demand?: string } = {}) => {
+    if (kind === 'RESOLUTION' || others.has(target)) diplo.push({ ...c, kind, target, key: kind === 'RESOLUTION' ? `RES:${forumOf}` : `${kind === 'STOP_IMPROVE' || kind === 'IMPROVE_RELATIONS' ? 'IMP' : 'ACT'}:${target}`, ...(kind === 'RESOLUTION' ? { forum: forumOf } : {}), ...extra });
+  };
+  const dip = k.diplomacy;
+  const capital = dip?.capital ?? Infinity;
+  const slotsFree = dip ? dip.improvingSlots - dip.improving.length : 0;
   const addLetter = (to: string, tone: LetterTone, gist: string, score: number) => { if (others.has(to)) letters.push({ to, tone, gist: gist.slice(0, LETTER_LIMITS.gist), score }); };
   const soften = (target: string): DiploKind => (soft || rel(target).trust < 0 ? 'BACKCHANNEL' : 'REASSURANCE');
 
@@ -130,13 +143,25 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     crossed.push(rl);
     const r = redLineResponse(rl);
     const st = r.stance && r.zoneId && canDeploy ? r.stance : null;
-    const dk = r.diplo && (r.target || r.diplo === 'UNSC_DRAFT') ? r.diplo : null;
-    const parts = [st ? `${STANCE_IT[st]} in ${r.zoneId} (intensità 3)` : '', dk ? `${DIPLO_IT[dk]}${r.target && dk !== 'UNSC_DRAFT' ? ` a ${r.target}` : ''}` : ''].filter(Boolean);
+    const dk = r.diplo && (r.target || r.diplo === 'RESOLUTION') ? r.diplo : null;
+    const parts = [st ? `${STANCE_IT[st]} in ${r.zoneId} (intensità 3)` : '', dk ? `${DIPLO_IT[dk]}${r.target && dk !== 'RESOLUTION' ? ` a ${r.target}` : ''}` : ''].filter(Boolean);
     const c: Cand = { score: P.score.red_line, rule: 'red_line', text: `Linea rossa «${rl.text}» superata (${rl.response}): ${parts.join(' e ') || 'nessuna forza disponibile'}` };
     if (st) addStance({ ...c, zoneId: r.zoneId!, stance: st, intensity: 3 });
-    if (dk) addDiplo(dk, dk === 'UNSC_DRAFT' ? 'UNSC' : r.target!, c);
+    if (dk) addDiplo(dk, dk === 'RESOLUTION' ? (r.target ?? '') : r.target!, c, dk === 'ULTIMATUM' ? { demand: `Cessare ogni azione che ha superato la linea rossa «${rl.text}»` } : {});
     if (!st && !dk) extra.push({ rule: c.rule, text: c.text });
     if (r.target) addLetter(r.target, 'firm', `Avvertire ${nm(r.target)} che il nostro Governo considera superata una linea rossa («${rl.text}») e ne trarrà le conseguenze.`, P.score.red_line);
+  }
+
+  // 2b) garanzia: se un garantito (trattato `guarantee`, io sono il garante) ha visto superata una sua linea rossa rispondo accanto a lui:
+  //     rassicurazione e, se ha un teatro e posso, una presenza nella zona della linea rossa
+  const guaranteed = new Set(k.knownAgreements.filter((a) => a.type === 'guarantee' && a.status === 'active' && a.parties[0] === me).flatMap((a) => a.parties.slice(1)));
+  const backed = new Set<string>();
+  for (const x of k.incidents) {
+    if (x.kind !== 'red_line' || x.to === me || !guaranteed.has(x.to) || backed.has(x.to)) continue;
+    backed.add(x.to);
+    const c: Cand = { score: P.score.red_line - 5, rule: 'red_line', text: `Garanzia a ${x.to}: linea rossa «${x.text ?? ''}» superata${x.response ? ` (${x.response})` : ''}: rassicurazione${x.zoneId && canDeploy && interest(x.zoneId) >= P.minInterest ? ` e presenza in ${x.zoneId}` : ''}` };
+    addDiplo('REASSURANCE', x.to, c);
+    if (x.zoneId && interest(x.zoneId) >= P.minInterest) addStance({ ...c, zoneId: x.zoneId, stance: 'presence', intensity: 2 });
   }
 
   // 3) atti ostili subiti nel turno precedente: risposta proporzionata al profilo, sempre una lettera ferma
@@ -155,6 +180,8 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     const force = aggressive && i.rng.chance(`regole ${me}: risposta di forza a ${x.from}`, p.aggressiveness).ok;
     const score = P.score.threat + sev;
     if (force && x.zoneId && canDeploy && i.geo.zones[x.zoneId]) addStance({ zoneId: x.zoneId, stance: 'show_of_force', intensity: x.kind === 'strike' ? 3 : 2, score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: dimostrazione di forza` });
+    // la scala diplomatica: prima si richiama l'ambasciatore, con i rapporti già ridotti si passa alle sanzioni
+    else if (force && !isAlly(x.from) && !dip?.ties[x.from] && dip) addDiplo('RECALL_AMBASSADOR', x.from, { score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: richiamo dell'ambasciatore (primo gradino prima delle sanzioni)` });
     else if (force && !isAlly(x.from)) addDiplo('SANCTION', x.from, { score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: sanzioni` });
     else { const kind = soft ? 'BACKCHANNEL' : 'DEMARCHE'; addDiplo(kind, x.from, { score, rule: 'threat', text: `Risposta ${act.a} di ${x.from}${where}: ${DIPLO_IT[kind]}` }); }
     addLetter(x.from, 'firm', `Rispondere con fermezza a ${act.noun} di ${nm(x.from)}${x.zoneId ? ` in ${zoneName(x.zoneId)}` : ''}: il nostro Governo non accetta pressioni e chiede di tornare al dialogo.`, score);
@@ -206,10 +233,26 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     else if (t.fn === 'indicator' && t.args[0] === 'migrationPressure') stance(best(k.knownCrises.filter((c) => c.type === 'migration').flatMap((c) => c.zoneIds).filter((z) => interest(z) > 0)) ?? topZone(true), 'patrol', 1);
     else if (t.fn === 'relation') {
       const other = t.args[0] === me ? t.args[1]! : t.args[0]!;
-      const kind = soften(other);
+      // un obiettivo di relazione è un lavoro continuo: se c'è uno slot e il capitale, si migliora la relazione (costa 1 CD a turno)
+      const kind: DiploKind = slotsFree > 0 && !dip?.improving.some((x) => x.target === other) && rel(other).trust < P.improveBelow + 30 ? 'IMPROVE_RELATIONS' : soften(other);
       addDiplo(kind, other, { score, rule: 'objective', text: say(`${DIPLO_IT[kind]} a ${other}`) });
       addLetter(other, soft ? 'conciliatory' : 'cordial', `Rafforzare la fiducia tra i nostri Governi e proporre a ${nm(other)} una cooperazione concreta sulle questioni di comune interesse.`, score);
     }
+  }
+
+  // 5b) relazioni: partner di un trattato in vigore che si allontanano (opinione sotto improveBelow, senza tensione alta) → migliorare le
+  //     relazioni (uno slot libero alla volta); relazioni già raggiunte (opinione ≥ improveStopAt) → liberare lo slot; rapporti ridotti
+  //     (richiamo, espulsione, rottura) con opinione tornata sopra restoreAt e tensione bassa → ripristino
+  if (dip) {
+    for (const x of dip.improving) if (rel(x.target).trust >= P.improveStopAt) addDiplo('STOP_IMPROVE', x.target, { score: P.score.routine, rule: 'relations', text: `Relazioni con ${x.target} consolidate (opinione ${Math.round(rel(x.target).trust)}): libero lo slot` });
+    const partners = [...new Set(k.knownAgreements.filter((a) => a.status === 'active' && a.type !== 'secret' && a.parties.includes(me)).flatMap((a) => a.parties))]
+      .filter((x) => x !== me && others.has(x) && !dip.improving.some((y) => y.target === x) && !dip.ties[x] && rel(x).trust < P.improveBelow && rel(x).tension < P.adversaryTension)
+      .sort((a, b) => rel(a).trust - rel(b).trust || a.localeCompare(b));
+    if (slotsFree > 0 && partners[0] && !diplo.some((c) => c.kind === 'IMPROVE_RELATIONS' && c.target === partners[0]))
+      addDiplo('IMPROVE_RELATIONS', partners[0], { score: P.score.routine + 5, rule: 'relations', text: `Partner ${partners[0]} con opinione bassa (${Math.round(rel(partners[0]!).trust)}): migliorare le relazioni` });
+    for (const [x, st] of Object.entries(dip.ties).sort(([a], [b]) => a.localeCompare(b)))
+      if (others.has(x) && rel(x).trust >= P.restoreAt && rel(x).tension < P.restoreTension)
+        addDiplo('RESTORE_RELATIONS', x, { score: P.score.detente, rule: 'detente', text: `Rapporti con ${x} ridotti (${st}) ma opinione tornata a ${Math.round(rel(x).trust)}: ripristino delle relazioni` });
   }
 
   // 6) alleati sotto pressione (atto ostile di una fazione non alleata): scorta al traffico nella zona o rassicurazione
@@ -247,11 +290,10 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     }
   }
 
-  // accordi proposti alla fazione da altri: si accetta con fiducia sufficiente (tregue e migrazione anche sotto, se non assertiva)
-  for (const a of k.knownAgreements.filter((x) => x.status === 'proposed' && x.parties.includes(me) && x.parties[0] !== me).sort((x, y) => x.id.localeCompare(y.id))) {
-    const from = a.parties[0]!; const t = rel(from).trust;
-    const accept = t >= P.acceptTrust || ((a.type === 'ceasefire' || a.type === 'migration') && p.diplomacyStyle !== 'assertive');
-    responses.push({ action: { id: '', kind: 'RESPOND_AGREEMENT', agreementId: a.id, response: accept ? 'accept' : 'reject' }, text: `Accordo ${a.id} (${a.type}) proposto da ${from}: ${accept ? 'accettato' : 'respinto'} (fiducia ${t})` });
+  // accordi proposti alla fazione da altri: risponde acceptance() (engine/acceptance.ts, deterministica: punteggio ≥ 0 accetta), con i motivi
+  for (const pr of dip?.proposals ?? []) {
+    const why = [...pr.reasons].sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 2).map((r) => `${r.label} ${r.value > 0 ? '+' : ''}${r.value}`).join('; ');
+    responses.push({ action: { id: '', kind: 'RESPOND_AGREEMENT', agreementId: pr.agreementId, response: pr.accept ? 'accept' : 'reject' }, text: `Accordo ${pr.agreementId} (${pr.type}) proposto da ${pr.from}: ${pr.accept ? 'accettato' : 'respinto'} (punteggio ${pr.score}: ${why})` });
   }
 
   // routine: pattugliamento leggero della zona di maggiore interesse non ancora coperta da un'altra regola (punteggio più basso:
@@ -289,7 +331,18 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   });
   if (allyEscort && !chosenStances.includes(allyEscort)) reassureAlly();
   const rankedDiplo = oneEach(diplo, (c) => c.key);
-  const chosenDiplo = rankedDiplo.slice(0, P.maxDiplomacy);
+  // il capitale diplomatico: si sceglie nell'ordine del punteggio ciò che si può pagare, non in ricarica, con i rapporti che lo permettono
+  const chosenDiplo: DiploCand[] = []; let left = capital;
+  const unaffordable: DiploCand[] = [];
+  for (const c of rankedDiplo) {
+    if (chosenDiplo.length >= P.maxDiplomacy) break;
+    const a = diploAction(c);
+    const why = notReady(a, c);
+    if (why) { if (why === 'capitale') unaffordable.push(c); continue; }
+    left -= costOf(a);
+    chosenDiplo.push(c);
+  }
+  for (const c of unaffordable.slice(0, 1)) extra.push({ rule: c.rule, text: `Rinuncia a ${DIPLO_IT[c.kind]}${c.target ? ` verso ${c.target}` : ''}: capitale diplomatico ${Math.round(capital * 10) / 10} CD, ne servono ${costOf(diploAction(c))}` });
   // una lettera per destinatario (la ragione più forte), al massimo due: il tetto per fazione e per turno lo applica il motore
   const chosenLetters = [...letters].sort((a, b) => b.score - a.score || a.to.localeCompare(b.to))
     .filter((l, j, all) => all.findIndex((x) => x.to === l.to) === j).slice(0, 2);
@@ -303,7 +356,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     ...withdrawals.map((z) => ({ zoneId: z, stance: 'withdraw' as const, intensity: 1 as const })),
   ];
   extra.push(...withdrawals.map((z) => ({ rule: 'withdraw' as const, text: `Ritiro da ${z}: nessuna crisi, obiettivo o minaccia che chieda di restarci` })));
-  const diplomacy: DiploAction[] = [...chosenDiplo.map((c) => diploAction(c.kind, c.target)), ...responses.map((r) => r.action)];
+  const diplomacy: DiploAction[] = [...chosenDiplo.map((c) => diploAction(c)), ...responses.map((r) => r.action)];
   const rationale: Rationale[] = [
     ...chosenStances, ...joined, ...chosenDiplo, ...extra, ...responses.map((r) => ({ rule: 'agreement' as const, text: r.text })),
   ].map((c) => ({ rule: c.rule, text: c.text })).sort((a, b) => ruleRank(a.rule) - ruleRank(b.rule));
@@ -311,7 +364,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   if (!rationale.length) rationale.push({ rule: 'routine', text: 'Nessuna azione: nessuna minaccia, crisi, obiettivo o accordo che chieda di agire' });
   const optionsConsidered = [
     ...rankedStances.map((c) => ({ label: `${c.rule}: ${STANCE_IT[c.stance]} in ${c.zoneId}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.stance] ?? 0.2, chosen: chosenStances.includes(c) })),
-    ...rankedDiplo.map((c, j) => ({ label: `${c.rule}: ${DIPLO_IT[c.kind]} a ${c.target}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.kind] ?? 0.2, chosen: j < P.maxDiplomacy })),
+    ...rankedDiplo.map((c) => ({ label: `${c.rule}: ${DIPLO_IT[c.kind]}${c.target ? ` a ${c.target}` : ''}`, summary: c.text, expectedGain: +(c.score / 100).toFixed(2), risk: RISK[c.kind] ?? 0.2, chosen: chosenDiplo.includes(c) })),
   ].slice(0, 8);
 
   const hot = crises.filter((c) => c.zoneIds.some((z) => interest(z) >= P.minInterest)).map((c) => `${c.id} ${c.escalation}/10`);
@@ -349,17 +402,20 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     zoneId ??= topZone();
     let stance: StanceCand['stance'] | null = null; let diplo: DiploKind | null = null;
     if (/sanzion/.test(txt)) diplo = 'SANCTION';
-    if (/consiglio di sicurezza|\bonu\b|nazioni unite/.test(txt)) diplo = 'UNSC_DRAFT';
+    if (/consiglio di sicurezza|\bonu\b|nazioni unite/.test(txt)) diplo = 'RESOLUTION';
     if (/minacc/.test(txt)) { diplo = 'THREAT'; stance = 'show_of_force'; }
+    // l'ultimatum solo se la linea rossa lo scrive come risposta (mai di iniziativa)
+    if (/ultimatum/.test(txt)) diplo = 'ULTIMATUM';
     if (/strike|attacc|militar|mobilitaz|naval/.test(txt)) stance = 'show_of_force';
     if (/rinforz|schier|contingent/.test(txt)) stance ??= 'presence';
     if (!stance && !diplo) stance = 'presence';
-    if ((diplo === 'THREAT' || diplo === 'SANCTION') && !target) diplo = null;
+    if ((diplo === 'THREAT' || diplo === 'SANCTION' || diplo === 'ULTIMATUM') && !target) diplo = null;
     return { stance, diplo, zoneId, target };
   }
 
   /** Azione diplomatica con testo da modello di frase (niente LLM). */
-  function diploAction(kind: DiploKind, target: string): DiploAction {
+  function diploAction(c: DiploCand): DiploAction {
+    const { kind, target } = c;
     const who = nm(target);
     switch (kind) {
       case 'DEMARCHE': return { id: '', kind, target, message: `Il Governo protesta formalmente con ${who} e chiede spiegazioni sulle azioni del turno precedente.`, visibility: 'public' };
@@ -368,7 +424,28 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
       case 'BACKCHANNEL': return { id: '', kind, target, message: `Proposta riservata a ${who}: aprire un canale diretto per abbassare la tensione.` };
       case 'SANCTION': return { id: '', kind, target, scope: 'misure economiche mirate' };
       case 'PROPOSE_AGREEMENT': return { id: '', kind, target: [target], agreement: { type: 'ceasefire', parties: [me, target], terms: `Tregua e canale militare diretto tra ${nm(me)} e ${who}`, endTurn: null, visibility: 'public' } };
-      case 'UNSC_DRAFT': return { id: '', kind, subject: `Richiesta di ${nm(me)} al Consiglio di sicurezza dopo il superamento di una linea rossa` };
+      case 'RESOLUTION': return { id: '', kind, forum: c.forum ?? forumOf, subject: `Richiesta di ${nm(me)} dopo il superamento di una linea rossa`, topic: 'aggression', ...(target ? { target } : {}) };
+      case 'ULTIMATUM': return { id: '', kind, target, demand: c.demand ?? 'Cessare le azioni ostili', deadlineTurns: 2 };
+      case 'RECALL_AMBASSADOR': case 'RESTORE_RELATIONS': case 'IMPROVE_RELATIONS': case 'STOP_IMPROVE': return { id: '', kind, target };
     }
+  }
+
+  /** Costo in CD di un'azione per questa fazione: il catalogo, con il raddoppio delle azioni coercitive per le democrazie a tensione bassa. */
+  function costOf(a: DiploAction): number {
+    const spec = DIPLO_CATALOG[a.kind];
+    return (typeof spec.cost === 'function' ? spec.cost(a) : spec.cost) * (spec.coercive ? dip?.coerciveCost ?? 1 : 1);
+  }
+
+  /** Perché un'azione non si può fare adesso (`capitale`, `ricarica`, `rapporti`, `slot`, `prerequisito`), altrimenti null. */
+  function notReady(a: DiploAction, c: DiploCand): string | null {
+    if (!dip) return null;
+    if (costOf(a) > left + 1e-9) return 'capitale';
+    if (cooldownKeys(me, a).some((key) => (dip.cooldowns[key.slice(me.length + 1)] ?? 0) > k.turn)) return 'ricarica';
+    if (c.target && dip.ties[c.target] === 'broken' && !['RESTORE_RELATIONS', 'THREAT', 'SANCTION', 'ULTIMATUM', 'RESOLUTION'].includes(a.kind)) return 'rapporti';
+    if (a.kind === 'ULTIMATUM' && rel(c.target).tension < PARAMS.diplo.ultimatum.minTension) return 'prerequisito';
+    if (a.kind === 'RECALL_AMBASSADOR' && dip.ties[c.target]) return 'prerequisito';
+    if (a.kind === 'IMPROVE_RELATIONS' && slotsFree <= 0) return 'slot';
+    if (a.kind === 'RESOLUTION' && !forumMember(me, a.forum)) return 'prerequisito';
+    return null;
   }
 }
