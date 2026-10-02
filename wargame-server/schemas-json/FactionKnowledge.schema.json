@@ -843,7 +843,12 @@
        "ceasefire",
        "arms_sale",
        "intel_sharing",
-       "secret"
+       "secret",
+       "non_aggression",
+       "guarantee",
+       "military_access",
+       "defense_cooperation",
+       "trade"
       ]
      },
      "parties": {
@@ -1117,7 +1122,8 @@
        "cyber",
        "sof",
        "show_of_force",
-       "red_line"
+       "red_line",
+       "ultimatum"
       ]
      },
      "from": {
@@ -1133,6 +1139,12 @@
      },
      "ref": {
       "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "response": {
+      "type": "string"
      }
     },
     "required": [
@@ -1142,6 +1154,195 @@
      "to"
     ]
    }
+  },
+  "diplomacy": {
+   "type": "object",
+   "properties": {
+    "capital": {
+     "type": "number"
+    },
+    "rent": {
+     "type": "number"
+    },
+    "improvingSlots": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "coerciveCost": {
+     "default": 1,
+     "type": "number"
+    },
+    "improving": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "target": {
+        "type": "string",
+        "minLength": 2
+       },
+       "since": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "target",
+       "since"
+      ]
+     }
+    },
+    "cooldowns": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "ties": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string",
+      "minLength": 2
+     },
+     "additionalProperties": {
+      "type": "string",
+      "enum": [
+       "recalled",
+       "expelled",
+       "broken"
+      ]
+     }
+    },
+    "ultimatums": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "to": {
+        "type": "string",
+        "minLength": 2
+       },
+       "demand": {
+        "type": "string"
+       },
+       "issuedTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "deadlineTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "pending",
+         "met",
+         "expired"
+        ]
+       },
+       "answered": {
+        "type": "boolean"
+       },
+       "legitimateUntil": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "id",
+       "from",
+       "to",
+       "demand",
+       "issuedTurn",
+       "deadlineTurn",
+       "status"
+      ]
+     }
+    },
+    "embargoes": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "proposals": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "agreementId": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "type": {
+        "type": "string"
+       },
+       "score": {
+        "type": "number"
+       },
+       "accept": {
+        "type": "boolean"
+       },
+       "reasons": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "label": {
+           "type": "string"
+          },
+          "value": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "label",
+          "value"
+         ]
+        }
+       }
+      },
+      "required": [
+       "agreementId",
+       "from",
+       "type",
+       "score",
+       "accept",
+       "reasons"
+      ]
+     }
+    }
+   },
+   "required": [
+    "capital",
+    "rent",
+    "improvingSlots"
+   ]
   },
   "ownRelations": {
    "default": {},

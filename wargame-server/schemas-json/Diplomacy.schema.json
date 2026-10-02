@@ -97,6 +97,186 @@
    "additionalProperties": {
     "type": "number"
    }
+  },
+  "capital": {
+   "default": {},
+   "type": "object",
+   "propertyNames": {
+    "type": "string",
+    "minLength": 2
+   },
+   "additionalProperties": {
+    "type": "number"
+   }
+  },
+  "cooldowns": {
+   "default": {},
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number"
+   }
+  },
+  "improving": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "actor": {
+      "type": "string",
+      "minLength": 2
+     },
+     "target": {
+      "type": "string",
+      "minLength": 2
+     },
+     "since": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     }
+    },
+    "required": [
+     "actor",
+     "target",
+     "since"
+    ]
+   }
+  },
+  "ultimatums": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "from": {
+      "type": "string",
+      "minLength": 2
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "demand": {
+      "type": "string"
+     },
+     "issuedTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "deadlineTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "met",
+       "expired"
+      ]
+     },
+     "answered": {
+      "type": "boolean"
+     },
+     "legitimateUntil": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     }
+    },
+    "required": [
+     "id",
+     "from",
+     "to",
+     "demand",
+     "issuedTurn",
+     "deadlineTurn",
+     "status"
+    ]
+   }
+  },
+  "ties": {
+   "default": {},
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "string",
+    "enum": [
+     "recalled",
+     "expelled",
+     "broken"
+    ]
+   }
+  },
+  "embargoes": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "resolutions": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "forum": {
+      "type": "string"
+     },
+     "institutionId": {
+      "type": "string"
+     },
+     "subject": {
+      "type": "string"
+     },
+     "topic": {
+      "type": "string"
+     },
+     "proposer": {
+      "type": "string",
+      "minLength": 2
+     },
+     "target": {
+      "type": "string",
+      "minLength": 2
+     },
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "expiresTurn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     }
+    },
+    "required": [
+     "id",
+     "forum",
+     "institutionId",
+     "subject",
+     "topic",
+     "proposer",
+     "turn",
+     "expiresTurn"
+    ]
+   }
   }
  }
 }

@@ -593,7 +593,12 @@
              "ceasefire",
              "arms_sale",
              "intel_sharing",
-             "secret"
+             "secret",
+             "non_aggression",
+             "guarantee",
+             "military_access",
+             "defense_cooperation",
+             "trade"
             ]
            },
            "parties": {
@@ -829,6 +834,145 @@
          },
          "kind": {
           "type": "string",
+          "enum": [
+           "IMPROVE_RELATIONS",
+           "STOP_IMPROVE",
+           "RECALL_AMBASSADOR",
+           "EXPEL_DIPLOMATS",
+           "BREAK_RELATIONS",
+           "RESTORE_RELATIONS",
+           "ARMS_EMBARGO",
+           "LIFT_ARMS_EMBARGO"
+          ]
+         },
+         "target": {
+          "type": "string",
+          "minLength": 2
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "target"
+        ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "const": "ULTIMATUM"
+         },
+         "target": {
+          "type": "string",
+          "minLength": 2
+         },
+         "demand": {
+          "type": "string"
+         },
+         "deadlineTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "target",
+         "demand",
+         "deadlineTurns"
+        ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "const": "MEDIATE"
+         },
+         "crisisId": {
+          "type": "string"
+         },
+         "parties": {
+          "minItems": 2,
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+           "type": "string",
+           "minLength": 2
+          }
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "crisisId",
+         "parties"
+        ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
+          "const": "RESOLUTION"
+         },
+         "forum": {
+          "type": "string",
+          "enum": [
+           "UNSC",
+           "UNGA",
+           "EU_COUNCIL",
+           "NATO",
+           "ARAB_LEAGUE",
+           "AU"
+          ]
+         },
+         "subject": {
+          "type": "string"
+         },
+         "topic": {
+          "default": "other",
+          "type": "string",
+          "enum": [
+           "aggression",
+           "sanctions",
+           "humanitarian",
+           "maritime",
+           "nonproliferation",
+           "other"
+          ]
+         },
+         "target": {
+          "type": "string",
+          "minLength": 2
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "forum",
+         "subject"
+        ]
+       },
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "kind": {
+          "type": "string",
           "const": "LETTER"
          },
          "target": {
@@ -993,6 +1137,7 @@
        "detente",
        "objective",
        "ally",
+       "relations",
        "cyber",
        "agreement",
        "routine",

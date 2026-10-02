@@ -18,7 +18,8 @@
     "cyber",
     "sof",
     "show_of_force",
-    "red_line"
+    "red_line",
+    "ultimatum"
    ]
   },
   "from": {
@@ -33,6 +34,12 @@
    "type": "string"
   },
   "ref": {
+   "type": "string"
+  },
+  "text": {
+   "type": "string"
+  },
+  "response": {
    "type": "string"
   }
  },

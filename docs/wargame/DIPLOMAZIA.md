@@ -176,6 +176,16 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 - **Legittimità**: una BLOCKADE o una EXCLUSION_ZONE senza risoluzione, ultimatum scaduto o tensione mondiale ≥ 50 costa CD, credibilità e opinione presso i terzi.
 
+**Come è fatto (settore 09).** Il catalogo è in `engine/diplo-actions.ts` (`DIPLO_CATALOG`, costi in CD e ricariche; tabella nel README). Scelte dove il documento lasciava libertà:
+- **Rendita**: max(0,5; log₁₀(PIL in mld $) − 0,35 + 2 se seggio permanente) × credibilità/60 (tra 0,5× e 1,5×) a settimana; gli attori non statali (LNA) hanno 0,8 fisso; i blocchi 0. Partenza: 4 settimane di rendita. Il turno mensile vale 4 settimane. Esempi con credibilità 60: ITA 3,0 · USA 6,1 · FRA 5,2 · CHN 5,9 · TUR 2,8 · MLT 1,0.
+- **Ricarica N** = si può ripetere verso lo stesso destinatario da T+N (1 = una volta a turno); la lettera e la risposta a un trattato non hanno ricarica; la mediazione ha una ricarica per crisi e la risoluzione per sede.
+- **Slot di «migliorare le relazioni»**: rendita ≥ 5 → 4, ≥ 3 → 3, altrimenti 2. Il modificatore `improve` è uno per coppia (+2 a turno, tetto +30); dopo `STOP_IMPROVE` decade di 0,5 a settimana.
+- **Costo doppio** (§6): per le azioni *coercitive* (minaccia, sanzioni, richiamo, espulsione, rottura, embargo, ultimatum) delle democrazie (governo `democracy` o democrazia ≥ 6) con tensione mondiale < 25. Non ho aggiunto un modificatore d'opinione presso le altre democrazie: il costo in CD basta.
+- **Legittimità**: leggo «senza risoluzione approvata, ultimatum scaduto o tensione mondiale ≥ 50» come *senza nessuna di queste tre cose* (sono le eccezioni che tolgono il costo). Il costo si paga solo se nella zona ci sono unità di altri.
+- **Ultimatum**: richiede una tensione di coppia ≥ 30. Il destinatario lo «soddisfa» se prima della scadenza compie un atto di distensione verso chi lo ha mandato (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato, miglioramento delle relazioni): `relate(..., { detente: true })` segna l'ultimatum come `answered`, e alla scadenza (fase OPEN) esce `ULTIMATUM_MET` o `ULTIMATUM_EXPIRED` (legittimità per 6 turni; la tensione mondiale sale di 5 come incidente di fine turno).
+- **Accordi con più parti**: «Trattato attivo» (+10) lega il primo (il proponente) a ogni altra parte, fino a 8; un accordo di non aggressione si viola con uno strike o un blocco tra le parti.
+- **`military_access`** e **`defense_cooperation`**: l'effetto nel motore è che la presenza del partner non è pressione (niente −2/−5 di una dimostrazione di forza o di un blocco, nessuna violazione); le zone non hanno proprietario nello schema, quindi non c'è un divieto di transito da togliere.
+
 ## 8. Accettazione
 
 `acceptance(target, proposta, proponente) → { score, accept, reasons: [{ label, value }] }`, **deterministica** (niente dadi: deve essere spiegabile). Motivi:
@@ -193,6 +203,8 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 Accetta se `score ≥ 0`. Il giocatore vede punteggio e motivi **prima** di inviare, nel dry-run di `validate` (come il tooltip di HOI4). Le stesse regole valgono per le fazioni IA e per gli Stati del mondo.
 
+**Come è fatto (settore 09).** `engine/acceptance.ts`, pesi in `PARAMS.acceptance`: base per tipo (ceasefire +8 … basing −12), disponibilità di partenza −5, opinione × 0,5, allineamento ±10, minaccia comune (+12 per rivale in comune, tetto 24, «rivale» = opinione ≤ −25 da entrambi, solo per i trattati di sicurezza), commercio (quota × 0,3, ≤ +8), tensione mondiale (sicurezza: +5 da 40, +8 da 55, −3 sotto 25; commercio −4 da 55), istituzioni (+2 ciascuna, ≤ 6), conflitto (−12: un trattato di sicurezza del destinatario con un rivale del proponente, oppure un nemico del destinatario tra le parti), potenza relativa (protezione: +8 se il proponente ha ≥ 5× il PIL, −4 se ≤ 1/5), credibilità ((c − 50) × 0,1, ±5), proposta già respinta (−12 per 3 turni, chiave `rej|proponente|destinatario|tipo` in `diplomacy.cooldowns`), tregua (+1,5 per punto di escalation della crisi in comune). I motivi sono una lista di `{ label, value }` e il punteggio è la loro somma (arrotondata a 0,1). La Knowledge della fazione porta `diplomacy.proposals` (suggerimento `acceptance` per ogni proposta ricevuta): il decisore a regole risponde con quello, il giocatore lo vede nel pannello Diplomazia; il dry-run di `validate` lo calcola per le proposte della bozza, anche verso Stati senza fazione.
+
 ## 9. Istituzioni e votazioni
 
 - **AG ONU**: votano tutti (sì · no · astensione). Il voto dipende da opinione verso proponente e bersaglio, allineamento, coesione del blocco e tema.
@@ -201,6 +213,8 @@ Accetta se `score ≥ 0`. Il giocatore vede punteggio e motivi **prima** di invi
 - **NATO**: consenso.
 - **Effetti di ogni voto**: modificatori verso chi ha votato contro, credibilità del proponente, legittimità (§7), un evento `INSTITUTION_VOTE` con l'esito per Stato (serve alla mappa).
 - **Test di realismo**: una risoluzione dell'AG che condanna l'invasione di uno Stato da parte di un membro permanente deve dare un esito vicino a quello di marzo 2022 (141 sì, 5 no, 35 astenuti): sì tra 120 e 160, no ≤ 15.
+
+**Come è fatto (settore 09).** `engine/institutions.ts`, parametri in `PARAMS.votes`: il voto di uno Stato è un punteggio (`voteScore`) = 0,4 × opinione verso il proponente − 0,3 × opinione verso il bersaglio + 0,4 × (distanza dal bersaglio − distanza dal proponente)/2 sull'asse del voto ONU + 0,5 × coesione del blocco (alleanza o unione condivisa col proponente +coesione, col bersaglio −coesione, limitata a ±1) + tema (norma di base + componente occidentale × −punto ideale: aggression 0,3/0,15, sanctions −0,1/0,45, humanitarian 0,5/0, maritime 0,25/0,1, nonproliferation 0,15/0,3). Sì ≥ 0,15, no ≤ −0,4, altrimenti astensione; il proponente vota sì e il bersaglio no. Regole dal campo `decision` del registro (`tally`): `unsc` 9 voti e nessun veto (un permanente vota no, e quindi pone il veto, solo se punteggio ≤ −0,7 o è il bersaglio; altrimenti si astiene); `majority` sì > no; `qmv` QMV (55% degli Stati e 65% della popolazione) per `humanitarian` e `other`, unanimità per gli altri temi; `consensus` nessun no. Taratura (proponente ITA, bersaglio RUS, tema `aggression`): **143 sì, 6 no, 44 astenuti** in AG (riferimento 141/5/35); in CdS veto russo. Effetti: risoluzione approvata = mandato per 8 turni (`diplomacy.resolutions`), +3 credibilità (−2 se respinta), «condanna pubblica» (−5, tensione +3) contro il bersaglio, −3 verso il proponente per i no più popolosi (≤ 20). Le vecchie `NATO_ART4`, `EU_COUNCIL` e `UNSC_DRAFT` si leggono ancora come `RESOLUTION` con sede NATO, UE e CdS (tema `other`).
 
 ## 10. IA mondiale (livello C, `engine/world-ai.ts`)
 

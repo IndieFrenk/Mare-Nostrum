@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
 import { MockLLMProvider } from '../agents/mock-provider.js';
 import { LlmAgents } from '../agents/orchestrator.js';
 import type { LlmRequest } from '../agents/llm-client.js';
+import { PARAMS } from '../engine/params.js';
 import { Engine, agentFactions } from '../engine/turn-machine.js';
 import type { FactionMode } from '../config.js';
 import type { OrdersBody } from '../schemas/index.js';
@@ -47,7 +48,11 @@ export interface TurnStats { unitOrdersPerFaction: number; engagements: number; 
  * `opinionMean`: fiducia media tra tutte le coppie ordinate di fazioni (la riga di ogni fazione: opinione verso le altre) a fine turno,
  * dal turno 0; `worldTension`: tensione mondiale a fine turno (NaN per i motori che non l'hanno).
  */
-export interface BalanceRun { seed: string; mode: FactionMode; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[]; turns: TurnStats[]; llmByRole: Record<string, number>; opinionMean: number[]; worldTension: number[] }
+export interface BalanceRun {
+  seed: string; mode: FactionMode; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[]; turns: TurnStats[]; llmByRole: Record<string, number>; opinionMean: number[]; worldTension: number[];
+  /** capitale diplomatico (settore 09): media per fazione a fine turno (dal turno 0), quota di fazioni al tetto e a zero per turno, azioni diplomatiche per tipo, accordi firmati, voti, ultimatum */
+  capitalMean: number[]; capitalAtCap: number[]; capitalAtZero: number[]; diploByKind: Record<string, number>; agreementsSigned: number; votes: { total: number; passed: number }; ultimatums: { issued: number; expired: number; met: number };
+}
 const meanTrust = (s: { relations: Record<string, Record<string, { trust: number }>> }) => { const v = Object.values(s.relations).flatMap((r) => Object.values(r).map((x) => x.trust)); return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length); };
 
 /** Mock che conta le chiamate per ruolo (quelle delle fazioni spariscono in modalità rules). */
@@ -72,24 +77,43 @@ export async function balanceRun(seed: string, turns: number, dir: string, mode:
   const firstMax: Record<string, number | null> = {}; const migration: number[] = [];
   const opinionMean = [meanTrust(await engine.store.getState(r.campaign.id, 0))]; const worldTension: number[] = [];
   let final: Record<string, number> = {};
+  const capitalOf = (s: { diplomacy?: { capital: Record<string, number> } }) => Object.values(s.diplomacy?.capital ?? {});
+  const capitalMean: number[] = []; const capitalAtCap: number[] = []; const capitalAtZero: number[] = [];
+  const noteCapital = (s: Parameters<typeof capitalOf>[0]) => {
+    const c = capitalOf(s);
+    capitalMean.push(+(c.reduce((a, b) => a + b, 0) / Math.max(1, c.length)).toFixed(2));
+    capitalAtCap.push(+(c.filter((x) => x >= PARAMS.diplo.capital.cap - 0.05).length / Math.max(1, c.length)).toFixed(3));
+    capitalAtZero.push(+(c.filter((x) => x < 0.5).length / Math.max(1, c.length)).toFixed(3));
+  };
+  noteCapital(await engine.store.getState(r.campaign.id, 0));
+  const diploByKind: Record<string, number> = {}; let agreementsSigned = 0; const votes = { total: 0, passed: 0 }; const ultimatums = { issued: 0, expired: 0, met: 0 };
   const agents = agentFactions(await engine.store.getState(r.campaign.id, 0));
   for (let t = 1; t <= turns; t++) {
     const s = await engine.store.getState(r.campaign.id, t);
     migration.push(s.globalIndicators.migrationPressure);
     opinionMean.push(meanTrust(s)); worldTension.push((s.globalIndicators as { worldTension?: number }).worldTension ?? NaN);
+    noteCapital(s);
     for (const cr of Object.values(s.crises)) { if (!(cr.id in firstMax)) firstMax[cr.id] = null; if (cr.escalation >= 10 && firstMax[cr.id] === null) firstMax[cr.id] = t; }
     final = Object.fromEntries(Object.values(s.crises).map((cr) => [cr.id, cr.escalation]));
     const ds = (await Promise.all(agents.map((f) => engine.store.getDecision(r.campaign.id, t, f)))).filter((d) => !!d);
     const units = ds.reduce((n, d) => n + d.orders.military.filter((o) => 'unitIds' in o && o.unitIds.length).length, 0);
     const events = await engine.store.getEvents(r.campaign.id, t);
+    for (const f of Object.keys(s.factions)) for (const d of (await engine.store.getOrders(r.campaign.id, t, f))?.diplomacy ?? []) diploByKind[d.kind] = (diploByKind[d.kind] ?? 0) + 1;
+    agreementsSigned += events.filter((e) => e.type === 'AGREEMENT_CHANGED' && (e.payload as { agreement: { status: string } }).agreement.status === 'active').length;
+    for (const e of events.filter((e) => e.type === 'INSTITUTION_VOTE')) { votes.total++; if ((e.payload as { passed: boolean }).passed) votes.passed++; }
+    ultimatums.issued += events.filter((e) => e.type === 'DIPLOMACY_CHANGED' && (e.payload as { change: { op: string } }).change.op === 'ultimatum_add').length;
+    ultimatums.expired += events.filter((e) => e.type === 'ULTIMATUM_EXPIRED').length; ultimatums.met += events.filter((e) => e.type === 'ULTIMATUM_MET').length;
     Object.assign(perTurn[t - 1]!, {
       unitOrdersPerFaction: +(units / Math.max(1, agents.length)).toFixed(2),
       engagements: events.filter((e) => e.type === 'ENGAGEMENT_OPENED').length,
       initiatives: ds.reduce((n, d) => n + d.letters.filter((l) => l.kind === 'initiative').length, 0),
     });
   }
-  return { seed, mode, final, firstMax, migration, turns: perTurn, llmByRole: mock.byRole, opinionMean, worldTension };
+  return { seed, mode, final, firstMax, migration, turns: perTurn, llmByRole: mock.byRole, opinionMean, worldTension, capitalMean, capitalAtCap, capitalAtZero, diploByKind, agreementsSigned, votes, ultimatums };
 }
+
+const capitalByTurn = (rows: number[][]) => Array.from({ length: Math.max(0, ...rows.map((r) => r.length)) }, (_, i) => +(rows.map((r) => r[i]).filter((x): x is number => x !== undefined).reduce((a, b, _j, l) => a + b / l.length, 0)).toFixed(1));
+const sumKinds = (runs: BalanceRun[]) => runs.reduce<Record<string, number>>((a, r) => { for (const [k, n] of Object.entries(r.diploByKind)) a[k] = (a[k] ?? 0) + n; return a; }, {});
 
 export function summarize(runs: BalanceRun[]) {
   const ids = Object.keys(runs[0]?.final ?? {}).sort();
@@ -121,6 +145,11 @@ export function summarize(runs: BalanceRun[]) {
     opinionMeanStart: avg(runs.map((r) => r.opinionMean[0]!)),
     worldTensionMean: avg(runs.flatMap((r) => r.worldTension).filter((x) => !Number.isNaN(x))), worldTensionMax: Math.max(...runs.flatMap((r) => r.worldTension).filter((x) => !Number.isNaN(x)), -Infinity),
     worldTensionFinalMean: avg(runs.map((r) => r.worldTension.at(-1)!).filter((x) => !Number.isNaN(x))), turnsAtWorldTension100: runs.reduce((a, r) => a + r.worldTension.filter((x) => x >= 100).length, 0),
+    // capitale diplomatico (settore 09): non deve restare sempre al tetto né a zero
+    capitalMeanByTurn: capitalByTurn(runs.map((r) => r.capitalMean)), capitalAtCapShare: avg(runs.flatMap((r) => r.capitalAtCap.slice(1)).map((x) => x * 100)), capitalAtZeroShare: avg(runs.flatMap((r) => r.capitalAtZero.slice(1)).map((x) => x * 100)),
+    diploPerTurnByKind: Object.fromEntries(Object.entries(sumKinds(runs)).sort(([, a], [, b]) => b - a).map(([k, n]) => [k, +(n / Math.max(1, turns.length)).toFixed(2)])),
+    agreementsSignedPerRun: avg(runs.map((r) => r.agreementsSigned)), votesPerRun: avg(runs.map((r) => r.votes.total)), votesPassedPerRun: avg(runs.map((r) => r.votes.passed)),
+    ultimatumsPerRun: avg(runs.map((r) => r.ultimatums.issued)), ultimatumsExpiredPerRun: avg(runs.map((r) => r.ultimatums.expired)), ultimatumsMetPerRun: avg(runs.map((r) => r.ultimatums.met)),
   };
 }
 
@@ -145,6 +174,9 @@ async function main() {
   console.log(`ordini IA con unità per fazione per turno: ${s.unitOrdersPerFactionPerTurn} (turni sotto 1: ${s.turnsBelowOneUnitOrder}/${s.turnsTotal}) · ingaggi per partita: ${s.engagementsPerRun} (partite senza: ${s.runsWithoutEngagements})`);
   console.log(`lettere IA di iniziativa per turno: ${s.initiativesPerTurn} (turni senza: ${s.turnsWithoutInitiative}/${s.turnsTotal}) · chiamate LLM per turno: ${s.llmCallsPerTurn} ${JSON.stringify(s.llmCallsPerTurnByRole)} · ${s.msPerTurn} ms per turno (mock)`);
   console.log(`fiducia media tra fazioni: ${s.opinionMeanStart} all'inizio, deriva media a fine partita ${s.opinionDriftMean} (massima in valore assoluto ${s.opinionDriftMaxAbs}; obiettivo ≤ ±10) · tensione mondiale: media ${s.worldTensionMean ?? 'n/d'}, massima ${Number.isFinite(s.worldTensionMax) ? s.worldTensionMax : 'n/d'}, finale ${s.worldTensionFinalMean ?? 'n/d'}, turni a 100: ${s.turnsAtWorldTension100}`);
+  console.log(`capitale diplomatico medio per fazione, per turno (dal turno 0): ${s.capitalMeanByTurn.join(' ')} · fazioni al tetto ${s.capitalAtCapShare}% e a zero ${s.capitalAtZeroShare}% dei turni`);
+  console.log(`azioni diplomatiche per turno (tutte le fazioni): ${Object.entries(s.diploPerTurnByKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
+  console.log(`per partita: accordi firmati ${s.agreementsSignedPerRun} · votazioni ${s.votesPerRun} (approvate ${s.votesPassedPerRun}) · ultimatum ${s.ultimatumsPerRun} (scaduti ${s.ultimatumsExpiredPerRun}, soddisfatti ${s.ultimatumsMetPerRun})`);
   if (a.json) writeFileSync(a.json, JSON.stringify({ runs, summary: s }, null, 1));
 }
 

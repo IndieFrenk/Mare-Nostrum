@@ -345,7 +345,14 @@ type DiploAction =
   | { id: string; kind: "BACKCHANNEL"; target: FactionId; message: string }
   | { id: string; kind: "NATO_ART4" | "EU_COUNCIL" | "UNSC_DRAFT"; subject: string }
   | { id: string; kind: "ENERGY_DEAL"; target: FactionId; infrastructureId: string; terms: string }
-  | { id: string; kind: "AID"; target: FactionId; amount: MEur; type: "economic" | "military" };
+  | { id: string; kind: "AID"; target: FactionId; amount: MEur; type: "economic" | "military" }
+  // settore 09 (DIPLOMAZIA.md §7): azioni con costo in capitale diplomatico; `target` può essere anche l'ISO3 di uno Stato senza fazione
+  | { id: string; kind: "IMPROVE_RELATIONS" | "STOP_IMPROVE" | "RECALL_AMBASSADOR" | "EXPEL_DIPLOMATS" | "BREAK_RELATIONS" | "RESTORE_RELATIONS" | "ARMS_EMBARGO" | "LIFT_ARMS_EMBARGO"; target: FactionId }
+  | { id: string; kind: "ULTIMATUM"; target: FactionId; demand: string; deadlineTurns: 1 | 2 | 3 | 4 }
+  | { id: string; kind: "MEDIATE"; crisisId: string; parties: [FactionId, FactionId] }
+  | { id: string; kind: "RESOLUTION"; forum: "UNSC" | "UNGA" | "EU_COUNCIL" | "NATO" | "ARAB_LEAGUE" | "AU"; subject: string; topic: "aggression" | "sanctions" | "humanitarian" | "maritime" | "nonproliferation" | "other"; target?: FactionId };
+// NATO_ART4, EU_COUNCIL e UNSC_DRAFT (sopra) restano come alias in lettura di RESOLUTION con sede NATO, UE e CdS; Agreement.type ha in più
+// "non_aggression" | "guarantee" | "military_access" | "defense_cooperation" | "trade".
 interface ProcurementOrder { id: string; itemId: string; qty: number; destinationBaseId: string }
 interface PublicStatement { id: string; audience: "domestic" | "international" | FactionId; text: string; tone: "conciliatory" | "firm" | "threatening" }
 ```
