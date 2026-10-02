@@ -87,6 +87,38 @@ export const Zone = z.object({ id: ZoneId, name: z.string(), terrain: z.enum(['s
 export const Relation = z.object({ trust: z.number(), tension: z.number(), tradeDependency: z.number(), lastIncidentTurn: Turn.nullable(), notes: z.array(z.string()) });
 export const RelationMatrix = z.record(FactionId, z.record(FactionId, Relation));
 
+/**
+ * Modificatore dell'opinione (docs/wargame/DIPLOMAZIA.md §5.2): `opinion(from→to)` = base + Σ modificatori(from→to). Un'azione di A
+ * verso B crea un modificatore su `opinion(B→A)`, cioè su come B vede A. `value` è il valore corrente (si riduce verso 0 con il
+ * decadimento, un evento OPINION_DECAYED per turno); `decayPerWeek` 0 = finché dura la causa.
+ */
+export const OpinionModifier = z.object({
+  id: z.string(), from: FactionId, to: FactionId,
+  /** chiave della tabella PARAMS.opinion.modifiers («threat», «sanction», «history»…) */
+  kind: z.string(), label: z.string(),
+  value: z.number(), decayPerWeek: z.number().min(0).default(0),
+  /** valore assoluto sotto cui non scende finché la causa è attiva (senza `expiresTurn`) */
+  floor: z.number().optional(),
+  expiresTurn: Turn.optional(),
+  /** ordine, accordo o evento che l'ha causato */
+  causeRef: z.string(),
+  visibility: Visibility.default('public'),
+  /** turno in cui è nato (per «i turni che mancano» nella scheda paese) */
+  turn: Turn.default(0),
+});
+/**
+ * Stato sparso della diplomazia: mai la matrice completa (con 197 Stati sarebbero ~39.000 coppie per snapshot).
+ * - `modifiers`: tutti i modificatori d'opinione vivi;
+ * - `tension`: tensione di coppia (simmetrica) solo per le coppie diverse dal fondo, chiave «A|B» con A < B;
+ * - `tensionBase`: tensione strutturale delle coppie diverse dal predefinito (dallo scenario): il fondo verso cui la tensione torna.
+ * La tensione mondiale sta in `globalIndicators.worldTension`. Gli altri campi del §5.5 (capitale, ricariche, ultimatum) arrivano col settore 09.
+ */
+export const Diplomacy = z.object({
+  modifiers: z.array(OpinionModifier).default([]),
+  tension: z.record(z.string(), z.number()).default({}),
+  tensionBase: z.record(z.string(), z.number()).default({}),
+});
+
 export const Agreement = z.object({
   id: z.string(), type: z.enum(['defense', 'energy', 'basing', 'migration', 'ceasefire', 'arms_sale', 'intel_sharing', 'secret']),
   parties: z.array(FactionId), terms: z.string(), startTurn: Turn, endTurn: Turn.nullable(),
@@ -132,7 +164,13 @@ export const WorldState = z.object({
   infrastructure: z.record(z.string(), Infrastructure), zones: z.record(ZoneId, Zone), relations: RelationMatrix,
   crises: z.record(z.string(), Crisis), agreements: z.record(z.string(), Agreement),
   pendingDeliveries: z.array(PendingDelivery), engagements: z.record(z.string(), Engagement),
-  globalIndicators: z.object({ brentUsd: z.number(), ttfEurMwh: z.number(), medShippingRisk: z.number(), migrationPressure: z.number() }),
+  globalIndicators: z.object({
+    brentUsd: z.number(), ttfEurMwh: z.number(), medShippingRisk: z.number(), migrationPressure: z.number(),
+    /** tensione mondiale 0–100 (engine/world-tension.ts): rende più facili o più costose le azioni gravi (docs/wargame/DIPLOMAZIA.md §6) */
+    worldTension: z.number().default(30),
+  }),
+  /** opinione asimmetrica e tensione di coppia; assente nelle campagne precedenti (si riempie in lettura, store/migrations) */
+  diplomacy: Diplomacy.optional(),
 });
 
 export const LedgerEntry = z.object({
@@ -161,6 +199,8 @@ export type Base = z.infer<typeof Base>;
 export type Infrastructure = z.infer<typeof Infrastructure>;
 export type Zone = z.infer<typeof Zone>;
 export type Relation = z.infer<typeof Relation>;
+export type OpinionModifier = z.infer<typeof OpinionModifier>;
+export type Diplomacy = z.infer<typeof Diplomacy>;
 export type Agreement = z.infer<typeof Agreement>;
 export type Crisis = z.infer<typeof Crisis>;
 export type PendingDelivery = z.infer<typeof PendingDelivery>;

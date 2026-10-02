@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, Turn, Unit, Visibility, ZoneId } from './world.js';
 import { FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
 
+/** Fasce con cui si vede l'opinione degli altri verso di sé (docs/wargame/DIPLOMAZIA.md §5.6); le soglie sono in PARAMS.opinion.bands. */
+export const OPINION_BANDS = ['ostile', 'fredda', 'neutra', 'cordiale', 'stretta'] as const;
+export type OpinionBand = (typeof OPINION_BANDS)[number];
+
 export const TurnPhase = z.enum(['OPEN', 'INTEL', 'BRIEFING', 'PLAYER_ORDERS', 'AI_DECISIONS', 'ADJUDICATION', 'CMO_PENDING', 'DEBRIEF', 'CLOSED']);
 export const LlmRoleConfig = z.object({ model: z.string(), temperature: z.number(), maxTokens: z.number(), timeoutMs: z.number() });
 
@@ -92,14 +96,20 @@ export const FactionKnowledge = z.object({
   letters: z.array(DiploLetter).default([]),
   /** atti ostili o di pressione visti nel turno precedente (prima quelli che riguardano la fazione) */
   incidents: z.array(Incident).default([]),
-  /** fiducia e tensione della fazione verso le altre (la sua riga della matrice delle relazioni: il suo atteggiamento) */
-  ownRelations: z.record(FactionId, z.object({ trust: z.number(), tension: z.number() })).default({}),
+  /**
+   * L'opinione della fazione verso le altre (la sua riga: `trust` = opinionOf(lei → altra)) e la tensione di coppia. `opinionOfMe` è
+   * come le altre la vedono, solo a fasce (ostile · fredda · neutra · cordiale · stretta); il numero esatto (`opinionOfMeExact`) solo
+   * con un accordo di intelligence. Le coppie tra terzi non ci sono: si vedono solo dagli atti pubblici.
+   */
+  ownRelations: z.record(FactionId, z.object({ trust: z.number(), tension: z.number(), opinionOfMe: z.enum(OPINION_BANDS).optional(), opinionOfMeExact: z.number().optional() })).default({}),
 });
 
 export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED', 'CONTACT_LOST', 'ENGAGEMENT_OPENED', 'ENGAGEMENT_RESOLVED',
   'UNIT_DAMAGED', 'UNIT_DESTROYED', 'UNIT_CREATED', 'MUNITION_EXPENDED', 'DELIVERY_ARRIVED', 'PROCUREMENT_ORDERED',
   'BUDGET_CHANGED', 'RELATION_CHANGED', 'AGREEMENT_CHANGED', 'CRISIS_CHANGED', 'CYBER_EFFECT', 'SOF_RESULT', 'DIPLO_MESSAGE',
-  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT']);
+  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT',
+  // diplomazia asimmetrica (RELATION_CHANGED resta leggibile per le campagne vecchie e il replay, ma non si emette più)
+  'OPINION_MODIFIER', 'OPINION_DECAYED', 'TENSION_CHANGED', 'WORLD_TENSION_CHANGED']);
 export const GameEvent = z.object({
   id: z.string(), turn: Turn, seq: z.number().int(), phase: TurnPhase, type: EventType,
   actor: z.string(), targets: z.array(z.string()), payload: z.record(z.string(), z.unknown()),

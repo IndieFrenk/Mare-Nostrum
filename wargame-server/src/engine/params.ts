@@ -39,6 +39,100 @@ export const PARAMS = {
   /** riduzione dell'escalation quando entra in vigore un accordo pertinente */
   agreementDeescalation: { ceasefire: 2, migration: 1, energy: 1 },
   diplo: { propagation: 0.3 },
+  /**
+   * Opinione asimmetrica (engine/opinion.ts, docs/wargame/DIPLOMAZIA.md §5): opinion(A→B) = clamp(base(A,B) + Σ modificatori(A→B), ±100).
+   * Valori ragionati da tarare con `npm run balance` e con i test di plausibilità (test/opinion-plausibility.test.ts).
+   */
+  opinion: {
+    /**
+     * Base statica, funzione pura dei dati del mondo (scenarios/_world). Ogni componente è un «motivo» leggibile. Tarata su tutte le
+     * coppie (197 × 196): media +1,9, deviazione 14; solo 14 coppie su 38.612 arrivano a ±100 (le inimicizie più estreme); le coppie
+     * di riferimento di test/opinion-plausibility.test.ts restano sul segno atteso. I pesi sono più bassi di quelli indicativi del §5.1
+     * perché con alleanza 25 + unione 15 + allineamento 25 + coppia storica 45 anche le coppie amiche toccavano il tetto +100, dove un
+     * modificatore dinamico (−40 per uno strike) non avrebbe più effetto.
+     */
+    base: {
+      /** istituzione con difesa collettiva in comune (NATO, CSTO, CCG, Alleanza del Sahel): conta una volta */
+      alliance: 20,
+      /** stessa unione (UE) / stessa organizzazione regionale (Lega Araba, UA, ASEAN, OSA, Commonwealth, CoE…): una volta ciascuna */
+      union: 10, regional: 4,
+      /** blocchi contrapposti (un membro per parte): penalità */
+      opposedBlocs: [['NATO', 'CSTO']] as const, opposed: -10,
+      /**
+       * Vicinanza di allineamento e di voto ONU: distanza D 0–1 = media pesata (idealWeight per il punto ideale) di (distanza tra i tre
+       * poli)/2 e (distanza dei punti ideali)/2; il contributo va da +range (D = 0) a −range (D ≥ center + span), 0 a D = center. Con
+       * center 0,3 una coppia scelta a caso (D ≈ 0,2) riceve un piccolo premio e solo le coppie davvero lontane (USA–Iran) pagano.
+       */
+      alignment: { range: 20, center: 0.3, span: 0.4, idealWeight: 0.6 },
+      /** Somiglianza di regime dalla distanza tra i punteggi di democrazia (0–10): +range a 0, 0 a `center`, −range da center + span */
+      regime: { range: 6, center: 2, span: 4 },
+      /** Dipendenza commerciale di A da B: quota di B tra i primi partner di A × perShare (in punti per punto percentuale), tetto max */
+      trade: { perShare: 0.4, max: 12 },
+    },
+    /**
+     * Modificatori dinamici (§5.2): etichetta, valore di riferimento e decadimento per settimana (si scala sulla durata del turno:
+     * mese = 4 settimane). `value` è il riferimento per le azioni nuove (settore 09); `relate()` usa il valore passato da chi chiama
+     * (già tarato: fiducia −6 per una minaccia, −25 per uno strike…). `sticky` = un solo modificatore per coppia che si accumula fino a
+     * `cap`; `mutual` = entrambe le parti vedono peggio (o meglio) l'altra (scontri, accordi).
+     */
+    modifiers: {
+      threat: { label: 'Minaccia formale', value: -10, decayPerWeek: 1 },
+      statement_threat: { label: 'Dichiarazione minacciosa', value: -3, decayPerWeek: 1 },
+      statement_conciliatory: { label: 'Dichiarazione conciliante', value: 2, decayPerWeek: 1 },
+      demarche: { label: 'Démarche', value: -3, decayPerWeek: 0.5 },
+      reassurance: { label: 'Rassicurazione', value: 3, decayPerWeek: 0.5 },
+      backchannel: { label: 'Canale riservato', value: 2, decayPerWeek: 0.5 },
+      letter: { label: 'Lettera', value: 0, decayPerWeek: 0.5 },
+      sanction: { label: 'Sanzioni in vigore', value: -20, decayPerWeek: 0, sticky: true, cap: -40 },
+      sanction_lifted: { label: 'Sanzioni revocate', value: -10, decayPerWeek: 0.5 },
+      aid: { label: 'Aiuto', value: 10, decayPerWeek: 0.5 },
+      agreement: { label: 'Accordo accettato', value: 8, decayPerWeek: 0.5, mutual: true },
+      agreement_rejected: { label: 'Proposta respinta', value: -4, decayPerWeek: 0.5 },
+      blockade: { label: 'Blocco navale subito', value: -5, decayPerWeek: 0.5 },
+      show_of_force: { label: 'Dimostrazione di forza', value: -2, decayPerWeek: 0.5 },
+      strike: { label: 'Strike subito', value: -40, decayPerWeek: 0.5 },
+      clash: { label: 'Scontro armato', value: -40, decayPerWeek: 0.5, mutual: true },
+      incident: { label: 'Incidente', value: -3, decayPerWeek: 1, mutual: true },
+      sof: { label: 'Operazione clandestina scoperta', value: -10, decayPerWeek: 0.5 },
+      cyber: { label: 'Attacco cyber attribuito', value: -10, decayPerWeek: 0.5 },
+      /** permanenti: l'opinione dello scenario rispetto alla base, e quella delle campagne precedenti alla migrazione */
+      situation: { label: 'Situazione 2026', value: 0, decayPerWeek: 0 },
+      history: { label: 'Storia recente', value: 0, decayPerWeek: 0 },
+      /** reazione dei terzi e voti (settori 09–10) */
+      vote_against: { label: 'Voto contrario in un\'istituzione', value: -3, decayPerWeek: 1 },
+      condemnation: { label: 'Condanna pubblica', value: -5, decayPerWeek: 1 },
+      support: { label: 'Sostegno pubblico', value: 5, decayPerWeek: 1 },
+      treaty: { label: 'Trattato attivo', value: 10, decayPerWeek: 0 },
+      treaty_violated: { label: 'Trattato violato', value: -30, decayPerWeek: 0.5 },
+      improve: { label: 'Migliorare le relazioni', value: 2, decayPerWeek: 0 },
+    } as Record<string, { label: string; value: number; decayPerWeek: number; sticky?: boolean; cap?: number; mutual?: boolean }>,
+    /** un modificatore con |valore| sotto questa soglia si toglie */
+    epsilon: 0.05,
+    /** settimane per turno: scala il decadimento */
+    weeksPerTurn: { week: 1, month: 4 },
+    /** Fasce con cui si vede l'opinione degli altri verso di sé: ostile < −50 ≤ fredda < −15 ≤ neutra < 15 ≤ cordiale < 50 ≤ stretta */
+    bands: [-50, -15, 15, 50] as const,
+    /**
+     * Tensione di coppia (simmetrica): il fondo è il maggiore tra la tensione strutturale della coppia (predefinita 20, come la matrice
+     * dello scenario) e `perCrisisLevel` × l'escalation della crisi più grave che le coinvolge entrambe (a 10/10 → 30). Dopo un
+     * incidente torna al fondo di `decayPerWeek` punti a settimana: prima restava per sempre e la tensione di coppia saliva a ogni
+     * incidente fino ai massimi (ingaggi ostili da tensione ≥ 70).
+     */
+    tension: { default: 20, perCrisisLevel: 3, decayPerWeek: 0.5 },
+  },
+  /**
+   * Tensione mondiale 0–100 (engine/world-tension.ts, §6). A fine turno si avvicina di `relax` al valore dato dalle crisi
+   * (base + perMaxEscalation × escalation massima + perMeanEscalation × media: con RED_SEA a 5 e le altre a 2–4 → ≈ 30, la fascia «normale»)
+   * e ogni incidente del turno aggiunge la sua quota: scende da sola senza incidenti e non resta mai a 100 (il massimo di regime è 63).
+   * Gli effetti sugli indicatori sono piccoli e proporzionali alla variazione.
+   */
+  worldTension: {
+    base: 8, perMaxEscalation: 3.5, perMeanEscalation: 1.5, relax: 0.3,
+    incident: { engagement: 3, strike: 6, blockade: 2, threat: 1, ultimatum: 5 },
+    /** tetto all'aumento in un solo turno per incidenti */
+    maxIncidentBoost: 15,
+    indicators: { brentPerPoint: 0.06, ttfPerPoint: 0.1, shippingPerPoint: 0.15 },
+  },
   energy: { ttfPerLostShare: 120, stabilityPerLostShare: 25, penaltyPerLostShare: 60 },
   aarPlausibility: { victory: 0.75, draw: 0.55, defeat: 0.35 },
   autoResolveUncertainty: 0.3,
