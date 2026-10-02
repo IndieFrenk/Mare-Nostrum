@@ -2,7 +2,10 @@ import type { AgentRole, Campaign, LlmCounters, LlmTurnCounters, LlmUsage } from
 import { factionModeDefault } from '../config.js';
 import type { LlmCacheRow } from '../store/json-store.js';
 import { LlmSkipped, RateLimitError, type LlmProvider, type LlmRequest, type LlmResponse } from './llm-client.js';
+import type { BudgetStatus } from './llm-status.js';
 import { promptHash } from './repair.js';
+
+export type { BudgetStatus };
 
 /**
  * Gestore del budget delle chiamate LLM (docs/wargame/DIPLOMAZIA.md §11, docs/wargame/AGENTS.md «Budget»): tutte le chiamate dei ruoli passano di qui.
@@ -113,19 +116,6 @@ export interface BudgetOptions {
 
 interface Cached { text: string; model: string; tokens: { in: number; out: number } }
 interface CampaignState { usage: LlmUsage; cache: Map<string, Cached>; books: Map<number, number[]>; chain: Promise<void> }
-
-export interface BudgetStatus {
-  profile: string; baseUrl: string;
-  /** chiamate per turno (null = nessun tetto) */
-  callsPerTurn: number | null; cache: boolean; maxWaitMs: number;
-  endpoints: { key: string; model: string | null; rpm: number; rpd: number; inLastMinute: number; inLastDay: number; coolingMs: number }[];
-  campaign: null | {
-    id: string; callsPerTurn: number | null;
-    /** i contatori dell'ultimo turno con chiamate (o del turno richiesto) e quante ne restano */
-    turn: (LlmTurnCounters & { turn: number; remaining: number | null }) | null;
-    today: LlmCounters; turns: Record<string, LlmTurnCounters>; days: Record<string, LlmCounters>;
-  };
-}
 
 /** Parte di Campaign che serve al gestore (il resto non lo riguarda). */
 type CampaignRef = Pick<Campaign, 'id'> & { config: Pick<Campaign['config'], 'factionMode'> };

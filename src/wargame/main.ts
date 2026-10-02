@@ -1,7 +1,7 @@
 // Mare Nostrum — entry della variante "wargame" (AGPL-3.0, fork di World Monitor).
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
-import { api } from './api-client';
+import { api, type LlmStatus } from './api-client';
 import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, loadNation, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
 import { FACTIONS } from './layers/factions';
@@ -15,6 +15,13 @@ const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '�
 let map: WarMap | null = null;
 const mapEl = h('div', { id: 'wg-map' });
 const hud = h('div', { id: 'wg-hud' });
+
+/** Una riga sul budget delle chiamate: profilo, chiamate del turno, 429, ripieghi e chiamate saltate (da /llm/status). */
+function budgetLine(b: NonNullable<LlmStatus['budget']>) {
+  const t = b.campaign?.turn;
+  return [`Budget LLM: profilo ${b.profile}`, b.callsPerTurn === null ? 'chiamate per turno senza tetto' : `${t?.admitted ?? 0}/${b.callsPerTurn} chiamate nel turno`,
+    t ? `${t.tokensIn}+${t.tokensOut} token · ${t.rate429} 429 · ${t.fallbacks} ripieghi · ${t.skipped} saltate` : null, b.campaign ? `oggi ${b.campaign.today.calls} chiamate` : null].filter(Boolean).join(' · ');
+}
 
 /** Pallino dello stato dei modelli: verde (rispondono), giallo (manca un modello o lenti), rosso (irraggiungibili). Clic: ricontrolla. */
 function llmDot(s: UiState) {
@@ -30,6 +37,7 @@ function llmDot(s: UiState) {
       l.missing.length ? `Modelli mancanti sul server: ${l.missing.join(', ')}` : null,
       l.listed === null && l.reachable ? 'Il server non elenca i modelli (/models): presenza non verificata.' : null,
       l.factionMode === 'rules' ? 'Fazioni: regole del motore (l\'LLM scrive lettere, notizie e briefing e interpreta la Console Ordini).' : l.factionMode === 'llm' ? 'Fazioni: agenti LLM.' : null,
+      l.budget ? budgetLine(l.budget) : null,
       `Modelli per ruolo:\n${roles}`,
       `Controllato alle ${new Date(l.checkedAt).toLocaleTimeString('it-IT')} · clic per ricontrollare`,
     ].filter(Boolean).join('\n');

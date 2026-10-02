@@ -5,6 +5,7 @@ import { leaderOf } from './diplomacy.js';
 import { opinionLookup, tensionOf } from './opinion.js';
 import { buildDigest, type WorldDigest } from './world-digest.js';
 import { chanceryVocabulary, pickStates, EVENT_NOUN, type ChanceryState } from './chancery.js';
+import type { BudgetStatus } from '../agents/budget.js';
 import { activeDirective, limitDirective, strategistContext, strategistPowers, strategistsOfTurn, type LimitInput, type StrategistContext } from './directive.js';
 import { stateProfile, worldAiTurn, type WorldAiOutput } from './world-ai.js';
 import { worldData } from './world-data.js';
@@ -85,6 +86,8 @@ export interface AgentsPort {
   drainLlmCalls(): LlmCall[];
   /** Il motore consegna lo store: i contatori e la cache delle chiamate LLM stanno nel registro della campagna (facoltativo: replay e agenti finti non ne hanno). */
   attach?(store: JsonStore): void;
+  /** Stato del budget delle chiamate LLM e contatori della campagna (per GET /api/wg/llm/status). */
+  budgetStatus?(campaign?: Campaign, turn?: number): Promise<BudgetStatus>;
   /** Aspetta le scritture dei contatori LLM in corso (a fine fase). */
   settle?(): Promise<void>;
   /** Chiamate che il motore chiederà più avanti nel turno, per priorità (0–5): le priorità più basse lasciano loro il posto nel budget. */

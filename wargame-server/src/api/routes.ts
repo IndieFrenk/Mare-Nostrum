@@ -61,7 +61,8 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
   /** Stato dei modelli (cache 30 s; ?fresh=1 riprova subito): raggiungibili, modello per ruolo, modelli mancanti, latenza. */
   app.get<{ Querystring: { campaignId?: string; fresh?: string } }>(`${P}/llm/status`, async (req) => {
     const c = req.query.campaignId ? await store.getCampaign(req.query.campaignId) : null;
-    return { ...(await llm.status(await modelsFor(req.query.campaignId), req.query.fresh === '1')), factionMode: c ? factionModeOf(c) : factionModeDefault() };
+    const budget = await engine.agents.budgetStatus?.(c ?? undefined, c?.currentTurn);
+    return { ...(await llm.status(await modelsFor(req.query.campaignId), req.query.fresh === '1')), factionMode: c ? factionModeOf(c) : factionModeDefault(), ...(budget ? { budget } : {}) };
   });
 
   app.get(`${P}/scenarios`, async () => listScenarios());
