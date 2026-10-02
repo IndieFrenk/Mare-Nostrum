@@ -9,6 +9,7 @@ import { applyAttrition } from './attrition.js';
 import { applyAar, autoResolveMajor } from './cmo.js';
 import { TurnCtx } from './context.js';
 import { evolveCrises, recoverInfrastructure } from './crises.js';
+import { decayDiplomacy, updateWorldTension } from './world-tension.js';
 import { runDetection } from './detection.js';
 import { applyEnergy, chargeOperations } from './economy.js';
 import { briefingFacts, debriefFacts, energyFacts, type Fact } from './facts.js';
@@ -152,6 +153,7 @@ export class Engine {
             break;
           case 'OPEN':
             deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); continueTransit(ctx); recoverInfrastructure(ctx);
+            decayDiplomacy(ctx);
             evolveCrises(ctx, ctx.turn > 1 ? await this.store.getEvents(id, ctx.turn - 1) : []);
             ctx.phase = 'INTEL'; break;
           case 'INTEL': await this.intel(ctx, c); ctx.phase = 'BRIEFING'; break;
@@ -323,6 +325,8 @@ export class Engine {
     applyEnergy(ctx);
     updateObjectives(ctx);
     checkThreats(ctx, [...(ctx.turn > 2 ? await this.store.getEvents(c.id, ctx.turn - 2) : []), ...(ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : []), ...(await this.store.getEvents(c.id, ctx.turn))]);
+    // tensione mondiale: crisi e incidenti di tutto il turno (anche quelli salvati prima di un'eventuale pausa CMO)
+    updateWorldTension(ctx, [...new Map([...(await this.store.getEvents(c.id, ctx.turn)), ...ctx.events].map((e) => [e.id, e])).values()]);
     await this.flush(ctx, c);
     const events = await this.store.getEvents(c.id, ctx.turn);
     const player = c.playerFaction;

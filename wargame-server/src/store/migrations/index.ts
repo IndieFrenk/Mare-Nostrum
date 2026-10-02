@@ -4,6 +4,8 @@
  */
 import type { WorldState } from '../../schemas/index.js';
 import { loadScenario } from '../../engine/scenario.js';
+import { baseOpinion, emptyDiplomacy, setTension, syncAll } from '../../engine/opinion.js';
+import { PARAMS } from '../../engine/params.js';
 
 export const CURRENT = 1;
 const STEPS: Record<number, (d: Record<string, unknown>) => Record<string, unknown>> = {};
@@ -41,5 +43,27 @@ export function fillFromScenario(s: WorldState, scenarioId: string): WorldState 
     if (!f.policy && d.policy) f.policy = structuredClone(d.policy);
     if (d.name && f.name !== d.name) f.name = d.name;
   }
+  return s;
+}
+
+/**
+ * Campagne create prima dell'opinione asimmetrica (nessun `diplomacy` nello stato), riempite in lettura, solo in memoria: per ogni
+ * coppia di fazioni, fiducia attuale − base dei dati del mondo = un modificatore permanente «Storia recente»; le tensioni attuali vanno
+ * nella mappa sparsa (dove diverse dal fondo, la tensione strutturale è quella dello scenario). La campagna riprende con gli stessi
+ * `trust` e `tension` di prima.
+ */
+export function migrateDiplomacy(s: WorldState, scenarioId: string): WorldState {
+  if (s.diplomacy) return s;
+  const d = emptyDiplomacy();
+  s.diplomacy = d;
+  try { Object.assign(d.tensionBase, loadScenario(scenarioId).world.diplomacy?.tensionBase ?? {}); } catch { /* scenario sconosciuto: nessun fondo strutturale */ }
+  const old = Object.fromEntries(Object.entries(s.relations).map(([a, row]) => [a, Object.fromEntries(Object.entries(row).map(([b, r]) => [b, { trust: r.trust, tension: r.tension }]))]));
+  const label = PARAMS.opinion.modifiers.history!.label;
+  for (const [a, row] of Object.entries(old)) for (const [b, r] of Object.entries(row)) {
+    const value = Math.round((r.trust - baseOpinion(a, b).value) * 10) / 10;
+    if (Math.abs(value) >= PARAMS.opinion.epsilon) d.modifiers.push({ id: `history:${a}>${b}`, from: a, to: b, kind: 'history', label, value, decayPerWeek: 0, causeRef: 'migrazione', visibility: 'public', turn: s.turn });
+    if (a < b) setTension(s, a, b, r.tension);
+  }
+  syncAll(s);
   return s;
 }
