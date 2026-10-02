@@ -43,7 +43,12 @@ export async function moderatePlayer(engine: Engine, id: string, t: number) {
 
 /** Per turno: ordini IA con unità per fazione, ingaggi, lettere IA di iniziativa, chiamate LLM (mock) e tempo. */
 export interface TurnStats { unitOrdersPerFaction: number; engagements: number; initiatives: number; llmCalls: number; ms: number }
-export interface BalanceRun { seed: string; mode: FactionMode; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[]; turns: TurnStats[]; llmByRole: Record<string, number> }
+/**
+ * `opinionMean`: fiducia media tra tutte le coppie ordinate di fazioni (la riga di ogni fazione: opinione verso le altre) a fine turno,
+ * dal turno 0; `worldTension`: tensione mondiale a fine turno (NaN per i motori che non l'hanno).
+ */
+export interface BalanceRun { seed: string; mode: FactionMode; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[]; turns: TurnStats[]; llmByRole: Record<string, number>; opinionMean: number[]; worldTension: number[] }
+const meanTrust = (s: { relations: Record<string, Record<string, { trust: number }>> }) => { const v = Object.values(s.relations).flatMap((r) => Object.values(r).map((x) => x.trust)); return v.reduce((a, b) => a + b, 0) / Math.max(1, v.length); };
 
 /** Mock che conta le chiamate per ruolo (quelle delle fazioni spariscono in modalità rules). */
 class CountingMock extends MockLLMProvider {
@@ -65,11 +70,13 @@ export async function balanceRun(seed: string, turns: number, dir: string, mode:
   });
   perTurn.push({ unitOrdersPerFaction: 0, engagements: 0, initiatives: 0, llmCalls: mock.total - calls, ms: Date.now() - t0 });
   const firstMax: Record<string, number | null> = {}; const migration: number[] = [];
+  const opinionMean = [meanTrust(await engine.store.getState(r.campaign.id, 0))]; const worldTension: number[] = [];
   let final: Record<string, number> = {};
   const agents = agentFactions(await engine.store.getState(r.campaign.id, 0));
   for (let t = 1; t <= turns; t++) {
     const s = await engine.store.getState(r.campaign.id, t);
     migration.push(s.globalIndicators.migrationPressure);
+    opinionMean.push(meanTrust(s)); worldTension.push((s.globalIndicators as { worldTension?: number }).worldTension ?? NaN);
     for (const cr of Object.values(s.crises)) { if (!(cr.id in firstMax)) firstMax[cr.id] = null; if (cr.escalation >= 10 && firstMax[cr.id] === null) firstMax[cr.id] = t; }
     final = Object.fromEntries(Object.values(s.crises).map((cr) => [cr.id, cr.escalation]));
     const ds = (await Promise.all(agents.map((f) => engine.store.getDecision(r.campaign.id, t, f)))).filter((d) => !!d);
@@ -81,7 +88,7 @@ export async function balanceRun(seed: string, turns: number, dir: string, mode:
       initiatives: ds.reduce((n, d) => n + d.letters.filter((l) => l.kind === 'initiative').length, 0),
     });
   }
-  return { seed, mode, final, firstMax, migration, turns: perTurn, llmByRole: mock.byRole };
+  return { seed, mode, final, firstMax, migration, turns: perTurn, llmByRole: mock.byRole, opinionMean, worldTension };
 }
 
 export function summarize(runs: BalanceRun[]) {
@@ -108,6 +115,12 @@ export function summarize(runs: BalanceRun[]) {
     llmCallsPerTurn: avg(turns.map((t) => t.llmCalls)), msPerTurn: avg(turns.map((t) => t.ms)),
     llmCallsPerTurnByRole: Object.fromEntries(roles.map((x) => [x, +(runs.reduce((a, r) => a + (r.llmByRole[x] ?? 0), 0) / Math.max(1, turns.length)).toFixed(1)])),
     turnsTotal: turns.length,
+    // diplomazia (settore 08): deriva della fiducia media tra fazioni dal turno 0 al finale (obiettivo ≤ ±10) e tensione mondiale (non resta a 100)
+    opinionDriftMean: avg(runs.map((r) => r.opinionMean.at(-1)! - r.opinionMean[0]!)),
+    opinionDriftMaxAbs: runs.length ? +Math.max(...runs.map((r) => Math.abs(r.opinionMean.at(-1)! - r.opinionMean[0]!))).toFixed(1) : null,
+    opinionMeanStart: avg(runs.map((r) => r.opinionMean[0]!)),
+    worldTensionMean: avg(runs.flatMap((r) => r.worldTension).filter((x) => !Number.isNaN(x))), worldTensionMax: Math.max(...runs.flatMap((r) => r.worldTension).filter((x) => !Number.isNaN(x)), -Infinity),
+    worldTensionFinalMean: avg(runs.map((r) => r.worldTension.at(-1)!).filter((x) => !Number.isNaN(x))), turnsAtWorldTension100: runs.reduce((a, r) => a + r.worldTension.filter((x) => x >= 100).length, 0),
   };
 }
 
@@ -131,6 +144,7 @@ async function main() {
   console.log(`turno medio del primo 10/10: ${s.firstTenMeanTurn ?? '—'} · pressione migratoria media ${s.migrationMean} (finale ${s.migrationFinalMean}, turni a 100: ${s.turnsAtMigration100})`);
   console.log(`ordini IA con unità per fazione per turno: ${s.unitOrdersPerFactionPerTurn} (turni sotto 1: ${s.turnsBelowOneUnitOrder}/${s.turnsTotal}) · ingaggi per partita: ${s.engagementsPerRun} (partite senza: ${s.runsWithoutEngagements})`);
   console.log(`lettere IA di iniziativa per turno: ${s.initiativesPerTurn} (turni senza: ${s.turnsWithoutInitiative}/${s.turnsTotal}) · chiamate LLM per turno: ${s.llmCallsPerTurn} ${JSON.stringify(s.llmCallsPerTurnByRole)} · ${s.msPerTurn} ms per turno (mock)`);
+  console.log(`fiducia media tra fazioni: ${s.opinionMeanStart} all'inizio, deriva media a fine partita ${s.opinionDriftMean} (massima in valore assoluto ${s.opinionDriftMaxAbs}; obiettivo ≤ ±10) · tensione mondiale: media ${s.worldTensionMean ?? 'n/d'}, massima ${Number.isFinite(s.worldTensionMax) ? s.worldTensionMax : 'n/d'}, finale ${s.worldTensionFinalMean ?? 'n/d'}, turni a 100: ${s.turnsAtWorldTension100}`);
   if (a.json) writeFileSync(a.json, JSON.stringify({ runs, summary: s }, null, 1));
 }
 

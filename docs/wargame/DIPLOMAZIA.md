@@ -86,17 +86,17 @@ CdS 2026: i 5 permanenti + Danimarca, Grecia, Pakistan, Panama, Somalia (2025–
 `opinion(A→B)` = quanto A apprezza B, da −100 a +100 = `clamp(base(A,B) + Σ modificatori(A→B))`.
 
 ### 5.1 Base (statica)
-Funzione pura dei dati del §4, calcolata all'avvio e tenuta in cache: **non va nello snapshot**. Ogni componente è un motivo (`reasons[]`). Pesi in `PARAMS.opinion`:
+Funzione pura dei dati del §4, calcolata all'avvio e tenuta in cache: **non va nello snapshot**. Ogni componente è un motivo (`reasons[]`). Pesi in `PARAMS.opinion.base`. I valori della tabella sono quelli **tarati** nel settore 08 (erano 25 / 15 / 5 / −25…+25 / −10…+10 / 0…+15 nella prima stesura: con quei pesi anche le coppie amiche toccavano il tetto +100, dove un modificatore dinamico non ha più effetto). Taratura su tutte le coppie: media +1,9, deviazione 14, 14 coppie su 38.612 a ±100, correlazione con la somiglianza del punto ideale ONU 0,86.
 
-| Componente | Intervallo indicativo |
+| Componente | Intervallo |
 |---|---|
-| Alleanza difensiva in comune | +25 |
-| Stessa unione (UE) / stessa organizzazione regionale | +15 / +5 |
+| Alleanza difensiva in comune | +20 |
+| Stessa unione (UE) / stessa organizzazione regionale | +10 / +4 |
 | Blocchi contrapposti (es. NATO e CSTO) | −10 |
-| Distanza di allineamento (o di punto ideale ONU) | −25 … +25 |
-| Somiglianza di regime | −10 … +10 |
-| Dipendenza commerciale di A da B | 0 … +15 |
-| Coppia storica (`pairs.json`) | il valore della coppia |
+| Distanza di allineamento (60% punto ideale ONU, 40% poli) | −20 … +20 |
+| Somiglianza di regime | −6 … +6 |
+| Dipendenza commerciale di A da B | 0 … +12 |
+| Coppia storica (`pairs.json`, direzionale) | il valore della coppia |
 
 ### 5.2 Modificatori (dinamici)
 ```ts
@@ -131,7 +131,7 @@ Valori iniziali (da tarare con `balance`):
 Il decadimento si scala sulla durata del turno (mese = 4 settimane). I modificatori scaduti si tolgono nella fase OPEN con **un solo evento aggregato** (`OPINION_DECAYED`).
 
 ### 5.3 Tensione di coppia
-Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli incidenti, scende ogni turno verso un valore di fondo dato dalle crisi in comune. Memorizzata **solo dove è diversa dal fondo**.
+Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli incidenti, scende ogni turno (0,5 punti a settimana) verso un **fondo**: il maggiore tra la tensione strutturale della coppia (20 se non è nello scenario, altrimenti il valore dello scenario) e 3 × l'escalation della crisi più grave che le coinvolge entrambe. Memorizzata **solo dove è diversa dal fondo**.
 
 ### 5.4 Compatibilità
 - `relations[a][b].trust` resta per le coppie di fazioni come **valore derivato** = `opinion(a→b)`, ricalcolato dal reducer, così `policy.ts`, Console Ordini e UI continuano a funzionare. Il codice nuovo usa l'helper `opinionOf(state, a, b)`.
@@ -139,7 +139,7 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 - **Migrazione delle campagne vecchie**: `trust` attuale − base = un modificatore permanente «Storia recente».
 
 ### 5.5 Memorizzazione
-`WorldState.diplomacy = { modifiers, tension, improving, worldTension, capital, cooldowns, ultimatums }`: tutto sparso, mai la matrice completa. Obiettivo: **≤ 300 KB in più per snapshot** con 197 Stati.
+`WorldState.diplomacy = { modifiers, tension, tensionBase, improving, capital, cooldowns, ultimatums }`: tutto sparso, mai la matrice completa (`improving`, `capital`, `cooldowns` e `ultimatums` arrivano con il settore 09). `tensionBase` è la tensione strutturale delle coppie dello scenario diverse dal predefinito (il fondo del §5.3). **La tensione mondiale sta solo in `globalIndicators.worldTension`** (§6), non anche in `diplomacy`. Obiettivo: **≤ 300 KB in più per snapshot** con 197 Stati.
 
 ### 5.6 Nebbia
 - Ogni Stato conosce **la propria riga** (la sua opinione degli altri).
@@ -148,7 +148,7 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 ## 6. Tensione mondiale
 
-`worldTension` 0–100, in `globalIndicators`. Sale con: escalation massima delle crisi, scontri, strike, blocchi, ultimatum, segnali nucleari. Scende da sola ogni turno senza incidenti.
+`worldTension` 0–100, in `globalIndicators`. Sale con: escalation massima delle crisi, scontri, strike, blocchi, ultimatum, segnali nucleari. Scende da sola ogni turno senza incidenti. A fine turno si avvicina del 30% al valore di regime dato dalle crisi (8 + 3,5 × escalation massima + 1,5 × media: al massimo 63, quindi non resta mai a 100) e ogni incidente aggiunge la sua quota (scontro +3, strike +6, blocco +2, minaccia +1, ultimatum +5; tetto +15 a turno). Valore iniziale dello scenario 30 (crisi del Mar Rosso a 5: fascia «normale»). Un evento `WORLD_TENSION_CHANGED` per turno con le cause; Brent, TTF e rischio navale si muovono di 0,06 $ / 0,1 €/MWh / 0,15 punti per punto di tensione.
 
 | Fascia | Effetti |
 |---|---|
