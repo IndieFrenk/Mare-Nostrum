@@ -1,6 +1,7 @@
 # PROGRESS
 
 ## Fatto
+
 - **Fase 0** — Import di WorldMonitor, `RECON.md`, `SPEC.md`, `CLAUDE.md`.
 - **Fasi 1–4** — `wargame-server/`: schemi Zod + `schemas-json/`, `JsonStore` (scritture atomiche, lock, snapshot, fork), RNG mulberry32 con cursore e log dei tiri, scenario `med-2026`, motore event-sourced, agenti (OmniRoute/mock/replay), API Fastify + SSE + GeoJSON, CLI `sim`. 23 test Vitest verdi.
 - **Fase 5** — `wargame.html` + `src/wargame/` (mappa MapLibre, simboli `milsymbol`, 11 pannelli, SSE). Typecheck root pulito; biome e safe-html ok.
@@ -17,6 +18,7 @@
 - **La Console Ordini usa le unità nominate** (dopo il banco `parser` con qwen3.5 4B: 5 corretti / 8 sbagliati / 1 pericoloso; 9B: 6 / 8 / 0, sbagliate tutte le frasi che nominano un'unità): `translateStances` con `prefer` (le unità nominate entrano per prime nelle posture e contano nell'intensità, senza scaglioni di tipo né `busyElsewhere`; `unfitReason`); completamento del motore quando il modello non dà né ordine né postura (`completeNamed`: tipo dal verbo, ROE delle posture, segnalato nelle ambiguità) e quando non dà la CYBER_OP chiesta (`completeCyber`); regola principale in testa al prompt del parser (id tra parentesi quadre → ordine con quell'id) e corrispondenza italiano → `effect` per il cyber; schema del parser con `maxItems`/`maxLength` su ogni lista e testo (caso peggiore ~4.900 caratteri, sotto i 2000 token del ruolo); alias «Libia orientale» → LBY_LNA, «Libia occidentale»/«Tripolitania» → LBY_GNU. Banco parser con `--mock` (che ripete l'errore visto): 14/14 corretti. Playtest mock 6 turni: 0 problemi; replay 10 turni identico; e2e verde. 116 test backend verdi.
 
 ## Decisioni
+
 - Ogni mutazione dello stato è un `GameEvent` applicato da `engine/reducer.ts`: `state(N) = snapshot(N-1) + events(N)` (test dedicato).
 - Aggiunti campi/tipi (ammessi dalla spec): `WorldState.rngCursor`, `Faction.crossedRedLines`, `Base.zoneId`, `Infrastructure.zoneId`, `Zone.center`, `Contact.zoneId`, `CatalogItem.platformClassId`, eventi `UNIT_CREATED`, `FACTION_CHANGED`, `INDICATORS_CHANGED`, `TURN_ADVANCED`, `TURN_CLOSED`, `STATEMENT`.
 - Verità dei contatti salvata a parte in `truth/turn-N.json` (solo motore; serve a STRIKE/CMO dopo una pausa).
@@ -40,6 +42,7 @@
 - Stato dei modelli: controllo solo con il provider reale (mock e test esclusi); 503 anche su creazione campagna, *Interpreta* e bozza di lettera (chiamano i modelli); un «irraggiungibile» in cache si riprova subito prima di rifiutare. Giallo = modello configurato non elencato da `/models` o latenza > 2 s (combo/alias OmniRoute possono non comparire: è un avviso, non blocca).
 
 ## Debiti tecnici
+
 - Console ordini: i verbi e le parole chiave dei controlli e dei completamenti (`parse-review.ts`) sono elenchi italiani a mano (niente analisi grammaticale): «porta» come sostantivo o «manda un messaggio» con una zona nominata possono dare un avviso in più; la negazione è solo «non»/«mai» (un «non» in un'altra parte della frase blocca anche il completamento); gli alias di unità con parole comuni («Carabiniere», «Alpino») si riconoscono anche in minuscolo. Il banco «parser» con qwen3.5:4b/9b reali va rifatto dopo le unità nominate (serve il PC con Ollama): il mock riproduce l'errore visto, non il modello. Il caso peggiore dello schema del parser presume ~2,5 caratteri per token (tokenizer non misurato); `maxProperties` potrebbe essere ignorato dalla grammatica di Ollama. «Haftar» (nome di persona) era già tra gli alias di LBY_LNA e nel nome della fazione: non toccato.
 - Posture: `unitsPerSeaZone` ha quasi sempre lo stesso numero in ogni zona (con turni di una settimana le navi arrivano ovunque); le posture con una postura sconosciuta vengono tolte in lettura (restano solo nel registro LLM).
 - Lettere: il controllo «niente nomi di persone reali» è affidato al prompt (nessun elenco di nomi da confrontare); le non lette sono ricordate solo nel browser (localStorage).

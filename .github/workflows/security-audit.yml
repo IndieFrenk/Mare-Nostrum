@@ -55,6 +55,10 @@ jobs:
             path: workers/railway-reconcile-control
             package_json: workers/railway-reconcile-control/package.json
             lockfile: workers/railway-reconcile-control/package-lock.json
+          - name: wargame-server
+            path: wargame-server
+            package_json: wargame-server/package.json
+            lockfile: wargame-server/package-lock.json
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       # The introduced-vs-inherited split needs the base commit in the object
@@ -137,7 +141,7 @@ jobs:
           RUST_RESULT: ${{ needs.audit-rust.result }}
           # Names must match the audit-lockfile matrix exactly; the
           # ci-workflow-coverage test asserts they do.
-          AUDIT_NAMES: 'root scripts consumer-prices-core blog-site pro-test docker-runtime railway-reconcile-control'
+          AUDIT_NAMES: 'root scripts consumer-prices-core blog-site pro-test docker-runtime railway-reconcile-control wargame-server'
           FAIL_ON_OUTAGE: ${{ github.event_name == 'schedule' && '1' || '0' }}
         run: |
           # On a run this workflow's concurrency group evicted (#8443), this

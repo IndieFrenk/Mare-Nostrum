@@ -6,5 +6,7 @@
     "MD022": true,
     "MD032": true
   },
-  "ignores": ["node_modules/**", "dist/**", "src-tauri/target/**", ".planning/**", ".context/**", ".worktrees/**", "DMCA-TAKEDOWN-NOTICE.md"]
+  "ignores": ["node_modules/**", "dist/**", "src-tauri/target/**", ".planning/**", ".context/**", ".worktrees/**", "DMCA-TAKEDOWN-NOTICE.md",
+    // Wargame LLM prompts and faction briefs are model input, not docs: reflowing them changes what the agents read.
+    "wargame-server/src/agents/prompts/**", "wargame-server/scenarios/**"]
 }

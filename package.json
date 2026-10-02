@@ -91,7 +91,7 @@
     "dev:commodity": "cross-env VITE_VARIANT=commodity vite",
     "dev:energy": "cross-env VITE_VARIANT=energy vite",
     "dev:wargame": "vite -c vite.wargame.config.ts",
-    "build:wargame": "tsc --noEmit && vite build -c vite.wargame.config.ts",
+    "build:wargame": "npm run security:vite-env-secrets -- --strict-local && tsc --noEmit && vite build -c vite.wargame.config.ts",
     "preview:wargame": "vite preview -c vite.wargame.config.ts --open /wargame.html",
     "wargame:server": "npm --prefix wargame-server start",
     "wargame:sim": "npm --prefix wargame-server run sim --",

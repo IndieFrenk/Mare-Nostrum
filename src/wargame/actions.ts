@@ -1,3 +1,4 @@
+import { safeStorageGet, safeStorageRemove, safeStorageSet } from '@/utils/safe-storage';
 import { api, ApiError, type LetterAction, type LetterTone } from './api-client';
 import { emptyDraft, set, state } from './state/store';
 
@@ -5,10 +6,10 @@ const LAYERS = ['units', 'contacts', 'crises', 'infrastructure', 'lanes', 'zones
 let closeStream: (() => void) | null = null;
 
 function remember(id: string | null) {
-  try { if (id) localStorage.setItem('wg-campaign', id); else localStorage.removeItem('wg-campaign'); } catch { /* storage non disponibile */ }
+  if (id) safeStorageSet('wg-campaign', id); else safeStorageRemove('wg-campaign');
 }
 export function rememberedCampaign(): string | null {
-  try { return localStorage.getItem('wg-campaign'); } catch { return null; }
+  return safeStorageGet('wg-campaign');
 }
 
 async function guarded(fn: () => Promise<void>) {
@@ -148,14 +149,14 @@ export const configure = (patch: { turnLength?: 'week' | 'month'; cmoOnRequest?:
 // ——— lettere ———
 
 function seenLetters(id: string): string[] {
-  try { return JSON.parse(localStorage.getItem(`wg-letters-seen-${id}`) ?? '[]') as string[]; } catch { return []; }
+  try { return JSON.parse(safeStorageGet(`wg-letters-seen-${id}`) ?? '[]') as string[]; } catch { return []; }
 }
 /** Segna come lette le lettere ricevute (solo in questo browser). */
 export function markLettersSeen(ids: string[]) {
   const id = state.campaignId;
   if (!id || ids.every((x) => state.lettersSeen.includes(x))) return;
   const lettersSeen = [...new Set([...state.lettersSeen, ...ids])];
-  try { localStorage.setItem(`wg-letters-seen-${id}`, JSON.stringify(lettersSeen)); } catch { /* storage non disponibile */ }
+  safeStorageSet(`wg-letters-seen-${id}`, JSON.stringify(lettersSeen));
   set({ lettersSeen });
 }
 export const unreadLetters = () => state.letters.filter((l) => l.to === state.campaign?.playerFaction && !state.lettersSeen.includes(l.id));
