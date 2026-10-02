@@ -10,6 +10,8 @@ import { applyAar, autoResolveMajor } from './cmo.js';
 import { TurnCtx } from './context.js';
 import { evolveCrises, recoverInfrastructure } from './crises.js';
 import { decayDiplomacy, updateWorldTension } from './world-tension.js';
+import { diplomaticTurn } from './diplo-turn.js';
+import { DIPLO_CATALOG, actionCost } from './diplo-actions.js';
 import { runDetection } from './detection.js';
 import { applyEnergy, chargeOperations } from './economy.js';
 import { briefingFacts, debriefFacts, energyFacts, type Fact } from './facts.js';
@@ -153,7 +155,7 @@ export class Engine {
             break;
           case 'OPEN':
             deliver(ctx); chargeOperations(ctx); applyAttrition(ctx); continueTransit(ctx); recoverInfrastructure(ctx);
-            decayDiplomacy(ctx);
+            decayDiplomacy(ctx); diplomaticTurn(ctx);
             evolveCrises(ctx, ctx.turn > 1 ? await this.store.getEvents(id, ctx.turn - 1) : []);
             ctx.phase = 'INTEL'; break;
           case 'INTEL': await this.intel(ctx, c); ctx.phase = 'BRIEFING'; break;
@@ -283,11 +285,15 @@ export class Engine {
     for (const d of decisions) { d.orders.diplomacy = d.orders.diplomacy.filter((x) => x.kind !== 'LETTER'); d.letters = []; }
     type Choice = { factionId: string; to: string; kind: 'reply' | 'initiative'; replyTo?: DiploLetter; gist?: string; tone?: LetterTone; trigger?: LetterTriggerKind };
     const picks: Choice[] = [];
+    // ogni lettera costa CD (catalogo): ne scrive solo chi, dopo le altre azioni diplomatiche del turno, ha ancora il capitale
+    const left = new Map(decisions.map((d) => [d.factionId, (s.diplomacy?.capital[d.factionId] ?? 0) - d.orders.diplomacy.reduce((n, x) => n + actionCost(s, d.factionId, x), 0)]));
+    const letterCost = DIPLO_CATALOG.LETTER.cost as number;
+    const afford = (f: string) => { const l = left.get(f) ?? 0; if (l + 1e-9 < letterCost) return false; left.set(f, l - letterCost); return true; };
     const replying = new Set<string>();
     for (const l of ctx.turn > 1 ? await this.store.getLetters(c.id, ctx.turn - 1) : []) {
       if (l.from !== player || !byF.has(l.to) || replying.has(l.to)) continue;
       replying.add(l.to);
-      picks.push({ factionId: l.to, to: player, kind: 'reply', replyTo: l });
+      if (afford(l.to)) picks.push({ factionId: l.to, to: player, kind: 'reply', replyTo: l });
     }
     const major = (f: string) => s.factions[f]?.agentRole === 'faction_major';
     const prev = ctx.turn - 1;
@@ -305,7 +311,8 @@ export class Engine {
         && !(li.to === player && replying.has(d.factionId)) && !seen.has(li.to) && !!seen.add(li.to))
         .slice(0, major(d.factionId) ? 2 : 1);
     }).sort((a, b) => Number(major(b.factionId)) - Number(major(a.factionId)) || a.factionId.localeCompare(b.factionId));
-    picks.push(...initiatives.slice(0, cadenceOf(c).lettersPerTurn));
+    let chosen = 0;
+    for (const ini of initiatives) { if (chosen >= cadenceOf(c).lettersPerTurn) break; if (afford(ini.factionId)) { picks.push(ini); chosen++; } }
     if (!picks.length) return;
     const input = new Map(inputs.map((i) => [i.factionId, i]));
     const jobs = picks.map((p) => {

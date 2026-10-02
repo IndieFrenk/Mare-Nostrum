@@ -4,6 +4,7 @@
  */
 import type { WorldState } from '../../schemas/index.js';
 import { loadScenario } from '../../engine/scenario.js';
+import { initialCapital } from '../../engine/diplo-actions.js';
 import { baseOpinion, emptyDiplomacy, setTension, syncAll } from '../../engine/opinion.js';
 import { PARAMS } from '../../engine/params.js';
 
@@ -53,7 +54,8 @@ export function fillFromScenario(s: WorldState, scenarioId: string): WorldState 
  * `trust` e `tension` di prima.
  */
 export function migrateDiplomacy(s: WorldState, scenarioId: string): WorldState {
-  if (s.diplomacy) return s;
+  // campagne con l'opinione ma senza capitale diplomatico (settore 09): ripartono dalla dotazione iniziale
+  if (s.diplomacy) { initialCapital(s); return s; }
   const d = emptyDiplomacy();
   s.diplomacy = d;
   try { Object.assign(d.tensionBase, loadScenario(scenarioId).world.diplomacy?.tensionBase ?? {}); } catch { /* scenario sconosciuto: nessun fondo strutturale */ }
@@ -65,5 +67,6 @@ export function migrateDiplomacy(s: WorldState, scenarioId: string): WorldState 
     if (a < b) setTension(s, a, b, r.tension);
   }
   syncAll(s);
+  initialCapital(s);
   return s;
 }

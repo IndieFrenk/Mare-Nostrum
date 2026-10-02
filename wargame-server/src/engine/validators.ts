@@ -2,8 +2,11 @@ import type { FactionOrders, OrdersBody, WorldState } from '../schemas/index.js'
 import type { Catalog } from './scenario.js';
 import { PARAMS } from './params.js';
 import { LETTER_LIMITS } from '../schemas/index.js';
+import { acceptance, type AcceptanceResult } from './acceptance.js';
+import { DIPLO_CATALOG, actionCost, checkAction, cooldownKeys, isActor, targetsOf } from './diplo-actions.js';
 
-export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number }
+/** `acceptance`: per ogni proposta di trattato, come risponderebbe ogni destinatario (punteggio e motivi, engine/acceptance.ts): il dry-run del §8. */
+export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number; acceptance?: (AcceptanceResult & { actionId: string; type: string })[]; capitalCost?: number }
 
 /** Validazione unica per umano e IA: proprietà, disponibilità, budget, compatibilità. */
 export function validateOrders(s: WorldState, catalog: Catalog, factionId: string, o: OrdersBody | FactionOrders, knownRefs: Set<string> = new Set(), turnLength: 'week' | 'month' = 'week'): Validation {
@@ -75,13 +78,25 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
     cost += item.cost * p.qty;
   }
   let letters = 0;
+  let cdSpent = 0;
+  const verdicts: NonNullable<Validation['acceptance']> = [];
+  const seenKeys = new Set<string>();
   for (const d of o.diplomacy) {
-    // il destinatario è sempre una fazione (mai una zona come CANALE_SICILIA) e non la fazione stessa
-    const targets = 'target' in d ? (Array.isArray(d.target) ? d.target : [d.target]) : [];
-    if (d.kind === 'PROPOSE_AGREEMENT') targets.push(...d.agreement.parties.filter((x) => x !== factionId));
-    for (const t of new Set(targets)) {
-      if (!s.factions[t]) errors.push(`${d.id}: destinatario ${t} sconosciuto (non è una fazione)`);
-      else if (t === factionId && d.kind !== 'LETTER') errors.push(`${d.id}: ${d.kind} non può essere rivolto alla propria fazione`);
+    // il destinatario è una fazione o uno Stato del registro (ISO3), mai una zona come CANALE_SICILIA, e non la fazione stessa
+    for (const t of new Set(targetsOf(d))) {
+      if (!isActor(s, t)) errors.push(`${d.id}: destinatario ${t} sconosciuto (non è una fazione)`);
+      else if (t === factionId && d.kind !== 'LETTER' && d.kind !== 'MEDIATE' && !(d.kind === 'PROPOSE_AGREEMENT' && !d.target.includes(factionId))) errors.push(`${d.id}: ${d.kind} non può essere rivolto alla propria fazione`);
+      else if (!s.factions[t] && ['LETTER', 'ENERGY_DEAL', 'AID'].includes(d.kind)) errors.push(`${d.id}: ${d.kind} si rivolge solo a una fazione (${t} è uno Stato senza fazione)`);
+    }
+    // catalogo (§7): ricarica, rapporti, prerequisiti e capitale diplomatico (somma dei costi della bozza)
+    for (const e of checkAction(s, factionId, d)) errors.push(`${d.id}: ${e}`);
+    for (const k of cooldownKeys(factionId, d)) { if (seenKeys.has(k)) errors.push(`${d.id}: ${DIPLO_CATALOG[d.kind].label} ripetuta nella stessa bozza`); seenKeys.add(k); }
+    const cd = actionCost(s, factionId, d);
+    cdSpent += cd;
+    if (cd && cdSpent > (s.diplomacy?.capital[factionId] ?? 0) + 1e-9) errors.push(`${d.id}: capitale diplomatico insufficiente (${Math.round(cdSpent * 10) / 10} CD in bozza, ${Math.round((s.diplomacy?.capital[factionId] ?? 0) * 10) / 10} disponibili)`);
+    if (d.kind === 'PROPOSE_AGREEMENT') {
+      const parties = [...new Set([factionId, ...d.target, ...d.agreement.parties])];
+      for (const t of d.target.filter((x) => x !== factionId && isActor(s, x))) verdicts.push({ actionId: d.id, type: d.agreement.type, ...acceptance(s, t, { type: d.agreement.type, parties }, factionId) });
     }
     if (d.kind === 'LETTER') {
       letters++;
@@ -99,5 +114,5 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
   if (f.controller === 'human' && letters > LETTER_LIMITS.perTurnHuman) errors.push(`al massimo ${LETTER_LIMITS.perTurnHuman} lettere per turno (${letters} in bozza)`);
   cost = Math.round(cost * 10) / 10;
   if (cost > f.budget.discretionary) errors.push(`costo stimato ${cost} M€ oltre il budget disponibile ${f.budget.discretionary} M€`);
-  return { valid: errors.length === 0, errors, risks, estCost: cost };
+  return { valid: errors.length === 0, errors, risks, estCost: cost, ...(verdicts.length ? { acceptance: verdicts } : {}), ...(cdSpent ? { capitalCost: Math.round(cdSpent * 10) / 10 } : {}) };
 }

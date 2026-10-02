@@ -1,5 +1,5 @@
 import type { Diplomacy, GameEvent, OpinionModifier, WorldState } from '../schemas/index.js';
-import { OPINION_BANDS, type OpinionBand } from '../schemas/index.js';
+import { Diplomacy as DiplomacySchema, OPINION_BANDS, type OpinionBand } from '../schemas/index.js';
 import { PARAMS } from './params.js';
 import { worldData } from './world-data.js';
 
@@ -14,7 +14,8 @@ export interface OpinionResult { value: number; reasons: OpinionReason[]; modifi
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
-export const emptyDiplomacy = (): Diplomacy => ({ modifiers: [], tension: {}, tensionBase: {} });
+/** Blocco diplomatico vuoto, con tutti i campi (i default dello schema). */
+export const emptyDiplomacy = (): Diplomacy => DiplomacySchema.parse({});
 
 // ——— base statica ———
 
@@ -128,6 +129,10 @@ const NOTE_KINDS: [RegExp, string][] = [
   [/^démarche:/, 'demarche'], [/^rassicurazione/, 'reassurance'], [/^canale riservato/, 'backchannel'], [/^lettera \(/, 'letter'],
   [/^sanzioni:/, 'sanction'], [/^revoca sanzioni:/, 'sanction_lifted'], [/^aiuto /, 'aid'],
   [/^risposta ad accordo .*: accept$/, 'agreement'], [/^risposta ad accordo /, 'agreement_rejected'],
+  [/^migliorare le relazioni/, 'improve'], [/^richiamo dell'ambasciatore/, 'recall'], [/^espulsione di diplomatici/, 'expel'],
+  [/^rottura delle relazioni/, 'break_ties'], [/^ripristino delle relazioni/, 'restore'], [/^embargo sulle armi:/, 'embargo'], [/^revoca embargo sulle armi/, 'embargo_lifted'],
+  [/^ultimatum:/, 'ultimatum'], [/^mediazione in /, 'mediation'], [/^uso della forza senza mandato/, 'illegitimate'], [/^voto contrario /, 'vote_against'], [/^trattato violato:/, 'treaty_violated'],
+  [/^condanna pubblica/, 'condemnation'], [/^sostegno pubblico/, 'support'],
   [/^(BLOCKADE|EXCLUSION_ZONE) in /, 'blockade'], [/^dimostrazione di forza in /, 'show_of_force'], [/^strike su /, 'strike'],
   [/^scontro in /, 'clash'], [/^incidente in /, 'incident'], [/^operazione clandestina scoperta/, 'sof'], [/^attacco cyber attribuito/, 'cyber'],
 ];

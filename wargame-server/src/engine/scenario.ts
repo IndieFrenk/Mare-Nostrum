@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CatalogItem, WorldState, type Crisis, type Relation, type Unit } from '../schemas/index.js';
+import { initialCapital } from './diplo-actions.js';
 import { initialDiplomacy } from './opinion.js';
 
 export const SCENARIOS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../scenarios');
@@ -82,6 +83,7 @@ export function loadScenario(id: string): Scenario {
   // opinione asimmetrica: le coppie dello scenario (fiducia, tensione) diventano modificatori «Situazione 2026» rispetto alla base dei dati
   // del mondo; fiducia e tensione tra fazioni restano come valori derivati (opinionOf, tensione di coppia)
   initialDiplomacy(world, raw.relations.pairs);
+  initialCapital(world);
   const profiles = Object.fromEntries(readdirSync(path.join(dir, 'factions')).map((f) => [f.replace(/\.md$/, ''), readFileSync(path.join(dir, 'factions', f), 'utf8')]));
   const geo = Object.fromEntries(readdirSync(path.join(dir, 'geo')).map((f) => [f.replace(/\.geojson$/, ''), readJson(path.join(dir, 'geo', f))]));
   const namesFile = path.join(dir, 'names.json');

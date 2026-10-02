@@ -38,7 +38,75 @@ export const PARAMS = {
   migration: { base: 15, perLevel: 6, perAgreement: 10 },
   /** riduzione dell'escalation quando entra in vigore un accordo pertinente */
   agreementDeescalation: { ceasefire: 2, migration: 1, energy: 1 },
-  diplo: { propagation: 0.3 },
+  /** «Trattato attivo»: opinione reciproca finché l'accordo è in vigore (tolta se scade o è violato) */
+  treaty: { opinion: 10, violatedOpinion: -30, violatedCredibility: -3 },
+  diplo: {
+    propagation: 0.3,
+    /**
+     * Capitale diplomatico (CD, §7): una rendita per turno dalla potenza. Rendita a settimana = max(minima, log10(PIL in mld $) − 0,35 +
+     * 2 se membro permanente del CdS) × credibilità/60 (tra 0,5 e 1,5): con la credibilità iniziale (60) Italia ≈ 3,0, USA ≈ 6,1, Cina ≈ 5,9,
+     * Germania ≈ 3,3, Turchia ≈ 2,8, Malta ≈ 1,0. Il turno mensile vale 4 settimane. Tetto di accumulo 100; si parte da 4 settimane di rendita.
+     * Gli attori non statali (LNA) hanno una rendita fissa.
+     */
+    capital: { gdpOffset: -0.35, permanentSeat: 2, minRent: 0.5, nonStateRent: 0.8, credibilityRef: 60, credibilityMin: 0.5, credibilityMax: 1.5, cap: 100, initialWeeks: 4 },
+    /** «Migliorare le relazioni»: slot (2–4) secondo la rendita a settimana (≥ 5 → 4, ≥ 3 → 3), +2 a turno fino a +30, 1 CD a turno */
+    improve: { slotsByRent: [[5, 4], [3, 3]] as const, defaultSlots: 2, perTurn: 2, max: 30, costPerTurn: 1 },
+    /**
+     * Legittimità (§7): un blocco o una zona di esclusione senza risoluzione approvata, ultimatum scaduto o tensione mondiale ≥ `worldTension`
+     * costa CD e credibilità e un modificatore presso le democrazie terze. Risoluzione e ultimatum scaduto valgono per un certo numero di turni.
+     * Con tensione mondiale < `lowTension` le azioni coercitive delle democrazie (democrazia ≥ democracyScore) costano il doppio e danno −opinione
+     * con le altre democrazie (§6).
+     */
+    legitimacy: { cd: 4, credibility: 2, opinion: -3, resolutionTurns: 8, ultimatumTurns: 6, worldTension: 50, lowTension: 25, democracyScore: 6 },
+    /** Ultimatum: la tensione mondiale sale di `PARAMS.worldTension.incident.ultimatum` alla scadenza; il destinatario che ha cercato la distensione entro la scadenza lo «soddisfa» */
+    ultimatum: { tension: 10, opinion: -5, metTension: -5, minTension: 30 },
+    /** Scala dei rapporti diplomatici: valore dell'opinione del destinatario verso chi la sale, e tensione */
+    ties: { recall: { opinion: -8, tension: 8 }, expel: { opinion: -12, tension: 12 }, break: { opinion: -25, tension: 15 }, restore: { opinion: 4, tension: -10 } },
+    embargo: { opinion: -6, tension: 5, lift: 2 },
+    mediation: { escalation: -1, opinion: 3, credibility: 1, minOpinion: 0 },
+  },
+  /**
+   * Accettazione di una proposta di trattato (engine/acceptance.ts, §8): deterministica, accetta con punteggio ≥ 0. Il punteggio è la
+   * somma di motivi leggibili. Taratura: un partner cordiale (opinione 40) accetta una cooperazione di difesa (≈ +20); uno neutro accetta
+   * un accordo commerciale (≈ +1) ma non una garanzia (−9) senza un nemico comune (+12 per rivale, tetto 24) o una tensione mondiale alta.
+   */
+  acceptance: {
+    offset: -5,
+    baseByType: { ceasefire: 8, migration: 4, energy: 2, trade: 4, non_aggression: 0, arms_sale: -2, intel_sharing: -8, basing: -12, military_access: -10, defense_cooperation: -6, defense: -10, guarantee: -4, secret: -6 } as Record<string, number>,
+    opinionWeight: 0.5,
+    alignmentRange: 10,
+    commonThreat: { perRival: 12, max: 24, opinion: -25 },
+    tradeWeight: 0.3, tradeMax: 8,
+    worldTension: { mid: 5, high: 8, highTrade: -4, low: -3 },
+    sharedInstitution: 2, sharedInstitutionMax: 6,
+    conflict: -12,
+    smallPower: { ratio: 5, bonus: 8, big: -4 },
+    credibility: { ref: 50, perPoint: 0.1, max: 5 },
+    recentlyRejected: -12, rejectedTurns: 3,
+    /** tregua: ogni punto di escalation della crisi che coinvolge entrambe le parti */
+    ceasefirePerEscalation: 1.5,
+  },
+  /**
+   * Votazioni (engine/institutions.ts, §9): il voto di uno Stato è un punteggio deterministico, somma di motivi: opinione verso il proponente,
+   * opinione verso il bersaglio (chi lo apprezza non lo condanna), distanza sull'asse del voto ONU (più vicino al proponente che al bersaglio),
+   * coesione del blocco (alleanza condivisa con il bersaglio o con il proponente × coesione dell'istituzione) e tema (una norma di base più
+   * una componente «occidentale»: le sanzioni dividono, l'umanitario unisce). Sì sopra `yesAt`, no sotto `noAt`, in mezzo astensione (la banda
+   * è asimmetrica: votare no a una condanna costa più che astenersi). Tarato sul riferimento di marzo 2022 (141 sì, 5 no, 35 astenuti):
+   * una condanna in AG di un'aggressione russa deve dare tra 120 e 160 sì e al massimo 15 no (test/unga-calibration.test.ts).
+   */
+  votes: {
+    weights: { proposer: 0.4, target: 0.3, ideal: 0.4, bloc: 0.5 },
+    yesAt: 0.15, noAt: -0.4,
+    /** tema → [norma di base, componente occidentale]: punteggio += base + occidentale × (−punto ideale dello Stato) */
+    topics: { aggression: [0.3, 0.15], sanctions: [-0.1, 0.45], humanitarian: [0.5, 0], maritime: [0.25, 0.1], nonproliferation: [0.15, 0.3], other: [0, 0] } as Record<string, [number, number]>,
+    /** UE: maggioranza qualificata (55% degli Stati e 65% della popolazione) per i temi non di politica estera; unanimità per gli altri */
+    qmv: { states: 0.55, population: 0.65 },
+    qmvTopics: ['humanitarian', 'other'] as string[],
+    /** CdS: voti favorevoli necessari (su 15); un membro permanente pone il veto solo con un punteggio ≤ vetoAt (di norma il bersaglio e i suoi alleati più stretti), altrimenti si astiene (la Cina sulle risoluzioni sull'Ucraina) */
+    unscYes: 9, vetoAt: -0.7,
+    /** effetti: chi vota contro vede peggio il proponente (al massimo `maxModifiers` Stati, i più popolosi), il proponente guadagna o perde credibilità */
+    againstOpinion: -3, maxModifiers: 20, credibilityPassed: 3, credibilityFailed: -2, condemnation: -5, condemnationTension: 3,
+  },
   /**
    * Opinione asimmetrica (engine/opinion.ts, docs/wargame/DIPLOMAZIA.md §5): opinion(A→B) = clamp(base(A,B) + Σ modificatori(A→B), ±100).
    * Valori ragionati da tarare con `npm run balance` e con i test di plausibilità (test/opinion-plausibility.test.ts).
@@ -104,7 +172,17 @@ export const PARAMS = {
       support: { label: 'Sostegno pubblico', value: 5, decayPerWeek: 1 },
       treaty: { label: 'Trattato attivo', value: 10, decayPerWeek: 0 },
       treaty_violated: { label: 'Trattato violato', value: -30, decayPerWeek: 0.5 },
-      improve: { label: 'Migliorare le relazioni', value: 2, decayPerWeek: 0 },
+      /** azioni del settore 09: `improve` è uno per coppia (si accumula +2 a turno fino a +30, decade solo dopo STOP_IMPROVE) */
+      improve: { label: 'Migliorare le relazioni', value: 2, decayPerWeek: 0, sticky: true, cap: 30 },
+      recall: { label: 'Ambasciatore richiamato', value: -8, decayPerWeek: 0.5 },
+      expel: { label: 'Diplomatici espulsi', value: -12, decayPerWeek: 0.5 },
+      break_ties: { label: 'Relazioni diplomatiche rotte', value: -25, decayPerWeek: 0.5 },
+      restore: { label: 'Relazioni ripristinate', value: 4, decayPerWeek: 0.5 },
+      embargo: { label: 'Embargo sulle armi subito', value: -6, decayPerWeek: 0.5 },
+      embargo_lifted: { label: 'Embargo revocato', value: 2, decayPerWeek: 0.5 },
+      ultimatum: { label: 'Ultimatum', value: -5, decayPerWeek: 1 },
+      mediation: { label: 'Mediazione apprezzata', value: 3, decayPerWeek: 0.5 },
+      illegitimate: { label: 'Uso della forza senza mandato', value: -3, decayPerWeek: 1 },
     } as Record<string, { label: string; value: number; decayPerWeek: number; sticky?: boolean; cap?: number; mutual?: boolean }>,
     /** un modificatore con |valore| sotto questa soglia si toglie */
     epsilon: 0.05,
@@ -154,7 +232,7 @@ export const PARAMS = {
     /** Risposte agli atti subiti per turno: una per aggressore, prima le più gravi. */
     maxThreatResponses: 2,
     /** Gravità degli atti subiti: livello di minaccia (1–5) nel registro e ordine delle risposte. */
-    severity: { strike: 5, engagement: 4, blockade: 3, threat: 3, sanction: 2, cyber: 2, sof: 2 },
+    severity: { strike: 5, engagement: 4, blockade: 3, threat: 3, ultimatum: 4, sanction: 2, cyber: 2, sof: 2 },
     /** Una crisi chiede una postura da questa escalation in su, nelle zone con almeno questo interesse (le altre non contano). */
     crisisMin: 3, minInterest: 0.3,
     /** Distensione: i profili con aggressività < detenteBelow, in una crisi che li coinvolge con escalation ≥ detenteFrom +
@@ -181,8 +259,9 @@ export const PARAMS = {
     cyberDisruption: { aggressiveness: 0.6, tension: 80 },
     /** Azioni diplomatiche per turno (le risposte agli accordi proposti non contano): più di così è rumore, non politica. */
     maxDiplomacy: 3,
-    /** Un accordo proposto alla fazione si accetta con fiducia verso chi lo propone ≥ acceptTrust; tregue e accordi migratori
-     *  anche sotto, se lo stile non è assertive. */
-    acceptTrust: 10,
+    /** Un accordo proposto alla fazione lo accetta o respinge acceptance() (engine/acceptance.ts); i motivi vanno nella motivazione.
+     *  Relazioni: «migliorare le relazioni» con un partner di trattato con opinione < improveBelow (e un obiettivo di relazione sotto
+     *  improveBelow + 30), fine quando ≥ improveStopAt; ripristino dei rapporti ridotti con opinione ≥ restoreAt e tensione < restoreTension. */
+    improveBelow: 25, improveStopAt: 60, restoreAt: 0, restoreTension: 40,
   },
 } as const;

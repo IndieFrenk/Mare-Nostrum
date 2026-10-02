@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, Turn, Unit, Visibility, ZoneId } from './world.js';
+import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, TieStatus, Turn, Ultimatum, Unit, Visibility, ZoneId } from './world.js';
 import { FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
 
 /** Fasce con cui si vede l'opinione degli altri verso di sé (docs/wargame/DIPLOMAZIA.md §5.6); le soglie sono in PARAMS.opinion.bands. */
@@ -76,12 +76,14 @@ export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(
  * Atto ostile o di pressione che la fazione ha visto nel turno precedente (eventi a lei visibili): minacce, sanzioni, blocchi,
  * scontri, strike, cyber e SOF attribuiti, dimostrazioni di forza, linee rosse superate. Lo usa il decisore a regole.
  */
-export const INCIDENT_KINDS = ['threat', 'sanction', 'blockade', 'engagement', 'strike', 'cyber', 'sof', 'show_of_force', 'red_line'] as const;
+export const INCIDENT_KINDS = ['threat', 'sanction', 'blockade', 'engagement', 'strike', 'cyber', 'sof', 'show_of_force', 'red_line', 'ultimatum'] as const;
 export const Incident = z.object({
   turn: Turn, kind: z.enum(INCIDENT_KINDS), from: FactionId, to: FactionId,
   zoneId: ZoneId.optional(),
   /** id della linea rossa (red_line) o dell'ordine che ha causato l'atto */
   ref: z.string().optional(),
+  /** per red_line: testo e risposta scritta della linea rossa (li vede anche il garante di chi l'ha vista superare) */
+  text: z.string().optional(), response: z.string().optional(),
 });
 
 export const FactionKnowledge = z.object({
@@ -96,6 +98,21 @@ export const FactionKnowledge = z.object({
   letters: z.array(DiploLetter).default([]),
   /** atti ostili o di pressione visti nel turno precedente (prima quelli che riguardano la fazione) */
   incidents: z.array(Incident).default([]),
+  /** capitale diplomatico, ricariche, rapporti e ultimatum della fazione (la sua parte: mai quella degli altri) */
+  diplomacy: z.object({
+    capital: z.number(), rent: z.number(), improvingSlots: z.number().int(),
+    /** 2 per le democrazie con tensione mondiale bassa (le azioni coercitive costano il doppio), altrimenti 1 */
+    coerciveCost: z.number().default(1),
+    improving: z.array(z.object({ target: FactionId, since: Turn })).default([]),
+    /** «azione|destinatario» → primo turno in cui si può ripetere (solo ricariche ancora attive) */
+    cooldowns: z.record(z.string(), z.number()).default({}),
+    /** altra fazione → stato dei rapporti diplomatici con lei (richiamo, espulsione, rottura) */
+    ties: z.record(FactionId, TieStatus).default({}),
+    ultimatums: z.array(Ultimatum).default([]),
+    embargoes: z.array(z.string()).default([]),
+    /** proposte di trattato ricevute, con come risponderebbe il decisore a regole (punteggio e motivi di `acceptance`): suggerimento per il giocatore */
+    proposals: z.array(z.object({ agreementId: z.string(), from: FactionId, type: z.string(), score: z.number(), accept: z.boolean(), reasons: z.array(z.object({ label: z.string(), value: z.number() })) })).default([]),
+  }).optional(),
   /**
    * L'opinione della fazione verso le altre (la sua riga: `trust` = opinionOf(lei → altra)) e la tensione di coppia. `opinionOfMe` è
    * come le altre la vedono, solo a fasce (ostile · fredda · neutra · cordiale · stretta); il numero esatto (`opinionOfMeExact`) solo
@@ -109,7 +126,9 @@ export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED'
   'BUDGET_CHANGED', 'RELATION_CHANGED', 'AGREEMENT_CHANGED', 'CRISIS_CHANGED', 'CYBER_EFFECT', 'SOF_RESULT', 'DIPLO_MESSAGE',
   'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT',
   // diplomazia asimmetrica (RELATION_CHANGED resta leggibile per le campagne vecchie e il replay, ma non si emette più)
-  'OPINION_MODIFIER', 'OPINION_DECAYED', 'TENSION_CHANGED', 'WORLD_TENSION_CHANGED']);
+  'OPINION_MODIFIER', 'OPINION_DECAYED', 'TENSION_CHANGED', 'WORLD_TENSION_CHANGED',
+  // capitale diplomatico, stato dei rapporti, ultimatum e votazioni delle istituzioni (settore 09)
+  'CAPITAL_CHANGED', 'DIPLOMACY_CHANGED', 'ULTIMATUM_MET', 'ULTIMATUM_EXPIRED', 'INSTITUTION_VOTE']);
 export const GameEvent = z.object({
   id: z.string(), turn: Turn, seq: z.number().int(), phase: TurnPhase, type: EventType,
   actor: z.string(), targets: z.array(z.string()), payload: z.record(z.string(), z.unknown()),
@@ -123,7 +142,7 @@ export const DiceRoll = z.object({
 });
 
 /** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
-export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
+export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'relations', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
 export const Rationale = z.object({ rule: z.enum(POLICY_RULES), text: z.string() });
 
 export const DecisionOutput = z.object({

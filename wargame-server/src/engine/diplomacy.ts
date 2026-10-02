@@ -1,10 +1,14 @@
-import type { DiploAction, DiploLetter, LetterAction, LetterTone, PublicStatement, WorldState } from '../schemas/index.js';
+import type { Agreement, DiploAction, DiploLetter, LetterAction, LetterTone, PublicStatement, WorldState } from '../schemas/index.js';
+import { acceptance, rejKey, type AcceptanceResult } from './acceptance.js';
 import type { TurnCtx } from './context.js';
 import { deescalateByAgreement } from './crises.js';
-
-const PERMANENT = ['USA', 'GBR', 'FRA', 'RUS', 'CHN'];
+import { DIPLO_CATALOG, actionCost, cooldownsAfter, legacyForumOf } from './diplo-actions.js';
+import { spendCapital } from './diplo-turn.js';
+import { resolveResolution } from './institutions.js';
+import { PARAMS } from './params.js';
 
 function message(ctx: TurnCtx, from: string, to: string, text: string, channel: 'official' | 'backchannel', actionRef: string) {
+  if (!ctx.state.factions[to]) return; // gli Stati del mondo non hanno una casella di posta: rispondono con acceptance() o con la loro agenda
   ctx.emit('DIPLO_MESSAGE', from, { message: { id: `M-${ctx.turn}-${actionRef}-${to}`, turn: ctx.turn, from, to, channel, text, actionRef } },
     { targets: [to], visibility: channel === 'backchannel' ? [from, to] : 'public' });
 }
@@ -60,9 +64,41 @@ function resolveLetter(ctx: TurnCtx, actor: string, a: LetterAction) {
   if (a.visibility === 'public') ctx.emit('STATEMENT', actor, { text: letter.subject, tone: a.tone, audience: a.target, letterId: letter.id }, cause);
 }
 
+/** «Trattato attivo» (+10, permanente finché l'accordo è in vigore): ogni parte verso il proponente e il proponente verso ognuna. */
+function treatyModifiers(ctx: TurnCtx, ag: Agreement) {
+  const [proposer, ...others] = ag.parties;
+  const def = PARAMS.opinion.modifiers.treaty!;
+  for (const o of others.slice(0, 8)) {
+    if (!proposer || o === proposer) continue;
+    for (const [from, to] of [[o, proposer], [proposer, o]] as const) {
+      const modifier = { id: `treaty:${ag.id}:${from}<${to}`, from, to, kind: 'treaty', label: def.label, value: PARAMS.treaty.opinion, decayPerWeek: 0, causeRef: ag.id, visibility: ag.visibility === 'public' ? 'public' as const : ag.parties, turn: ctx.turn };
+      ctx.emit('OPINION_MODIFIER', from, { modifier }, { targets: [to], visibility: modifier.visibility });
+    }
+  }
+}
+
+/** Un accordo non aggressione violato da un atto di forza tra le parti: lo stato passa a `violated`, chi lo subisce lo vede, la credibilità scende. */
+export function violateTreaties(ctx: TurnCtx, aggressor: string, victim: string, why: string) {
+  for (const ag of Object.values(ctx.state.agreements).filter((x) => x.status === 'active' && x.type === 'non_aggression' && x.parties.includes(aggressor) && x.parties.includes(victim)).sort((a, b) => a.id.localeCompare(b.id))) {
+    ctx.emit('AGREEMENT_CHANGED', aggressor, { agreement: { ...ag, status: 'violated' }, violatedBy: aggressor, why }, { targets: ag.parties, visibility: ag.visibility });
+    ctx.relate(aggressor, victim, PARAMS.treaty.violatedOpinion, 5, `trattato violato: ${ag.id} (${why})`, { propagate: false });
+    ctx.emit('FACTION_CHANGED', aggressor, { factionId: aggressor, delta: { credibility: PARAMS.treaty.violatedCredibility } }, { visibility: 'public' });
+  }
+}
+
+const TIE_STEPS = {
+  RECALL_AMBASSADOR: { status: 'recalled', note: "richiamo dell'ambasciatore", ...PARAMS.diplo.ties.recall },
+  EXPEL_DIPLOMATS: { status: 'expelled', note: 'espulsione di diplomatici', ...PARAMS.diplo.ties.expel },
+  BREAK_RELATIONS: { status: 'broken', note: 'rottura delle relazioni', ...PARAMS.diplo.ties.break },
+} as const;
+
 export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
   const s = ctx.state;
   const cause = { causedBy: { orderId: a.id } };
+  // costo in CD e ricarica: valgono per ogni azione del catalogo (il validatore ha già controllato che il capitale basti)
+  spendCapital(ctx, actor, actionCost(s, actor, a), DIPLO_CATALOG[a.kind].label, a.id);
+  const cds = cooldownsAfter(s, actor, a);
+  if (Object.keys(cds).length) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'cooldown', keys: cds } }, { visibility: [actor], ...cause });
   switch (a.kind) {
     case 'LETTER': resolveLetter(ctx, actor, a); break;
     case 'DEMARCHE': ctx.relate(actor, a.target, -2, 3, `démarche: ${a.message}`, { propagate: false }); message(ctx, actor, a.target, a.message, 'official', a.id); break;
@@ -72,37 +108,87 @@ export function resolveDiplomacy(ctx: TurnCtx, actor: string, a: DiploAction) {
       message(ctx, actor, a.target, a.message, 'official', a.id); break;
     case 'REASSURANCE': ctx.relate(actor, a.target, 3, -5, 'rassicurazione', { propagate: false, detente: true }); message(ctx, actor, a.target, a.message, 'official', a.id); break;
     case 'BACKCHANNEL': ctx.relate(actor, a.target, 2, -2, 'canale riservato', { propagate: false, visibility: [actor, a.target], detente: true }); message(ctx, actor, a.target, a.message, 'backchannel', a.id); break;
+    case 'IMPROVE_RELATIONS':
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'improve_start', actor, target: a.target } }, { targets: [a.target], visibility: [actor], ...cause });
+      ctx.relate(actor, a.target, PARAMS.diplo.improve.perTurn, 0, `migliorare le relazioni con ${a.target}`, { propagate: false, detente: true });
+      break;
+    case 'STOP_IMPROVE': {
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'improve_stop', actor, target: a.target } }, { targets: [a.target], visibility: [actor], ...cause });
+      // il vantaggio accumulato non sparisce: da ora decade (0,5 a settimana)
+      const m = (s.diplomacy?.modifiers ?? []).find((x) => x.kind === 'improve' && x.from === a.target && x.to === actor);
+      if (m) ctx.emit('OPINION_MODIFIER', actor, { modifier: { ...m, decayPerWeek: 0.5 } }, { targets: [a.target], visibility: m.visibility, ...cause });
+      break;
+    }
+    case 'RECALL_AMBASSADOR': case 'EXPEL_DIPLOMATS': case 'BREAK_RELATIONS': {
+      const st = TIE_STEPS[a.kind];
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'tie', a: actor, b: a.target, status: st.status } }, { targets: [a.target], ...cause });
+      ctx.relate(actor, a.target, st.opinion, st.tension, st.note);
+      if (a.kind === 'BREAK_RELATIONS') for (const [x, y] of [[actor, a.target], [a.target, actor]] as const) if (s.diplomacy?.improving.some((i) => i.actor === x && i.target === y)) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'improve_stop', actor: x, target: y } }, { visibility: [x, y] });
+      break;
+    }
+    case 'RESTORE_RELATIONS':
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'tie', a: actor, b: a.target, status: null } }, { targets: [a.target], ...cause });
+      ctx.relate(actor, a.target, PARAMS.diplo.ties.restore.opinion, PARAMS.diplo.ties.restore.tension, 'ripristino delle relazioni', { propagate: false, detente: true });
+      break;
+    case 'ARMS_EMBARGO':
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'embargo_add', key: `${actor}>${a.target}` } }, { targets: [a.target], ...cause });
+      ctx.relate(actor, a.target, PARAMS.diplo.embargo.opinion, PARAMS.diplo.embargo.tension, `embargo sulle armi: ${a.target}`);
+      break;
+    case 'LIFT_ARMS_EMBARGO':
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'embargo_remove', key: `${actor}>${a.target}` } }, { targets: [a.target], ...cause });
+      ctx.relate(actor, a.target, PARAMS.diplo.embargo.lift, 0, `revoca embargo sulle armi: ${a.target}`, { propagate: false, detente: true });
+      break;
+    case 'ULTIMATUM': {
+      const ultimatum = { id: `ULT-${ctx.turn}-${actor}-${a.id}`, from: actor, to: a.target, demand: a.demand, issuedTurn: ctx.turn, deadlineTurn: ctx.turn + a.deadlineTurns, status: 'pending' as const };
+      ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'ultimatum_add', ultimatum } }, { targets: [a.target], ...cause });
+      ctx.relate(actor, a.target, PARAMS.diplo.ultimatum.opinion, PARAMS.diplo.ultimatum.tension, `ultimatum: ${a.demand}`);
+      message(ctx, actor, a.target, `Ultimatum (scadenza al turno ${ultimatum.deadlineTurn}): ${a.demand}`, 'official', a.id);
+      break;
+    }
+    case 'MEDIATE': {
+      const M = PARAMS.diplo.mediation;
+      ctx.escalate(a.crisisId, M.escalation, `mediazione di ${actor}`);
+      for (const p of a.parties) ctx.relate(actor, p, M.opinion, 0, `mediazione in ${a.crisisId}`, { propagate: false, detente: true });
+      ctx.emit('FACTION_CHANGED', actor, { factionId: actor, delta: { credibility: M.credibility } }, cause);
+      break;
+    }
+    case 'RESOLUTION': resolveResolution(ctx, actor, { id: a.id, forum: a.forum, subject: a.subject, topic: a.topic, ...(a.target ? { target: a.target } : {}) }); break;
+    case 'NATO_ART4': case 'EU_COUNCIL': case 'UNSC_DRAFT': resolveResolution(ctx, actor, { id: a.id, forum: legacyForumOf(a.kind) as 'NATO' | 'EU_COUNCIL' | 'UNSC', subject: a.subject, topic: 'other' }); break;
     case 'PROPOSE_AGREEMENT': {
-      const agreement = { ...a.agreement, id: `AG-${ctx.turn}-${actor}-${a.id}`, parties: [...new Set([actor, ...a.target, ...a.agreement.parties])], startTurn: ctx.turn, status: 'proposed' as const };
-      ctx.emit('AGREEMENT_CHANGED', actor, { agreement }, { targets: a.target, visibility: agreement.visibility === 'public' ? 'public' : agreement.parties, ...cause });
-      for (const t of a.target) message(ctx, actor, t, `Proposta di accordo ${agreement.type}: ${agreement.terms} [${agreement.id}]`, agreement.visibility === 'public' ? 'official' : 'backchannel', a.id);
+      const parties = [...new Set([actor, ...a.target, ...a.agreement.parties])];
+      const base = { ...a.agreement, id: `AG-${ctx.turn}-${actor}-${a.id}`, parties, startTurn: ctx.turn };
+      // gli Stati del mondo rispondono subito (acceptance, deterministica), le fazioni nel turno dopo
+      const world = a.target.filter((t) => t !== actor && !s.factions[t]);
+      const verdicts: AcceptanceResult[] = world.map((t) => acceptance(s, t, { type: base.type, parties }, actor));
+      const refused = verdicts.filter((v) => !v.accept);
+      const factionsToAsk = a.target.filter((t) => t !== actor && s.factions[t]);
+      const status = refused.length ? 'expired' as const : world.length && !factionsToAsk.length ? 'active' as const : 'proposed' as const;
+      const agreement: Agreement = { ...base, status };
+      ctx.emit('AGREEMENT_CHANGED', actor, { agreement, ...(verdicts.length ? { acceptance: verdicts } : {}) }, { targets: a.target, visibility: agreement.visibility === 'public' ? 'public' : agreement.parties, ...cause });
+      for (const t of factionsToAsk) message(ctx, actor, t, `Proposta di accordo ${agreement.type}: ${agreement.terms} [${agreement.id}]`, agreement.visibility === 'public' ? 'official' : 'backchannel', a.id);
+      for (const v of verdicts) {
+        ctx.relate(v.target, actor, v.accept ? 8 : -4, v.accept ? -5 : 2, `risposta ad accordo ${agreement.id}: ${v.accept ? 'accept' : 'reject'}`, { propagate: false, detente: v.accept });
+        if (!v.accept) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'cooldown', keys: { [rejKey(actor, v.target, agreement.type)]: ctx.turn + PARAMS.acceptance.rejectedTurns } } }, { visibility: [actor, v.target], ...cause });
+      }
+      if (status === 'active') { treatyModifiers(ctx, agreement); deescalateByAgreement(ctx, agreement); }
       break;
     }
     case 'RESPOND_AGREEMENT': {
       const ag = s.agreements[a.agreementId];
       if (!ag || !ag.parties.includes(actor) || ag.status !== 'proposed') break;
       const status = a.response === 'accept' ? 'active' : a.response === 'reject' ? 'expired' : 'proposed';
-      ctx.emit('AGREEMENT_CHANGED', actor, { agreement: { ...ag, status, terms: a.counterTerms ?? ag.terms } }, { targets: ag.parties, visibility: ag.visibility, ...cause });
+      const next: Agreement = { ...ag, status, terms: a.counterTerms ?? ag.terms };
+      ctx.emit('AGREEMENT_CHANGED', actor, { agreement: next }, { targets: ag.parties, visibility: ag.visibility, ...cause });
       for (const p of ag.parties) if (p !== actor) ctx.relate(actor, p, a.response === 'accept' ? 8 : a.response === 'reject' ? -4 : 0, a.response === 'accept' ? -5 : 2, `risposta ad accordo ${ag.id}: ${a.response}`, { propagate: false, detente: a.response === 'accept' });
-      if (status === 'active') deescalateByAgreement(ctx, ag);
+      if (a.response === 'reject' && ag.parties[0]) ctx.emit('DIPLOMACY_CHANGED', actor, { change: { op: 'cooldown', keys: { [rejKey(ag.parties[0], actor, ag.type)]: ctx.turn + PARAMS.acceptance.rejectedTurns } } }, { visibility: [actor, ag.parties[0]], ...cause });
+      if (status === 'active') { treatyModifiers(ctx, next); deescalateByAgreement(ctx, next); }
       break;
     }
     case 'SANCTION':
     case 'LIFT_SANCTION': {
       const k = a.kind === 'SANCTION' ? 1 : -0.5;
       ctx.relate(actor, a.target, -15 * k, 10 * k, `${a.kind === 'SANCTION' ? 'sanzioni' : 'revoca sanzioni'}: ${a.scope}`);
-      ctx.emit('FACTION_CHANGED', actor, { factionId: a.target, delta: { stability: -2 * k } }, cause);
-      break;
-    }
-    case 'NATO_ART4':
-    case 'EU_COUNCIL':
-    case 'UNSC_DRAFT': {
-      const members = a.kind === 'UNSC_DRAFT' ? PERMANENT : Object.values(s.factions).filter((f) => f.alliances.includes(a.kind === 'NATO_ART4' ? 'NATO' : 'EU')).map((f) => f.id);
-      const votes = members.filter((m) => m !== actor).map((m) => ({ m, yes: (s.relations[m]?.[actor]?.trust ?? 0) >= 20, veto: a.kind === 'UNSC_DRAFT' && (s.relations[m]?.[actor]?.trust ?? 0) < -20 }));
-      const yes = votes.filter((v) => v.yes).length;
-      const passed = !votes.some((v) => v.veto) && yes >= Math.ceil(votes.length / 2);
-      ctx.emit('STATEMENT', a.kind === 'UNSC_DRAFT' ? 'UNSC' : a.kind === 'NATO_ART4' ? 'NATO' : 'EU', { kind: a.kind, subject: a.subject, requester: actor, passed, yes, total: votes.length, vetoes: votes.filter((v) => v.veto).map((v) => v.m) }, cause);
-      ctx.emit('FACTION_CHANGED', actor, { factionId: actor, delta: { credibility: passed ? 3 : -2 } }, cause);
+      if (s.factions[a.target]) ctx.emit('FACTION_CHANGED', actor, { factionId: a.target, delta: { stability: -2 * k } }, cause);
       break;
     }
     case 'ENERGY_DEAL': {

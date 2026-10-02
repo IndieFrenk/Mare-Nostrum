@@ -1,4 +1,5 @@
 import type { Campaign, Contact, EventType, GameEvent, LedgerEntry, TurnPhase, Visibility, WorldState } from '../schemas/index.js';
+import { isActor } from './diplo-actions.js';
 import { buildModifier, kindOfNote, type ActRef } from './opinion.js';
 import { PARAMS } from './params.js';
 import { applyEvent } from './reducer.js';
@@ -59,8 +60,11 @@ export class TurnCtx {
    * detente: azione distensiva (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato) che raffredda le crisi comuni.
    */
   relate(a: string, b: string, trust: number, tension: number, note: string, opts: { incident?: boolean; propagate?: boolean; visibility?: Visibility; detente?: boolean } = {}) {
-    if (a === b || !this.state.relations[a]?.[b]) return;
+    // vale per ogni coppia di attori: fazioni dello scenario e Stati del registro (ISO3)
+    if (a === b || !isActor(this.state, a) || !isActor(this.state, b)) return;
     const visibility = opts.visibility ?? 'public';
+    // chi ha ricevuto un ultimatum e cerca la distensione verso chi lo ha mandato lo «soddisfa» (si verifica alla scadenza)
+    if (opts.detente) for (const u of this.state.diplomacy?.ultimatums ?? []) if (u.status === 'pending' && !u.answered && u.from === b && u.to === a) this.emit('DIPLOMACY_CHANGED', a, { change: { op: 'ultimatum_answered', id: u.id } }, { visibility: [a, b] });
     const { kind, label } = kindOfNote(note);
     const act: ActRef = { id: `A${this.turn}-${this.seq}`, a, b, note, ...(opts.incident ? { incident: true } : {}), ...(opts.detente ? { detente: true } : {}) };
     let carried = false;
@@ -123,7 +127,7 @@ export class TurnCtx {
 
 export function alliesOf(s: WorldState, f: string): string[] {
   return Object.values(s.agreements)
-    .filter((a) => a.status === 'active' && a.type === 'defense' && a.parties.includes(f) && a.parties.length <= 3)
+    .filter((a) => a.status === 'active' && (a.type === 'defense' || a.type === 'defense_cooperation') && a.parties.includes(f) && a.parties.length <= 3)
     .flatMap((a) => a.parties).filter((x) => x !== f);
 }
 

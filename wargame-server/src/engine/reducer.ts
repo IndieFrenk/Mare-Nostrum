@@ -1,5 +1,6 @@
-import type { Agreement, Crisis, Engagement, Faction, GameEvent, OpinionModifier, PendingDelivery, Unit, WorldState } from '../schemas/index.js';
-import { emptyDiplomacy, setTension, syncPair, syncRelation, tensionOf } from './opinion.js';
+import type { Agreement, Crisis, Engagement, Faction, GameEvent, OpinionModifier, PendingDelivery, Resolution, Ultimatum, Unit, WorldState } from '../schemas/index.js';
+import { emptyDiplomacy, pairKey, setTension, syncPair, syncRelation, tensionOf } from './opinion.js';
+import { PARAMS } from './params.js';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -79,6 +80,43 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
       }
       break;
     }
+    case 'CAPITAL_CHANGED': {
+      // `deltas`: attore → variazione (la rendita del turno è un solo evento per tutte le fazioni; una spesa ne ha uno solo)
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      for (const [f, delta] of Object.entries(p.deltas as Record<string, number>)) d.capital[f] = clamp(r1((d.capital[f] ?? 0) + delta), 0, PARAMS.diplo.capital.cap);
+      break;
+    }
+    case 'DIPLOMACY_CHANGED': {
+      // un solo tipo di evento per i registri della diplomazia (ricariche, miglioramenti, rapporti, embarghi, ultimatum, risoluzioni)
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      const c = p.change as Record<string, any>;
+      switch (c.op) {
+        case 'cooldown': Object.assign(d.cooldowns, c.keys); break;
+        case 'cooldown_prune': for (const k of c.keys as string[]) delete d.cooldowns[k]; break;
+        case 'improve_start': d.improving.push({ actor: c.actor, target: c.target, since: e.turn }); break;
+        case 'improve_stop': d.improving = d.improving.filter((x) => !(x.actor === c.actor && x.target === c.target)); break;
+        case 'tie': if (c.status) d.ties[pairKey(c.a, c.b)] = c.status; else delete d.ties[pairKey(c.a, c.b)]; break;
+        case 'embargo_add': if (!d.embargoes.includes(c.key)) d.embargoes.push(c.key); break;
+        case 'embargo_remove': d.embargoes = d.embargoes.filter((x) => x !== c.key); break;
+        case 'ultimatum_add': d.ultimatums.push(c.ultimatum as Ultimatum); break;
+        case 'ultimatum_answered': for (const u of d.ultimatums) if (u.id === c.id) u.answered = true; break;
+        case 'resolution_prune': d.resolutions = d.resolutions.filter((r) => !(c.ids as string[]).includes(r.id)); break;
+        case 'ultimatum_prune': d.ultimatums = d.ultimatums.filter((u) => !(c.ids as string[]).includes(u.id)); break;
+        default: break;
+      }
+      break;
+    }
+    case 'ULTIMATUM_MET': case 'ULTIMATUM_EXPIRED': {
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      const u = d.ultimatums.find((x) => x.id === p.ultimatumId);
+      if (u) Object.assign(u, e.type === 'ULTIMATUM_MET' ? { status: 'met' } : { status: 'expired', legitimateUntil: p.legitimateUntil });
+      break;
+    }
+    case 'INSTITUTION_VOTE': {
+      // l'esito di una votazione: se approvata e con effetti vincolanti dà una risoluzione che vale come mandato (legittimità)
+      if (p.resolution) (s.diplomacy ??= emptyDiplomacy()).resolutions.push(p.resolution as Resolution);
+      break;
+    }
     case 'WORLD_TENSION_CHANGED': s.globalIndicators.worldTension = clamp(r1(p.to), 0, 100); break;
     // legacy: eventi delle campagne precedenti ai modificatori (non si emettono più); per le coppie tra fazioni si applica il delta diretto
     case 'RELATION_CHANGED': {
@@ -92,7 +130,17 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
       }
       break;
     }
-    case 'AGREEMENT_CHANGED': s.agreements[(p.agreement as Agreement).id] = p.agreement as Agreement; break;
+    case 'AGREEMENT_CHANGED': {
+      const ag = p.agreement as Agreement;
+      s.agreements[ag.id] = ag;
+      // il «Trattato attivo» vale finché l'accordo è in vigore: scaduto o violato, i suoi modificatori si tolgono
+      if (ag.status === 'expired' || ag.status === 'violated') {
+        const d = s.diplomacy;
+        const gone = d?.modifiers.filter((m) => m.id.startsWith(`treaty:${ag.id}:`)) ?? [];
+        if (d && gone.length) { d.modifiers = d.modifiers.filter((m) => !m.id.startsWith(`treaty:${ag.id}:`)); for (const m of gone) syncRelation(s, m.from, m.to); }
+      }
+      break;
+    }
     case 'CRISIS_CHANGED': {
       const c: Crisis = p.crisis ?? s.crises[p.crisisId];
       c.escalation = clamp(r1(c.escalation + (p.delta ?? 0)), 0, 10);
