@@ -1,0 +1,36 @@
+# Americhe (35 membri ONU). Colonne come in nations-africa.txt.
+USA|US|Stati Uniti|Washington|Il Presidente degli Stati Uniti d'America|AM-N|dem|7.8|340|29200|997|1330|d|100/0/0|-0.9|x:4:5|CAN:15 MEX:15 CHN:11 DEU:5 JPN:4
+CAN|CA|Canada|Ottawa|Il Primo Ministro del Canada|AM-N|dem|8.7|41|2240|29|65|n|95/0/0|-0.8|x:8:5|USA:68 CHN:6 MEX:3 JPN:2 DEU:2
+BLZ|BZ|Belize|Belmopan|Il Primo Ministro del Belize|AM-C|dem|6.6|0.4|3.3|0.03|2|n|55/5/0|-0.1|i:7:0|USA:30 GBR:12 MEX:10 NLD:6 GTM:5
+CRI|CR|Costa Rica|San José|Il Presidente della Repubblica di Costa Rica|AM-C|dem|8.3|5.2|95|0|0|n|75/10/0|-0.5|i:6:0|USA:40 CHN:9 MEX:5 NLD:4 GTM:3
+SLV|SV|El Salvador|San Salvador|Il Presidente della Repubblica di El Salvador|AM-C|hyb|4.5|6.3|35|0.4|25|n|60/10/0|-0.3|i:7:0|USA:35 GTM:13 HND:10 MEX:6 CHN:6
+GTM|GT|Guatemala|Città del Guatemala|Il Presidente della Repubblica del Guatemala|AM-C|hyb|4.7|18|105|0.5|18|n|60/10/0|-0.2|i:6:0|USA:30 MEX:12 SLV:8 CHN:8 HND:5
+HND|HN|Honduras|Tegucigalpa|Il Presidente della Repubblica dell'Honduras|AM-C|hyb|5.0|10.5|36|0.4|18|n|50/15/0|-0.1|i:7:0|USA:35 GTM:8 SLV:7 CHN:6 MEX:6
+MEX|MX|Messico|Città del Messico|Il Presidente degli Stati Uniti Messicani|AM-C|hyb|5.3|130|1850|12|265|n|60/10/0|-0.3|m:4:5|USA:60 CHN:12 CAN:3 KOR:3 JPN:3
+NIC|NI|Nicaragua|Managua|Il Presidente della Repubblica del Nicaragua|AM-C|aut|2.5|7|17|0.1|12|n|10/30/30|0.8|i:7:0|USA:30 CHN:10 SLV:9 GTM:8 MEX:7
+PAN|PA|Panama|Panama|Il Presidente della Repubblica di Panama|AM-C|dem|7.0|4.5|85|0|0|n|65/15/0|-0.3|i:8:0|USA:20 CHN:12 CRI:6 COL:5 KOR:5
+ATG|AG|Antigua e Barbuda|Saint John's|Il Primo Ministro di Antigua e Barbuda|AM-K|dem|7.0|0.1|2.0|0.03|0.2|n|55/10/0|0.0|i:9:0|USA:30 GBR:10 TTO:7 CHN:7 CAN:5
+BHS|BS|Bahamas|Nassau|Il Primo Ministro del Commonwealth delle Bahamas|AM-K|dem|7.8|0.4|16|0.07|1|n|65/10/0|-0.2|i:9:0|USA:40 CHN:8 CAN:5 GBR:5 NLD:3
+BRB|BB|Barbados|Bridgetown|Il Presidente della Repubblica di Barbados|AM-K|dem|7.8|0.28|6|0.05|1|n|55/10/0|0.0|i:9:0|USA:25 TTO:12 GBR:8 CHN:7 CAN:5
+CUB|CU|Cuba|L'Avana|Il Presidente della Repubblica di Cuba|AM-K|aut|2.6|10|25|0.4|50|n|0/25/35|0.9|i:9:0|CHN:22 ESP:12 RUS:8 CAN:6 BRA:5
+DMA|DM|Dominica|Roseau|Il Presidente del Commonwealth di Dominica|AM-K|dem|7.0|0.07|0.6|0.0|0.1|n|50/15/0|0.0|i:9:0|USA:20 TTO:10 GBR:8 CHN:8 JAM:7
+DOM|DO|Repubblica Dominicana|Santo Domingo|Il Presidente della Repubblica Dominicana|AM-K|hyb|6.5|11.3|125|1.1|56|n|65/10/0|-0.3|i:8:0|USA:45 CHN:9 HTI:7 MEX:4 BRA:4
+GRD|GD|Grenada|Saint George's|Il Primo Ministro di Grenada|AM-K|dem|7.1|0.12|1.4|0.0|0.1|n|55/10/0|0.0|i:9:0|USA:25 TTO:15 GBR:8 CHN:6 CAN:5
+HTI|HT|Haiti|Port-au-Prince|Il Presidente del Consiglio presidenziale di transizione di Haiti|AM-K|tra|2.7|11.7|20|0.1|1|n|50/5/0|0.0|i:9:0|USA:45 DOM:20 CHN:8 CAN:5 BRA:3
+JAM|JM|Giamaica|Kingston|Il Primo Ministro della Giamaica|AM-K|dem|7.0|2.8|20|0.2|4|n|60/10/0|-0.1|i:9:0|USA:40 CAN:10 NLD:6 CHN:6 GBR:5
+KNA|KN|Saint Kitts e Nevis|Basseterre|Il Primo Ministro di Saint Kitts e Nevis|AM-K|dem|7.0|0.05|1.1|0.02|0.3|n|55/10/0|0.0|i:9:0|USA:45 CAN:10 GBR:8 TTO:5 CHN:5
+LCA|LC|Santa Lucia|Castries|Il Primo Ministro di Santa Lucia|AM-K|dem|7.0|0.18|2.6|0.0|0.4|n|55/10/0|0.0|i:9:0|USA:30 TTO:15 GBR:8 CHN:6 BRB:5
+VCT|VC|Saint Vincent e Grenadine|Kingstown|Il Primo Ministro di Saint Vincent e Grenadine|AM-K|dem|7.0|0.1|1.0|0.0|0.3|n|45/10/5|0.1|i:9:0|USA:20 TTO:15 GBR:8 CHN:7 CAN:6
+TTO|TT|Trinidad e Tobago|Port of Spain|Il Primo Ministro di Trinidad e Tobago|AM-K|dem|7.0|1.4|30|0.5|4|n|60/10/0|-0.1|x:6:7|USA:30 BRA:6 ARG:5 CHN:5 CAN:4
+ARG|AR|Argentina|Buenos Aires|Il Presidente della Nazione Argentina|AM-S|hyb|6.8|47|640|4|72|n|65/15/0|-0.4|m:3:3|BRA:20 CHN:18 USA:8 CHL:4 DEU:3
+BOL|BO|Bolivia|Sucre|Il Presidente dello Stato Plurinazionale di Bolivia|AM-S|hyb|4.0|12.4|46|0.6|34|n|20/25/15|0.5|x:2:7|ARG:15 BRA:15 CHN:12 USA:8 PER:7
+BRA|BR|Brasile|Brasilia|Il Presidente della Repubblica Federativa del Brasile|AM-S|dem|6.8|212|2170|20.4|360|n|35/30/5|0.0|x:6:1|CHN:28 USA:11 ARG:6 NLD:3 DEU:3
+CHL|CL|Cile|Santiago|Il Presidente della Repubblica del Cile|AM-S|dem|8.0|19.5|335|5.5|68|n|65/20/0|-0.4|i:8:6|CHN:33 USA:16 BRA:7 JPN:6 KOR:6
+COL|CO|Colombia|Bogotá|Il Presidente della Repubblica di Colombia|AM-S|hyb|6.6|52|420|11.5|295|n|60/20/0|-0.1|x:6:2|USA:26 CHN:19 PAN:5 BRA:5 MEX:4
+ECU|EC|Ecuador|Quito|Il Presidente della Repubblica dell'Ecuador|AM-S|hyb|5.7|18|120|2.6|40|n|55/20/0|-0.2|x:6:0|USA:25 CHN:16 PAN:8 PER:5 COL:4
+GUY|GY|Guyana|Georgetown|Il Presidente della Repubblica Cooperativa di Guyana|AM-S|hyb|6.3|0.8|20|0.15|4|n|55/15/0|-0.1|x:8:0|ARE:18 USA:16 NLD:8 CAN:7 TTO:6
+PRY|PY|Paraguay|Asunción|Il Presidente della Repubblica del Paraguay|AM-S|hyb|5.8|6.9|44|0.5|13|n|55/20/0|-0.2|m:2:0|BRA:30 ARG:15 CHN:14 CHL:6 USA:5
+PER|PE|Perù|Lima|Il Presidente della Repubblica del Perù|AM-S|hyb|5.9|34|290|3.5|81|n|55/30/0|-0.2|m:3:3|CHN:30 USA:13 BRA:5 CHL:4 CAN:4
+SUR|SR|Suriname|Paramaribo|Il Presidente della Repubblica del Suriname|AM-S|dem|6.5|0.62|3.5|0.06|2|n|45/20/0|0.0|x:5:0|ARE:20 USA:12 CHE:10 NLD:9 BEL:6
+URY|UY|Uruguay|Montevideo|Il Presidente della Repubblica Orientale dell'Uruguay|AM-S|dem|8.7|3.4|80|0.9|20|n|65/20/0|-0.4|i:8:0|CHN:27 BRA:20 ARG:10 USA:7 NLD:3
+VEN|VE|Venezuela|Caracas|Il Presidente della Repubblica Bolivariana del Venezuela|AM-S|aut|2.3|28|100|2|123|n|5/30/35|0.8|x:10:1|USA:20 CHN:20 IND:12 BRA:5 ESP:5

@@ -1,0 +1,44 @@
+# Europa (43 membri ONU). Colonne come in nations-africa.txt. «nato_sharing» = ospita armi nucleari USA (condivisione nucleare NATO).
+BLR|BY|Bielorussia|Minsk|Il Presidente della Repubblica di Bielorussia|EU-E|aut|2.0|9.1|72|1.7|48|n|0/15/80|0.9|i:8:9|RUS:55 CHN:7 KAZ:3 TUR:3 POL:3
+BGR|BG|Bulgaria|Sofia|Il Presidente della Repubblica di Bulgaria|EU-E|hyb|6.5|6.4|110|2.3|31|n|85/0/5|-0.4|i:8:6|DEU:12 ROU:9 ITA:7 TUR:7 GRC:6
+CZE|CZ|Cechia|Praga|Il Presidente della Repubblica Ceca|EU-E|dem|7.9|10.9|345|5.7|25|n|90/5/0|-0.7|i:8:7|DEU:28 POL:9 SVK:7 CHN:6 FRA:4
+HUN|HU|Ungheria|Budapest|Il Primo Ministro dell'Ungheria|EU-E|hyb|6.7|9.6|220|5.5|28|n|55/20/20|-0.1|i:7:8|DEU:25 CHN:7 SVK:6 AUT:5 ROU:5
+MDA|MD|Moldavia|Chisinău|Il Presidente della Repubblica di Moldavia|EU-E|hyb|6.0|2.4|16.5|0.1|6|n|65/5/5|-0.3|i:8:9|ROU:20 UKR:9 TUR:8 DEU:7 CHN:7
+POL|PL|Polonia|Varsavia|Il Presidente della Repubblica di Polonia|EU-E|dem|7.4|37.5|840|38|205|n|95/0/0|-0.8|i:8:7|DEU:27 CZE:6 FRA:4 ITA:4 NLD:4
+ROU|RO|Romania|Bucarest|Il Presidente della Romania|EU-E|hyb|6.4|19|350|8|75|n|90/0/0|-0.7|m:5:5|DEU:19 ITA:11 HUN:7 FRA:6 POL:5
+RUS|RU|Russia|Mosca|Il Presidente della Federazione Russa|EU-E|aut|2.2|144|2160|149|1134|d|0/20/80|0.9|x:9:9|CHN:35 IND:12 TUR:7 BLR:5 KAZ:4
+SVK|SK|Slovacchia|Bratislava|Il Presidente della Repubblica Slovacca|EU-E|dem|7.0|5.4|140|2.6|15|n|65/10/15|-0.3|i:8:9|DEU:20 CZE:12 POL:7 HUN:6 AUT:5
+UKR|UA|Ucraina|Kiev|Il Presidente dell'Ucraina|EU-E|hyb|4.2|38|190|64.7|900|n|90/0/0|-0.8|i:7:5|CHN:14 POL:13 DEU:10 TUR:6 ROU:6
+DNK|DK|Danimarca|Copenaghen|Il Primo Ministro del Regno di Danimarca|EU-N|dem|9.3|6.0|420|9|15|n|95/0/0|-0.9|m:3:2|DEU:16 USA:9 SWE:9 NLD:6 CHN:6
+EST|EE|Estonia|Tallinn|Il Presidente della Repubblica di Estonia|EU-N|dem|7.9|1.4|43|1.8|8|n|95/0/0|-0.8|i:8:7|FIN:14 LVA:9 SWE:9 LTU:8 DEU:7
+FIN|FI|Finlandia|Helsinki|Il Presidente della Repubblica di Finlandia|EU-N|dem|9.3|5.6|300|7|23|n|95/0/0|-0.9|i:8:6|DEU:12 SWE:10 USA:8 NLD:7 CHN:5
+ISL|IS|Islanda|Reykjavik|Il Presidente della Repubblica d'Islanda|EU-N|dem|9.5|0.39|33|0.05|0.2|n|95/0/0|-0.8|i:8:0|NLD:11 DEU:9 USA:8 NOR:7 CHN:7
+IRL|IE|Irlanda|Dublino|Il Primo Ministro d'Irlanda|EU-N|dem|9.1|5.3|560|1.4|9|n|90/5/0|-0.7|i:7:7|USA:28 GBR:11 NLD:8 DEU:7 BEL:6
+LVA|LV|Lettonia|Riga|Il Presidente della Repubblica di Lettonia|EU-N|dem|7.4|1.9|44|1.8|8|n|95/0/0|-0.8|i:8:8|LTU:15 EST:10 DEU:8 POL:8 SWE:5
+LTU|LT|Lituania|Vilnius|Il Presidente della Repubblica di Lituania|EU-N|dem|7.2|2.9|80|2.9|23|n|95/0/0|-0.8|i:8:7|POL:10 LVA:9 DEU:9 SWE:5 NLD:5
+NOR|NO|Norvegia|Oslo|Il Primo Ministro del Regno di Norvegia|EU-N|dem|9.8|5.6|485|9.1|20|n|95/0/0|-0.8|x:9:10|DEU:16 GBR:14 SWE:9 NLD:8 CHN:7
+SWE|SE|Svezia|Stoccolma|Il Primo Ministro del Regno di Svezia|EU-N|dem|9.4|10.5|610|11.8|15|n|95/0/0|-0.9|i:7:3|DEU:12 NOR:9 USA:8 DNK:8 FIN:7
+GBR|GB|Regno Unito|Londra|Il Primo Ministro del Regno Unito|EU-N|dem|8.3|68.3|3640|81.8|140|d|95/0/0|-0.9|m:4:5|USA:14 DEU:9 NLD:7 CHN:6 FRA:6
+ALB|AL|Albania|Tirana|Il Primo Ministro della Repubblica d'Albania|EU-S|hyb|6.1|2.4|27|0.5|8|n|75/5/0|-0.5|m:4:0|ITA:28 TUR:8 CHN:8 GRC:7 DEU:6
+AND|AD|Andorra|Andorra la Vella|Il Capo del governo del Principato di Andorra|EU-S|dem|7.7|0.08|3.9|0.0|0|n|85/0/0|-0.6|i:9:0|ESP:40 FRA:20 PRT:5 DEU:4 ITA:4
+BIH|BA|Bosnia ed Erzegovina|Sarajevo|Il Presidente di turno della Presidenza della Bosnia ed Erzegovina|EU-S|hyb|5.0|3.2|27|0.4|10|n|45/10/20|0.0|i:7:6|DEU:13 HRV:12 ITA:9 SRB:9 SVN:7
+HRV|HR|Croazia|Zagabria|Il Presidente della Repubblica di Croazia|EU-S|dem|6.8|3.8|90|1.7|15|n|90/0/0|-0.7|i:8:7|ITA:13 DEU:12 SVN:11 BIH:9 HUN:7
+GRC|GR|Grecia|Atene|Il Primo Ministro della Repubblica Ellenica|EU-S|dem|7.6|10.4|240|8.5|140|n|90/0/0|-0.7|i:8:7|ITA:9 DEU:8 TUR:7 CYP:5 BGR:5
+ITA|IT|Italia|Roma|Il Presidente del Consiglio dei Ministri della Repubblica Italiana|EU-S|dem|7.7|59|2375|38.6|165|nato_sharing|90/0/0|-0.8|i:8:8|DEU:12 USA:10 FRA:8 CHN:6 ESP:5
+MLT|MT|Malta|La Valletta|Il Primo Ministro della Repubblica di Malta|EU-S|dem|7.6|0.54|23|0.1|2|n|85/5/0|-0.6|i:9:0|ITA:12 DEU:9 FRA:7 GBR:7 CHN:5
+MNE|ME|Montenegro|Podgorica|Il Presidente del Montenegro|EU-S|hyb|6.2|0.62|7.3|0.1|2|n|65/10/5|-0.3|i:8:0|SRB:20 BIH:9 DEU:7 CHN:7 ITA:6
+MKD|MK|Macedonia del Nord|Skopje|Il Presidente della Repubblica di Macedonia del Nord|EU-S|hyb|6.0|1.8|16|0.5|8|n|75/5/5|-0.5|i:8:5|DEU:22 GRC:7 SRB:7 BGR:6 TUR:6
+PRT|PT|Portogallo|Lisbona|Il Presidente della Repubblica Portoghese|EU-S|dem|7.9|10.4|290|4.3|25|n|90/0/0|-0.8|i:8:7|ESP:30 FRA:12 DEU:11 USA:6 ITA:5
+SMR|SM|San Marino|San Marino|I Capitani Reggenti della Repubblica di San Marino|EU-S|dem|8.0|0.034|2.0|0.0|0|n|90/0/0|-0.5|i:9:0|ITA:85 DEU:3 FRA:3 USA:2 CHE:1
+SRB|RS|Serbia|Belgrado|Il Presidente della Repubblica di Serbia|EU-S|hyb|5.5|6.6|85|2.4|28|n|30/25/30|0.0|i:7:9|DEU:13 CHN:12 ITA:7 HUN:6 BIH:6
+SVN|SI|Slovenia|Lubiana|Il Presidente della Repubblica di Slovenia|EU-S|dem|7.5|2.1|71|1.2|7|n|90/0/0|-0.7|i:8:6|DEU:18 ITA:10 HRV:9 AUT:8 SRB:5
+ESP|ES|Spagna|Madrid|Il Presidente del Governo di Spagna|EU-S|dem|8.1|48.6|1720|24.6|120|n|90/0/0|-0.8|i:8:7|FRA:14 DEU:11 ITA:8 PRT:7 USA:6
+AUT|AT|Austria|Vienna|Il Cancelliere della Repubblica d'Austria|EU-W|dem|8.2|9.1|540|4|15|n|90/0/0|-0.6|i:8:8|DEU:30 ITA:6 USA:6 CHN:5 CZE:4
+BEL|BE|Belgio|Bruxelles|Il Primo Ministro del Regno del Belgio|EU-W|dem|7.6|11.8|640|6.5|24|nato_sharing|95/0/0|-0.8|i:8:8|DEU:15 FRA:13 NLD:13 USA:9 GBR:5
+FRA|FR|Francia|Parigi|Il Presidente della Repubblica francese|EU-W|dem|8.1|66|3160|64.7|205|d|90/5/0|-0.7|i:8:7|DEU:15 ITA:8 ESP:8 BEL:8 USA:7
+DEU|DE|Germania|Berlino|Il Cancelliere della Repubblica Federale di Germania|EU-W|dem|8.8|84|4660|88.5|180|nato_sharing|95/0/0|-0.8|i:9:8|CHN:9 USA:9 NLD:8 FRA:7 POL:6
+LIE|LI|Liechtenstein|Vaduz|Il Principe del Liechtenstein|EU-W|dem|8.0|0.04|7.2|0.0|0|n|90/0/0|-0.6|i:9:0|CHE:40 DEU:15 USA:8 AUT:6 FRA:3
+LUX|LU|Lussemburgo|Lussemburgo|Il Granduca del Lussemburgo|EU-W|dem|8.8|0.67|89|0.6|0.4|n|95/0/0|-0.8|i:9:0|DEU:25 BEL:20 FRA:15 NLD:4 CHN:3
+MCO|MC|Monaco|Monaco|Il Principe di Monaco|EU-W|hyb|6.0|0.04|8.5|0.0|0|n|90/0/0|-0.6|i:9:0|FRA:35 ITA:20 DEU:5 USA:5 GBR:4
+NLD|NL|Paesi Bassi|Amsterdam|Il Primo Ministro del Regno dei Paesi Bassi|EU-W|dem|9.0|17.9|1230|22.6|34|nato_sharing|95/0/0|-0.9|i:8:8|DEU:19 BEL:11 USA:8 GBR:7 FRA:6
+CHE|CH|Svizzera|Berna|Il Presidente della Confederazione Svizzera|EU-W|dem|9.1|8.9|940|6.1|21|n|85/5/0|-0.6|i:8:6|DEU:20 USA:12 CHN:9 ITA:7 FRA:6

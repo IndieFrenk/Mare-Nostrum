@@ -53,7 +53,7 @@ export const Nation = z.object({
   memberships: z.array(z.string()),
   /** fazione dello scenario med-2026 che governa questo Stato (DZA ↔ ALG, LBY ↔ LBY_GNU); assente per gli altri */
   factionId: z.string().optional(),
-  /** fonte per campo (es. `population: «Banca Mondiale 2024»` oppure `«stima»`) */
+  /** fonte per campo, come codice della legenda in `NationsFile.sourceLegend` (es. `stima`, `WB:SP.POP.TOTL:2023`) */
   sources: z.record(z.string(), z.string()),
   /** affidabilità 0–1 per campo: i valori stimati a mano stanno sotto 0,7 */
   confidence: z.record(z.string(), z.number().min(0).max(1)),
@@ -88,7 +88,8 @@ export const Institution = z.object({
  */
 export const HistoricPair = z.tuple([Iso3, Iso3, z.number().min(-100).max(100), z.string().min(3)]);
 
-export const NationsFile = z.object({ schemaVersion: z.literal(1), asOf: z.string(), nations: z.array(Nation) });
+/** `sourceLegend`: codice → descrizione e licenza; i codici con parametri (`WB:indicatore:anno`) si risolvono sul prefisso prima dei «:» se il codice intero manca. */
+export const NationsFile = z.object({ schemaVersion: z.literal(1), asOf: z.string(), sourceLegend: z.record(z.string(), z.string()), nations: z.array(Nation) });
 export const InstitutionsFile = z.object({ schemaVersion: z.literal(1), asOf: z.string(), institutions: z.array(Institution) });
 export const PairsFile = z.object({ schemaVersion: z.literal(1), pairs: z.array(HistoricPair) });
 

@@ -1,0 +1,48 @@
+# Asia (47 membri ONU). Colonne come in nations-africa.txt.
+KAZ|KZ|Kazakistan|Astana|Il Presidente della Repubblica del Kazakistan|AS-C|aut|3.2|20|290|1.9|39|n|15/30/40|0.5|x:9:3|CHN:20 RUS:18 ITA:7 TUR:6 UZB:5
+KGZ|KG|Kirghizistan|Bishkek|Il Presidente della Repubblica del Kirghizistan|AS-C|aut|2.7|7.2|15|0.4|11|n|5/25/55|0.6|i:7:2|CHN:30 RUS:22 KAZ:10 UZB:8 TUR:6
+TJK|TJ|Tagikistan|Dušanbe|Il Presidente della Repubblica del Tagikistan|AS-C|aut|1.9|10.5|13|0.3|16|n|0/25/55|0.6|i:3:2|RUS:22 CHN:15 KAZ:14 TUR:8 UZB:6
+TKM|TM|Turkmenistan|Ashgabat|Il Presidente del Turkmenistan|AS-C|aut|1.7|7.5|60|0.6|36|n|0/55/20|0.5|x:3:10|CHN:70 TUR:6 RUS:4 UZB:3 ARE:3
+UZB|UZ|Uzbekistan|Tashkent|Il Presidente della Repubblica dell'Uzbekistan|AS-C|aut|2.1|36.5|115|2.5|68|n|10/35/40|0.5|m:2:3|CHN:23 RUS:17 KAZ:8 TUR:7 KOR:5
+CHN|CN|Cina|Pechino|Il Presidente della Repubblica Popolare Cinese|AS-E|aut|2.1|1410|18700|314|2035|d|0/95/5|0.85|i:7:4|USA:11 KOR:6 JPN:5 VNM:5 DEU:4
+JPN|JP|Giappone|Tokyo|Il Primo Ministro del Giappone|AS-E|dem|8.4|123|4030|55|247|latent|90/5/0|-0.7|i:9:9|CHN:20 USA:15 AUS:5 KOR:5 TWN:4
+PRK|KP|Corea del Nord|Pyongyang|Il Presidente degli Affari di Stato della Repubblica Popolare Democratica di Corea|AS-E|aut|1.1|26|25|4|1280|d|0/30/45|0.95|i:6:0|CHN:90 RUS:6 IND:1
+KOR|KR|Corea del Sud|Seul|Il Presidente della Repubblica di Corea|AS-E|dem|8.0|51.7|1870|47.6|500|latent|90/5/0|-0.7|i:9:9|CHN:20 USA:15 JPN:6 VNM:6 AUS:4
+MNG|MN|Mongolia|Ulan Bator|Il Presidente della Mongolia|AS-E|hyb|6.4|3.5|22|0.3|10|n|30/35/20|0.1|x:3:0|CHN:65 RUS:15 KOR:3 JPN:3 CAN:2
+BRN|BN|Brunei|Bandar Seri Begawan|Il Sultano del Brunei|AS-SE|mon|3.3|0.45|15|0.5|7|n|45/30/5|0.1|x:9:7|JPN:15 CHN:14 SGP:12 MYS:10 KOR:8
+KHM|KH|Cambogia|Phnom Penh|Il Re di Cambogia|AS-SE|aut|2.2|17|45|0.8|124|n|10/60/5|0.5|i:8:0|CHN:30 USA:19 VNM:10 THA:7 JPN:4
+IDN|ID|Indonesia|Giacarta|Il Presidente della Repubblica d'Indonesia|AS-SE|hyb|6.5|280|1400|9.5|400|n|30/35/5|0.1|m:4:4|CHN:27 USA:9 JPN:8 SGP:7 IND:6
+LAO|LA|Laos|Vientiane|Il Presidente della Repubblica Democratica Popolare del Laos|AS-SE|aut|1.7|7.6|15|0.2|30|n|5/60/5|0.6|i:7:0|THA:32 CHN:30 VNM:14 KOR:3 JPN:3
+MYS|MY|Malesia|Kuala Lumpur|Il Re della Malesia|AS-SE|hyb|7.3|34|420|4.0|113|n|45/25/0|-0.1|x:5:6|CHN:17 SGP:12 USA:10 JPN:6 TWN:5
+MMR|MM|Myanmar|Naypyidaw|Il Presidente del Consiglio di amministrazione dello Stato del Myanmar|AS-SE|mil|0.8|54|60|2.5|400|n|0/45/35|0.5|x:3:7|CHN:35 THA:20 SGP:9 IND:6 JPN:4
+PHL|PH|Filippine|Manila|Il Presidente della Repubblica delle Filippine|AS-SE|hyb|6.7|116|470|5.8|150|n|75/15/0|-0.4|i:8:2|CHN:17 USA:12 JPN:11 KOR:6 SGP:5
+SGP|SG|Singapore|Singapore|Il Primo Ministro della Repubblica di Singapore|AS-SE|hyb|6.2|6.0|540|13|51|n|70/20/0|-0.4|i:9:4|MYS:13 CHN:13 USA:9 IDN:8 TWN:7
+THA|TH|Thailandia|Bangkok|Il Re di Thailandia|AS-SE|hyb|6.0|71|530|5.8|360|n|40/35/0|0.0|i:7:6|CHN:17 USA:11 JPN:10 MYS:5 VNM:4
+TLS|TL|Timor Est|Dili|Il Presidente della Repubblica Democratica di Timor Est|AS-SE|dem|7.0|1.4|2.0|0.1|2|n|40/30/0|0.0|x:9:3|IDN:25 CHN:15 SGP:10 AUS:6 THA:5
+VNM|VN|Vietnam|Hanoi|Il Presidente della Repubblica Socialista del Vietnam|AS-SE|aut|2.6|100|470|7|450|n|25/30/25|0.3|m:4:3|CHN:23 USA:16 KOR:12 JPN:6 TWN:4
+AFG|AF|Afghanistan|Kabul|Il Capo supremo dell'Emirato islamico dell'Afghanistan|AS-S|the|0.3|42|17|0.5|150|n|0/15/15|0.7|i:7:0|PAK:30 IND:15 ARE:10 CHN:8 KAZ:6
+BGD|BD|Bangladesh|Dacca|Il Capo del governo ad interim del Bangladesh|AS-S|tra|4.0|173|450|4.3|205|n|40/30/5|0.1|i:7:6|CHN:15 USA:12 IND:12 DEU:7 GBR:5
+BTN|BT|Bhutan|Thimphu|Il Re del Bhutan|AS-S|mon|5.2|0.78|3.0|0.04|8|n|20/5/0|0.1|x:0:0|IND:78 BGD:5 CHN:3 SGP:2 THA:2
+IND|IN|India|Nuova Delhi|Il Primo Ministro dell'India|AS-S|hyb|7.0|1430|3910|86|1475|d|30/10/25|0.2|i:8:5|USA:11 CHN:10 ARE:8 RUS:7 SAU:5
+IRN|IR|Iran|Teheran|Il Presidente della Repubblica Islamica dell'Iran|AS-S|the|1.9|89|400|7.9|610|latent|0/35/35|0.95|x:8:7|CHN:30 ARE:15 TUR:8 IRQ:8 IND:5
+MDV|MV|Maldive|Malé|Il Presidente della Repubblica delle Maldive|AS-S|hyb|5.5|0.52|6.5|0.1|4|n|25/40/0|0.2|i:9:0|ARE:15 IND:13 CHN:12 SGP:10 MYS:6
+NPL|NP|Nepal|Katmandu|Il Primo Ministro del Nepal|AS-S|hyb|4.5|30|42|0.4|96|n|25/30/0|0.2|i:8:0|IND:60 CHN:14 USA:6 ARE:3 BGD:2
+PAK|PK|Pakistan|Islamabad|Il Primo Ministro della Repubblica Islamica del Pakistan|AS-S|hyb|2.8|245|375|10.2|660|d|15/50/5|0.5|i:6:5|CHN:20 USA:10 ARE:8 SAU:7 GBR:4
+LKA|LK|Sri Lanka|Colombo|Il Presidente della Repubblica Socialista Democratica dello Sri Lanka|AS-S|hyb|5.8|22|100|1.8|200|n|40/30/0|0.1|i:8:0|IND:14 CHN:12 USA:12 GBR:7 ARE:5
+ARM|AM|Armenia|Erevan|Il Primo Ministro della Repubblica di Armenia|AS-W|hyb|5.4|3.0|25|1.7|45|n|35/5/30|0.2|i:7:9|RUS:28 ARE:12 CHN:11 IRN:7 TUR:5
+AZE|AZ|Azerbaigian|Baku|Il Presidente della Repubblica dell'Azerbaigian|AS-W|aut|2.7|10.2|75|3.7|66|n|20/15/25|0.4|x:9:8|ITA:20 TUR:12 RUS:9 CHN:7 DEU:5
+BHR|BH|Bahrein|Manama|Il Re del Bahrein|AS-W|aut|2.1|1.5|47|1.5|8|n|60/10/5|0.1|x:5:3|SAU:15 ARE:9 USA:8 CHN:8 IND:6
+CYP|CY|Cipro|Nicosia|Il Presidente della Repubblica di Cipro|AS-W|dem|7.4|1.3|35|0.6|15|n|75/5/5|-0.7|i:9:0|GRC:11 ITA:8 ISR:7 DEU:6 GBR:6
+GEO|GE|Georgia|Tbilisi|Il Primo Ministro della Georgia|AS-W|hyb|5.3|3.7|33|0.5|20|n|35/15/10|0.0|i:7:9|TUR:14 RUS:12 CHN:10 AZE:7 ARM:6
+IRQ|IQ|Iraq|Baghdad|Il Presidente della Repubblica dell'Iraq|AS-W|hyb|2.9|46|270|8|190|n|20/20/10|0.5|x:10:2|CHN:28 IND:12 KOR:8 TUR:7 USA:6
+ISR|IL|Israele|Gerusalemme|Il Primo Ministro dello Stato di Israele|AS-W|dem|7.9|10|530|46.5|170|d|95/0/0|-0.9|m:6:3|USA:20 CHN:10 DEU:6 GBR:5 TUR:4
+JOR|JO|Giordania|Amman|Il Re del Regno Hascemita di Giordania|AS-W|aut|3.2|11.5|52|2.3|100|n|55/10/0|-0.1|i:9:4|USA:15 SAU:12 CHN:8 IRQ:8 IND:6
+KWT|KW|Kuwait|Città del Kuwait|L'Emiro del Kuwait|AS-W|mon|3.8|4.9|160|7.7|17|n|55/10/5|0.2|x:10:1|KOR:14 CHN:13 JPN:10 IND:9 USA:7
+LBN|LB|Libano|Beirut|Il Presidente della Repubblica Libanese|AS-W|hyb|4.2|5.5|20|0.8|80|n|40/10/10|-0.1|i:9:0|CHN:11 USA:8 ARE:8 GRC:6 TUR:6
+OMN|OM|Oman|Mascate|Il Sultano dell'Oman|AS-W|mon|3.1|5.2|105|6.5|42|n|45/20/5|0.2|x:9:5|CHN:35 ARE:12 IND:8 KOR:6 JPN:5
+QAT|QA|Qatar|Doha|L'Emiro del Qatar|AS-W|mon|3.2|2.9|220|8.0|17|n|55/15/5|0.1|x:6:10|CHN:15 IND:12 KOR:10 JPN:9 ITA:6
+SAU|SA|Arabia Saudita|Riad|Il Re dell'Arabia Saudita|AS-W|mon|2.0|35|1100|80.3|250|n|45/25/5|0.3|x:10:4|CHN:17 IND:9 JPN:8 KOR:8 USA:7
+SYR|SY|Siria|Damasco|Il Presidente della Repubblica Araba Siriana|AS-W|tra|1.5|23|9|0.5|100|n|15/5/10|0.4|i:7:2|TUR:30 ARE:10 EGY:8 LBN:7 IRQ:6
+TUR|TR|Turchia|Ankara|Il Presidente della Repubblica di Turchia|AS-W|hyb|4.3|85|1320|25|355|nato_sharing|45/10/10|0.1|i:9:9|DEU:8 RUS:8 CHN:8 USA:5 ITA:5
+ARE|AE|Emirati Arabi Uniti|Abu Dhabi|Il Presidente degli Emirati Arabi Uniti|AS-W|aut|2.9|11|540|23|63|n|45/25/10|0.2|x:8:5|IND:12 CHN:10 SAU:7 USA:6 JPN:5
+YEM|YE|Yemen|Sana'a|Il Presidente del Consiglio di leadership presidenziale dello Yemen|AS-W|tra|1.5|35|20|1.5|40|n|15/10/15|0.4|m:5:1|CHN:20 ARE:15 SAU:12 IND:8 TUR:6
