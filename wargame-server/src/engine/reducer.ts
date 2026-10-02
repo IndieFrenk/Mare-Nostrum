@@ -1,7 +1,19 @@
-import type { Agreement, Crisis, Engagement, Faction, GameEvent, PendingDelivery, Unit, WorldState } from '../schemas/index.js';
+import type { Agreement, Crisis, Engagement, Faction, GameEvent, OpinionModifier, PendingDelivery, Unit, WorldState } from '../schemas/index.js';
+import { emptyDiplomacy, setTension, syncPair, syncRelation, tensionOf } from './opinion.js';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
+
+/** Nota e ultimo incidente di un atto diplomatico sulle relazioni tra fazioni (come faceva RELATION_CHANGED, per entrambe le direzioni). */
+function noteAct(s: WorldState, act: { a: string; b: string; note?: string; incident?: boolean } | undefined, turn: number) {
+  if (!act) return;
+  for (const [x, y] of [[act.a, act.b], [act.b, act.a]] as const) {
+    const rel = s.relations[x]?.[y];
+    if (!rel) continue;
+    if (act.incident) rel.lastIncidentTurn = turn;
+    if (act.note) rel.notes = [...rel.notes.slice(-4), act.note];
+  }
+}
 
 /** Unico punto in cui lo stato viene mutato: state(N) = snapshot(N-1) + reduce(events(N)). */
 export function applyEvent(s: WorldState, e: GameEvent): void {
@@ -32,6 +44,43 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
       break;
     }
     case 'BUDGET_CHANGED': { const b = s.factions[p.factionId].budget; b.discretionary = r1(b.discretionary + p.delta); break; }
+    case 'OPINION_MODIFIER': {
+      // aggiunge o aggiorna (stesso id) un modificatore di opinion(from→to) e ricalcola il valore derivato tra le fazioni
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      const m = p.modifier as OpinionModifier;
+      const i = d.modifiers.findIndex((x) => x.id === m.id);
+      if (i >= 0) d.modifiers[i] = m; else d.modifiers.push(m);
+      syncRelation(s, m.from, m.to);
+      noteAct(s, p.act, e.turn);
+      break;
+    }
+    case 'OPINION_DECAYED': {
+      // un solo evento per turno: valori nuovi dei modificatori che decadono e id di quelli che si tolgono
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      const touched = new Set<string>();
+      const gone = new Set<string>(p.removed ?? []);
+      const next = new Map<string, number>(p.changed ?? []);
+      for (const m of d.modifiers) if (gone.has(m.id) || next.has(m.id)) touched.add(`${m.from}>${m.to}`);
+      d.modifiers = d.modifiers.filter((m) => !gone.has(m.id)).map((m) => (next.has(m.id) ? { ...m, value: next.get(m.id)! } : m));
+      for (const t of touched) { const [a, b] = t.split('>') as [string, string]; syncRelation(s, a, b); }
+      break;
+    }
+    case 'TENSION_CHANGED': {
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      if (Array.isArray(p.changes)) {
+        // ritorno al fondo (fase OPEN): `[chiave «A|B», nuovo valore | null]`; si ricalcolano dopo, il fondo non cambia durante il passo
+        const keys: string[] = [];
+        for (const [key, v] of p.changes as [string, number | null][]) { if (v === null) delete d.tension[key]; else d.tension[key] = v; keys.push(key); }
+        for (const key of keys) { const [a, b] = key.split('|') as [string, string]; syncPair(s, a, b); }
+      } else {
+        setTension(s, p.a, p.b, tensionOf(s, p.a, p.b) + (p.delta ?? 0));
+        syncPair(s, p.a, p.b);
+        noteAct(s, p.act, e.turn);
+      }
+      break;
+    }
+    case 'WORLD_TENSION_CHANGED': s.globalIndicators.worldTension = clamp(r1(p.to), 0, 100); break;
+    // legacy: eventi delle campagne precedenti ai modificatori (non si emettono più); per le coppie tra fazioni si applica il delta diretto
     case 'RELATION_CHANGED': {
       for (const [a, b] of [[p.a, p.b], [p.b, p.a]]) {
         const rel = s.relations[a]?.[b];
@@ -51,6 +100,8 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
       if (p.delta) c.history.push({ turn: e.turn, delta: p.delta, cause: p.cause });
       s.crises[c.id] = c;
       for (const z of c.zoneIds) if (s.zones[z]) s.zones[z].tension = Math.max(...Object.values(s.crises).filter((k) => k.zoneIds.includes(z)).map((k) => k.escalation * 10), 10);
+      // il fondo della tensione di coppia dipende dalle crisi in comune: si ricalcola per le parti coinvolte
+      for (let i = 0; i < c.involved.length; i++) for (let j = i + 1; j < c.involved.length; j++) syncPair(s, c.involved[i]!, c.involved[j]!);
       break;
     }
     case 'INFRA_STATUS': s.infrastructure[p.infraId].status = p.status; break;

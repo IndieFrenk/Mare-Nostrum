@@ -50,12 +50,16 @@ describe('lettere: effetti deterministici del tono', () => {
     for (const tone of Object.keys(LETTER_TONE_EFFECTS) as (keyof typeof LETTER_TONE_EFFECTS)[]) {
       const state = await e.store.getState(c.id);
       const ctx = new TurnCtx(state, c, loadScenario('med-2026'), new Rng(c.seed, c.rngCursor, 1), 0);
-      const before = structuredClone(state.relations.ITA!.EGY!);
+      const before = structuredClone(state.relations.EGY!.ITA!);
+      const mine = structuredClone(state.relations.ITA!.EGY!);
       resolveDiplomacy(ctx, 'ITA', letter({ target: 'EGY', tone }));
-      const after = ctx.state.relations.ITA!.EGY!;
+      // asimmetria: la lettera cambia come l'Egitto vede l'Italia (la sua opinione), non come l'Italia vede l'Egitto; la tensione è della coppia
+      const after = ctx.state.relations.EGY!.ITA!;
       const clamp = (v: number, lo: number, hi: number) => +(Math.max(lo, Math.min(hi, v))).toFixed(1);
       expect(after.trust, tone).toBe(clamp(before.trust + LETTER_TONE_EFFECTS[tone].trust, -100, 100));
       expect(after.tension, tone).toBe(clamp(before.tension + LETTER_TONE_EFFECTS[tone].tension, 0, 100));
+      expect(ctx.state.relations.ITA!.EGY!.trust, tone).toBe(mine.trust);
+      expect(ctx.state.relations.ITA!.EGY!.tension, tone).toBe(after.tension);
       const sent = ctx.events.find((x) => x.type === 'LETTER_SENT')!;
       expect(sent.visibility).toEqual(['ITA', 'EGY']);
       expect((sent.payload as { letter: { fromTitle: string; place: string; source: string } }).letter).toMatchObject({ fromTitle: 'Il Presidente del Consiglio dei Ministri della Repubblica Italiana', place: 'Roma', source: 'human' });

@@ -1,4 +1,5 @@
 import type { Contact, DiploLetter, DiploMessage, FactionKnowledge, GameEvent, Incident, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
+import { diploActs, opinionBand, opinionOf, tensionOf } from './opinion.js';
 import { hashString } from './rng.js';
 
 const INTENT = ['guerra aperta', 'confronto armato limitato', 'coercizione', 'competizione', 'cooperazione'];
@@ -27,19 +28,23 @@ const MAX_OTHER_INCIDENTS = 40;
  */
 export function incidentsFrom(events: GameEvent[], factionId: string): Incident[] {
   const out: Incident[] = [];
-  for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
+  // gli atti diplomatici (nuovi OPINION_MODIFIER/TENSION_CHANGED o vecchi RELATION_CHANGED) con la loro nota: uno per evento
+  const acts = new Map(diploActs(sorted).map((x) => [x.event.id, x]));
+  for (const e of sorted) {
     if (!visibleTo(e, factionId)) continue;
     const p = e.payload as Record<string, unknown>;
     if (e.type === 'RED_LINE_CROSSED' && e.actor === factionId) { out.push({ turn: e.turn, kind: 'red_line', from: e.actor, to: e.actor, ref: String(p.redLineId) }); continue; }
-    if (e.type !== 'RELATION_CHANGED' || typeof p.note !== 'string') continue;
-    const kind = NOTE_KINDS.find(([re]) => re.test(p.note as string))?.[1];
+    const act = acts.get(e.id);
+    if (!act) continue;
+    const kind = NOTE_KINDS.find(([re]) => re.test(act.note))?.[1];
     if (!kind) continue;
-    const zoneId = / in ([A-Z_]+)$/.exec(p.note)?.[1];
+    const zoneId = / in ([A-Z_]+)$/.exec(act.note)?.[1];
     const ref = e.causedBy?.orderId;
     const one = (from: string, to: string): Incident => ({ turn: e.turn, kind, from, to, ...(zoneId && kind !== 'threat' ? { zoneId } : {}), ...(ref ? { ref } : {}) });
-    out.push(one(String(p.a), String(p.b)));
+    out.push(one(act.a, act.b));
     // uno scontro lo subiscono entrambe le parti
-    if (kind === 'engagement') out.push(one(String(p.b), String(p.a)));
+    if (kind === 'engagement') out.push(one(act.b, act.a));
   }
   const seen = new Set<string>();
   const unique = out.filter((x) => { const key = `${x.kind}|${x.from}|${x.to}|${x.zoneId ?? ''}|${x.ref ?? ''}`; if (seen.has(key)) return false; seen.add(key); return true; });
@@ -70,6 +75,21 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
     publicNews: extra.news,
     letters: (extra.letters ?? []).filter((l) => letterVisibleTo(l, factionId) && l.turn >= s.turn - 3),
     incidents: incidentsFrom(extra.prevEvents ?? [], factionId),
-    ownRelations: Object.fromEntries(Object.entries(s.relations[factionId] ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([b, r]) => [b, { trust: r.trust, tension: r.tension }])),
+    ownRelations: ownRelations(s, factionId),
   };
+}
+
+/**
+ * La riga della fazione: la sua opinione degli altri (`trust` = opinionOf(lei → altra)) e la tensione di coppia. Come le altre
+ * vedono lei si dà solo a fasce; il numero esatto solo con un accordo di intelligence attivo tra le due. Le coppie tra terzi non ci sono.
+ */
+export function ownRelations(s: WorldState, f: string): FactionKnowledge['ownRelations'] {
+  const intel = Object.values(s.agreements).filter((a) => a.status === 'active' && a.type === 'intel_sharing' && a.parties.includes(f));
+  return Object.fromEntries(Object.keys(s.relations[f] ?? {}).sort((a, b) => a.localeCompare(b)).map((b) => {
+    const theirs = opinionOf(s, b, f).value;
+    return [b, {
+      trust: opinionOf(s, f, b).value, tension: Math.round(tensionOf(s, f, b) * 10) / 10, opinionOfMe: opinionBand(theirs),
+      ...(intel.some((a) => a.parties.includes(b)) ? { opinionOfMeExact: theirs } : {}),
+    }];
+  }));
 }

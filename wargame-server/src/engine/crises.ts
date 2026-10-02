@@ -1,6 +1,7 @@
 import type { GameEvent } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { evaluate } from './conditions.js';
+import { diploActs } from './opinion.js';
 import { PARAMS } from './params.js';
 
 /** OPEN: deriva delle crisi con 2d6 ed eventi casuali pesati per zona/tensione. */
@@ -22,10 +23,9 @@ export function deescalateByAgreement(ctx: TurnCtx, ag: { id: string; type: stri
   }
 }
 
-/** Azioni distensive (RELATION_CHANGED con detente) del turno precedente tra due fazioni coinvolte nella crisi. */
+/** Azioni distensive (atti diplomatici con `detente`) del turno precedente tra due fazioni coinvolte nella crisi. */
 export function detenteActions(prevEvents: GameEvent[], involved: string[]) {
-  return prevEvents.filter((e) => e.type === 'RELATION_CHANGED' && (e.payload as { detente?: boolean }).detente
-    && involved.includes(String(e.payload.a)) && involved.includes(String(e.payload.b))).length;
+  return diploActs(prevEvents).filter((x) => x.detente && involved.includes(x.a) && involved.includes(x.b)).length;
 }
 
 /** Probabilità di raffreddamento di una crisi: base se il turno prima è stato quieto (× (1 + calma)) più il bonus delle azioni distensive. */

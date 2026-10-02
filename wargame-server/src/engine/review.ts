@@ -1,6 +1,7 @@
 import type { Contact, GameEvent } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { evaluate } from './conditions.js';
+import { diploActs } from './opinion.js';
 
 const HOSTILE = /^(strike|sanzioni|BLOCKADE|EXCLUSION_ZONE|dimostrazione|scontro)/;
 
@@ -10,8 +11,7 @@ export function checkThreats(ctx: TurnCtx, past: GameEvent[]) {
   const all = [...past, ...ctx.events];
   for (const e of all.filter((x) => x.turn === due && x.type === 'FACTION_CHANGED' && (x.payload as { pendingThreat?: unknown }).pendingThreat)) {
     const { target } = (e.payload as { pendingThreat: { target: string } }).pendingThreat;
-    const kept = all.some((x) => x.turn >= due && x.type === 'RELATION_CHANGED' && (x.payload as { a: string }).a === e.actor
-      && (x.payload as { b: string }).b === target && HOSTILE.test(String((x.payload as { note?: string }).note ?? '')));
+    const kept = diploActs(all).some((x) => x.event.turn >= due && x.a === e.actor && x.b === target && HOSTILE.test(x.note));
     if (!kept) ctx.emit('FACTION_CHANGED', e.actor, { factionId: e.actor, delta: { credibility: -4 }, note: `minaccia a ${target} non mantenuta` });
   }
 }
