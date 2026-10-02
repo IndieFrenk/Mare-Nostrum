@@ -255,7 +255,7 @@ export const PARAMS = {
   /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
   letterTriggers: { tensionJump: 10 },
   /** Console Ordini (engine/parse-review.ts): fiducia da cui una fazione conta come alleata negli avvisi sulle azioni ostili */
-  parser: { allyTrust: 40 },
+  parser: { allyOpinion: 40 },
   /** Decisore a regole delle fazioni non giocate dall'umano (engine/policy.ts). */
   policy: {
     /** Punteggio di base per regola, nell'ordine di priorità della spec: se due regole chiedono la stessa zona o lo stesso
@@ -289,11 +289,11 @@ export const PARAMS = {
      *  con +20 di alleanza e +10 di unione nella base), ≥ 60 dà 0–5, e «opinione ≤ −20 con tensione ≥ 50» dà 0–5 avversari (IRN 4, ISR 5,
      *  USA 3, ITA 1). Con soglie più basse (30 / −10) quasi ogni fazione avrebbe più di 15 alleati e la rassicurazione dell'alleato sotto
      *  pressione (regola 6) scatterebbe a ogni atto. */
-    allyTrust: 40, adversaryTrust: -20, adversaryTension: 50,
+    allyOpinion: 40, adversaryOpinion: -20, adversaryTension: 50,
     /** Alleato stretto: accordo di difesa con al massimo 3 parti o opinione ≥ closeAllyOpinion. Solo loro sostengono un alleato dopo
      *  un atto senza zona (sanzioni, minacce, cyber): con tutta la NATO e l'UE una sanzione alla Francia portava 10 rassicurazioni
      *  a turno (56 in 10 turni nel playtest). Per un atto in una zona sostiene chi ha interesse in quella zona. */
-    closeAllyTrust: 60,
+    closeAllyOpinion: 60,
     /** Cyber: al massimo un'operazione per turno dalle regole; disruption invece di espionage solo con aggressività e tensione
      *  verso il bersaglio almeno così (il resto è spionaggio, il meno ostile). */
     cyberDisruption: { aggressiveness: 0.6, tension: 80 },
@@ -303,5 +303,10 @@ export const PARAMS = {
      *  Relazioni: «migliorare le relazioni» con un partner di trattato con opinione < improveBelow (e un obiettivo di relazione sotto
      *  improveBelow + 30), fine quando ≥ improveStopAt; ripristino dei rapporti ridotti con opinione ≥ restoreAt e tensione < restoreTension. */
     improveBelow: 25, improveStopAt: 60, restoreAt: 0, restoreTension: 40,
+    /** Isolamento (settore 10): una reazione internazionale a un atto della fazione con almeno `minStates` Stati che condannano e una quota ≥ `share`
+     *  (o una condanna approvata da un'istituzione) fa cercare la distensione ai profili prudenti, con questo bonus di punteggio. */
+    isolation: { minStates: 10, share: 0.3, bonus: 8 },
+    /** Direttiva (§11): bonus per punto di peso su un'azione verso il bersaglio di una priorità, malus verso chi si evita (tranne la distensione). */
+    directive: { bonus: 15, avoid: 30 },
   },
 } as const;

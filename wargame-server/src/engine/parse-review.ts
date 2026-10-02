@@ -212,14 +212,14 @@ export interface ReviewInput {
   auto?: Set<string>;
 }
 
-/** Un alleato: stessa alleanza (NATO, UE), il blocco di cui si fa parte, o fiducia ≥ soglia. Restituisce il motivo o null. */
+/** Un alleato: stessa alleanza (NATO, UE), il blocco di cui si fa parte, o opinione ≥ soglia. Restituisce il motivo o null. */
 export function allyReason(s: WorldState, me: string, other: string): string | null {
   const a = s.factions[me]; const b = s.factions[other];
   if (!a || !b || me === other) return null;
   const shared = a.alliances.filter((x) => b.alliances.includes(x) || x === other);
   if (shared.length) return shared.join(', ');
   const trust = s.relations[me]?.[other]?.trust ?? 0;
-  return trust >= PARAMS.parser.allyTrust ? `fiducia ${trust}` : null;
+  return trust >= PARAMS.parser.allyOpinion ? `opinione ${trust}` : null;
 }
 
 /**
@@ -250,7 +250,7 @@ export function reviewParsed(i: ReviewInput): { risks: string[]; ambiguities: st
     for (const u of namedUnits) if (!assigned.has(u)) ambiguities.push(`${u} è nominata nella direttiva ma nessun ordine la impiega.`);
   }
 
-  // 2) azioni ostili verso alleati (NATO/UE o fiducia ≥ 40): avviso chiaro
+  // 2) azioni ostili verso alleati (NATO/UE o opinione ≥ 40): avviso chiaro
   const contactFaction = new Map(i.knowledge.contacts.map((c) => [c.id, c.estFaction]));
   const hostile: { kind: string; target: string }[] = [];
   for (const o of orders.military) {

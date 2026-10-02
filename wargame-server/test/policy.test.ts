@@ -177,7 +177,7 @@ describe('decisore a regole', () => {
     });
     const d = decide(withEnemy);
     expect(d.orders.military).toEqual([{ id: '', kind: 'CYBER_OP', target: 'RUS', targetRef: 'reti governative', effect: 'espionage' }]);
-    expect(d.rationale).toContainEqual({ rule: 'cyber', text: 'Operazione cyber (espionage) contro RUS: avversario, fiducia -60, tensione 70' });
+    expect(d.rationale).toContainEqual({ rule: 'cyber', text: 'Operazione cyber (espionage) contro RUS: avversario, opinione -60, tensione 70' });
   });
 
   it('nebbia di guerra: la fazione non reagisce a ciò che non conosce', () => {

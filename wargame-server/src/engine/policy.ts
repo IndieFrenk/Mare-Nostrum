@@ -1,4 +1,4 @@
-import type { Base, DecisionOutput, DiploAction, FactionKnowledge, FactionPolicy, Incident, Infrastructure, LetterTone, Order, PolicyRule, Rationale, RedLine, Stance, Zone, ZoneStance } from '../schemas/index.js';
+import type { Agreement, Base, DecisionOutput, Directive, DiploAction, FactionKnowledge, FactionPolicy, Incident, Infrastructure, LetterTone, Order, PolicyRule, Rationale, RedLine, Stance, Zone, ZoneStance } from '../schemas/index.js';
 import { LETTER_LIMITS, POLICY_RULES } from '../schemas/index.js';
 import { DIPLO_CATALOG, cooldownKeys, forumMember } from './diplo-actions.js';
 import { PARAMS } from './params.js';
@@ -27,6 +27,12 @@ export interface PolicyInput {
   rng: Rng;
   /** nomi pubblici delle fazioni, per le tracce delle lettere */
   names?: Record<string, string>;
+  /**
+   * Direttiva strategica (docs/wargame/DIPLOMAZIA.md §11), facoltativa: oggi il motore non ne passa mai una (= nessun effetto). Il settore 11 la farà
+   * proporre a un LLM; qui diventa un bonus di punteggio sulle azioni verso i bersagli delle priorità, un malus verso chi si evita, uno scarto
+   * dell'interesse per zona e candidati per gli accordi cercati.
+   */
+  directive?: Directive;
 }
 
 type Hostile = keyof typeof PARAMS.policy.severity;
@@ -68,8 +74,14 @@ const FALLBACK: Record<Exclude<Stance, 'withdraw'>, Exclude<Stance, 'withdraw'>[
 interface Cand { score: number; rule: PolicyRule; text: string }
 interface StanceCand extends Cand { zoneId: string; stance: Exclude<Stance, 'withdraw'>; intensity: 1 | 2 | 3 }
 /** `target` può mancare solo per una RESOLUTION senza bersaglio (la sede e il tema stanno nei campi propri) */
-interface DiploCand extends Cand { key: string; kind: DiploKind; target: string; forum?: 'UNSC' | 'UNGA'; demand?: string }
+interface DiploCand extends Cand { key: string; kind: DiploKind; target: string; forum?: 'UNSC' | 'UNGA'; demand?: string; agreementType?: Agreement['type'] }
 interface LetterCand { to: string; gist: string; tone: LetterTone; score: number }
+
+/** le azioni che ogni tipo di priorità della direttiva favorisce */
+const DIRECTIVE_ACTIONS: Record<Directive['priorities'][number]['kind'], DiploKind[]> = {
+  improve: ['IMPROVE_RELATIONS', 'REASSURANCE', 'BACKCHANNEL'], court: ['REASSURANCE', 'PROPOSE_AGREEMENT', 'IMPROVE_RELATIONS'],
+  deter: ['THREAT', 'DEMARCHE', 'ULTIMATUM'], isolate: ['SANCTION', 'RECALL_AMBASSADOR'], contain: ['THREAT', 'SANCTION', 'RECALL_AMBASSADOR'],
+};
 
 const clamp3 = (n: number) => Math.max(1, Math.min(3, n)) as 1 | 2 | 3;
 const byScore = <T extends Cand>(a: T, b: T) => b.score - a.score || ruleRank(a.rule) - ruleRank(b.rule);
@@ -97,12 +109,17 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   const p = f.policy ?? defaultPolicy(me, i.geo.bases);
   const nm = (x: string) => i.names?.[x] ?? x;
   const zoneName = (z: string) => i.geo.zones[z]?.name ?? z;
-  const interest = (z: string) => p.zoneInterests[z] ?? 0;
+  const dir = i.directive;
+  const interest = (z: string) => Math.max(0, (p.zoneInterests[z] ?? 0) + (dir?.zoneInterestDelta[z] ?? 0));
+  /** zone con un interesse del profilo o ritoccato dalla direttiva */
+  const interestZones = () => [...new Set([...Object.keys(p.zoneInterests), ...Object.keys(dir?.zoneInterestDelta ?? {})])];
   const rel = (x: string) => k.ownRelations[x] ?? { trust: 0, tension: 20 };
+  /** opinione della fazione verso x (`opinionOf(lei → x)`, il campo `trust` della Knowledge è questo valore: −100…+100) */
+  const opinion = (x: string) => rel(x).trust;
   /** le altre fazioni che conosce (i blocchi non ricevono lettere né azioni bilaterali) */
   const others = new Set(Object.keys(k.beliefs));
   const defense = k.knownAgreements.filter((a) => a.type === 'defense' && a.status === 'active' && a.parties.includes(me));
-  const isAlly = (x: string) => x !== me && (defense.some((a) => a.parties.includes(x)) || rel(x).trust >= P.allyTrust);
+  const isAlly = (x: string) => x !== me && (defense.some((a) => a.parties.includes(x)) || opinion(x) >= P.allyOpinion);
   const live = k.ownUnits.filter((u) => u.status !== 'destroyed');
   const canDeploy = live.length > 0 && p.maxStancesPerTurn > 0;
   const aggressive = p.aggressiveness >= P.forceAt;
@@ -110,7 +127,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   const known = new Map(k.knownCrises.map((c) => [c.id, c]));
   /** zona d'interesse più alta tra quelle date (a parità, per id); null se nessuna esiste */
   const best = (zones: Iterable<string>) => [...new Set(zones)].filter((z) => i.geo.zones[z]).sort((a, b) => interest(b) - interest(a) || a.localeCompare(b))[0] ?? null;
-  const topZone = (sea = false) => best(Object.keys(p.zoneInterests).filter((z) => interest(z) > 0 && (!sea || i.geo.zones[z]?.terrain !== 'land')));
+  const topZone = (sea = false) => best(interestZones().filter((z) => interest(z) > 0 && (!sea || i.geo.zones[z]?.terrain !== 'land')));
   /** dove conta un'altra fazione: zone delle sue basi e delle crisi note che la coinvolgono */
   const zoneOf = (x: string) => best([...Object.values(i.geo.bases).filter((b) => b.factionId === x).map((b) => b.zoneId), ...k.knownCrises.filter((c) => c.involved.includes(x)).flatMap((c) => c.zoneIds)]);
 
@@ -121,14 +138,22 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   const addStance = (c: StanceCand) => { if (canDeploy && i.geo.zones[c.zoneId]) stances.push(c); };
   /** la sede delle risoluzioni: il Consiglio di sicurezza per i suoi membri, per gli altri l'Assemblea generale */
   const forumOf = forumMember(me, 'UNSC') ? 'UNSC' as const : 'UNGA' as const;
-  const addDiplo = (kind: DiploKind, target: string, c: Cand, extra: { demand?: string } = {}) => {
+  /** bonus (o malus) di una direttiva su un'azione verso un bersaglio: le priorità favoriscono le azioni del loro tipo, `avoid` le frena */
+  const dirBonus = (kind: DiploKind, target: string) => {
+    if (!dir) return 0;
+    const fav = dir.priorities.filter((x) => x.target === target && DIRECTIVE_ACTIONS[x.kind].includes(kind)).reduce((n, x) => n + x.weight, 0);
+    return Math.round(fav * P.directive.bonus) - (dir.avoid.includes(target) && kind !== 'REASSURANCE' && kind !== 'BACKCHANNEL' ? P.directive.avoid : 0);
+  };
+  const addDiplo = (kind: DiploKind, target: string, c0: Cand, extra: { demand?: string; agreementType?: Agreement['type'] } = {}) => {
+    const bonus = dirBonus(kind, target);
+    const c: Cand = bonus ? { ...c0, score: c0.score + bonus, text: `${c0.text} [direttiva ${bonus > 0 ? '+' : ''}${bonus}]` } : c0;
     if (kind === 'RESOLUTION' || others.has(target)) diplo.push({ ...c, kind, target, key: kind === 'RESOLUTION' ? `RES:${forumOf}` : `${kind === 'STOP_IMPROVE' || kind === 'IMPROVE_RELATIONS' ? 'IMP' : 'ACT'}:${target}`, ...(kind === 'RESOLUTION' ? { forum: forumOf } : {}), ...extra });
   };
   const dip = k.diplomacy;
   const capital = dip?.capital ?? Infinity;
   const slotsFree = dip ? dip.improvingSlots - dip.improving.length : 0;
   const addLetter = (to: string, tone: LetterTone, gist: string, score: number) => { if (others.has(to)) letters.push({ to, tone, gist: gist.slice(0, LETTER_LIMITS.gist), score }); };
-  const soften = (target: string): DiploKind => (soft || rel(target).trust < 0 ? 'BACKCHANNEL' : 'REASSURANCE');
+  const soften = (target: string): DiploKind => (soft || opinion(target) < 0 ? 'BACKCHANNEL' : 'REASSURANCE');
 
   // 1) unità logorate e danneggiate: rientro e riparazione li ordina il traduttore delle posture; qui solo la motivazione
   const worn = live.filter((u) => (u.status === 'deployed' || u.status === 'transit') && u.readiness < PARAMS.stances.wornReadiness).length;
@@ -234,9 +259,9 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     else if (t.fn === 'relation') {
       const other = t.args[0] === me ? t.args[1]! : t.args[0]!;
       // un obiettivo di relazione è un lavoro continuo: se c'è uno slot e il capitale, si migliora la relazione (costa 1 CD a turno)
-      const kind: DiploKind = slotsFree > 0 && !dip?.improving.some((x) => x.target === other) && rel(other).trust < P.improveBelow + 30 ? 'IMPROVE_RELATIONS' : soften(other);
+      const kind: DiploKind = slotsFree > 0 && !dip?.improving.some((x) => x.target === other) && opinion(other) < P.improveBelow + 30 ? 'IMPROVE_RELATIONS' : soften(other);
       addDiplo(kind, other, { score, rule: 'objective', text: say(`${DIPLO_IT[kind]} a ${other}`) });
-      addLetter(other, soft ? 'conciliatory' : 'cordial', `Rafforzare la fiducia tra i nostri Governi e proporre a ${nm(other)} una cooperazione concreta sulle questioni di comune interesse.`, score);
+      addLetter(other, soft ? 'conciliatory' : 'cordial', `Rafforzare l'opinione reciproca tra i nostri Governi e proporre a ${nm(other)} una cooperazione concreta sulle questioni di comune interesse.`, score);
     }
   }
 
@@ -244,19 +269,46 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   //     relazioni (uno slot libero alla volta); relazioni già raggiunte (opinione ≥ improveStopAt) → liberare lo slot; rapporti ridotti
   //     (richiamo, espulsione, rottura) con opinione tornata sopra restoreAt e tensione bassa → ripristino
   if (dip) {
-    for (const x of dip.improving) if (rel(x.target).trust >= P.improveStopAt) addDiplo('STOP_IMPROVE', x.target, { score: P.score.routine, rule: 'relations', text: `Relazioni con ${x.target} consolidate (opinione ${Math.round(rel(x.target).trust)}): libero lo slot` });
+    for (const x of dip.improving) if (opinion(x.target) >= P.improveStopAt) addDiplo('STOP_IMPROVE', x.target, { score: P.score.routine, rule: 'relations', text: `Relazioni con ${x.target} consolidate (opinione ${Math.round(opinion(x.target))}): libero lo slot` });
     const partners = [...new Set(k.knownAgreements.filter((a) => a.status === 'active' && a.type !== 'secret' && a.parties.includes(me)).flatMap((a) => a.parties))]
-      .filter((x) => x !== me && others.has(x) && !dip.improving.some((y) => y.target === x) && !dip.ties[x] && rel(x).trust < P.improveBelow && rel(x).tension < P.adversaryTension)
-      .sort((a, b) => rel(a).trust - rel(b).trust || a.localeCompare(b));
+      .filter((x) => x !== me && others.has(x) && !dip.improving.some((y) => y.target === x) && !dip.ties[x] && opinion(x) < P.improveBelow && rel(x).tension < P.adversaryTension)
+      .sort((a, b) => opinion(a) - opinion(b) || a.localeCompare(b));
     if (slotsFree > 0 && partners[0] && !diplo.some((c) => c.kind === 'IMPROVE_RELATIONS' && c.target === partners[0]))
-      addDiplo('IMPROVE_RELATIONS', partners[0], { score: P.score.routine + 5, rule: 'relations', text: `Partner ${partners[0]} con opinione bassa (${Math.round(rel(partners[0]!).trust)}): migliorare le relazioni` });
+      addDiplo('IMPROVE_RELATIONS', partners[0], { score: P.score.routine + 5, rule: 'relations', text: `Partner ${partners[0]} con opinione bassa (${Math.round(opinion(partners[0]!))}): migliorare le relazioni` });
     for (const [x, st] of Object.entries(dip.ties).sort(([a], [b]) => a.localeCompare(b)))
-      if (others.has(x) && rel(x).trust >= P.restoreAt && rel(x).tension < P.restoreTension)
-        addDiplo('RESTORE_RELATIONS', x, { score: P.score.detente, rule: 'detente', text: `Rapporti con ${x} ridotti (${st}) ma opinione tornata a ${Math.round(rel(x).trust)}: ripristino delle relazioni` });
+      if (others.has(x) && opinion(x) >= P.restoreAt && rel(x).tension < P.restoreTension)
+        addDiplo('RESTORE_RELATIONS', x, { score: P.score.detente, rule: 'detente', text: `Rapporti con ${x} ridotti (${st}) ma opinione tornata a ${Math.round(opinion(x))}: ripristino delle relazioni` });
+  }
+
+  // 5c) direttiva: gli accordi che cerca (candidati con un bonus, come ogni altra azione; ricarica e capitale li filtra la scelta)
+  for (const sk of dir?.seekAgreements ?? []) {
+    if (!others.has(sk.with) || k.knownAgreements.some((a) => a.type === sk.type && a.status !== 'expired' && a.parties.includes(me) && a.parties.includes(sk.with))) continue;
+    addDiplo('PROPOSE_AGREEMENT', sk.with, { score: P.score.objective + 10, rule: 'objective', text: `Direttiva: cercare un accordo ${sk.type} con ${nm(sk.with)}` }, { agreementType: sk.type });
+  }
+
+  // 5d) isolamento internazionale (IA mondiale): se un atto della fazione ha avuto la condanna di molti Stati o un'istituzione l'ha condannata,
+  //     i profili prudenti (sotto `detenteBelow`) cercano la distensione con la vittima (o con chi ha proposto la condanna) e migliorano le relazioni
+  //     con il più popoloso tra chi la condanna
+  const wv = k.world;
+  if (wv && p.aggressiveness < P.detenteBelow) {
+    const condemned = wv.reactions.filter((r) => r.actor === me && r.condemn >= P.isolation.minStates && r.condemn / Math.max(1, r.condemn + r.support + r.silent) >= P.isolation.share);
+    const voted = wv.votes.filter((v) => v.target === me && v.passed);
+    if (condemned.length || voted.length) {
+      const counterpart = [...condemned.map((r) => r.victim), ...voted.map((v) => v.proposer)].find((x) => x !== me && others.has(x));
+      const why = condemned.length ? `Condannata da ${condemned[0]!.condemn} Stati dopo ${condemned[0]!.kind} su ${nm(condemned[0]!.victim)}` : `Condannata in ${voted[0]!.forum} (${voted[0]!.yes} sì, ${voted[0]!.no} no)`;
+      if (counterpart) {
+        const kind = soften(counterpart);
+        const score = P.score.detente + P.isolation.bonus;
+        addDiplo(kind, counterpart, { score, rule: 'detente', text: `${why}: distensione con ${nm(counterpart)} (${DIPLO_IT[kind]})` });
+        addLetter(counterpart, 'conciliatory', `Spiegare a ${nm(counterpart)} la posizione del nostro Governo dopo la condanna internazionale e proporre un canale di dialogo diretto.`, score);
+      }
+      const critic = condemned.flatMap((r) => r.topCondemners).find((x) => others.has(x) && x !== counterpart);
+      if (critic && slotsFree > 0 && !dip?.improving.some((x) => x.target === critic)) addDiplo('IMPROVE_RELATIONS', critic, { score: P.score.detente + P.isolation.bonus - 2, rule: 'detente', text: `${why}: migliorare le relazioni con ${nm(critic)}, tra i critici più influenti` });
+    }
   }
 
   // 6) alleati sotto pressione (atto ostile di una fazione non alleata): scorta al traffico nella zona o rassicurazione
-  const closeAlly = (x: string) => defense.some((a) => a.parties.length <= 3 && a.parties.includes(x)) || rel(x).trust >= P.closeAllyTrust;
+  const closeAlly = (x: string) => defense.some((a) => a.parties.length <= 3 && a.parties.includes(x)) || opinion(x) >= P.closeAllyOpinion;
   const pressured = new Map<string, Incident>();
   for (const x of k.incidents) {
     if (x.to === me || x.from === me || !isHostile(x) || !others.has(x.to) || !isAlly(x.to) || isAlly(x.from)) continue;
@@ -278,15 +330,15 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   }
 
   // 7) cyber: solo verso avversari (mai alleati), con probabilità cyberPropensity × offense / 10, un'operazione al turno
-  const adversaries = [...others].filter((x) => !isAlly(x) && rel(x).trust <= P.adversaryTrust && rel(x).tension >= P.adversaryTension)
-    .sort((a, b) => (rel(a).trust - rel(a).tension) - (rel(b).trust - rel(b).tension) || a.localeCompare(b));
+  const adversaries = [...others].filter((x) => !isAlly(x) && opinion(x) <= P.adversaryOpinion && rel(x).tension >= P.adversaryTension)
+    .sort((a, b) => (opinion(a) - rel(a).tension) - (opinion(b) - rel(b).tension) || a.localeCompare(b));
   const target = adversaries[0];
   if (target && p.cyberPropensity > 0 && f.cyber.offense > 0 && f.budget.discretionary >= PARAMS.sortieCost.CYBER_OP) {
     const r = rel(target);
     if (i.rng.chance(`regole ${me}: operazione cyber contro ${target}`, Math.min(1, (p.cyberPropensity * f.cyber.offense) / 10)).ok) {
       const effect = p.aggressiveness >= P.cyberDisruption.aggressiveness && r.tension >= P.cyberDisruption.tension ? 'disruption' : 'espionage';
       military.push({ id: '', kind: 'CYBER_OP', target, targetRef: 'reti governative', effect });
-      extra.push({ rule: 'cyber', text: `Operazione cyber (${effect}) contro ${target}: avversario, fiducia ${r.trust}, tensione ${r.tension}` });
+      extra.push({ rule: 'cyber', text: `Operazione cyber (${effect}) contro ${target}: avversario, opinione ${r.trust}, tensione ${r.tension}` });
     }
   }
 
@@ -300,7 +352,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   // entra solo se resta posto nel tetto del profilo)
   if (canDeploy) {
     const covered = new Set(stances.map((c) => c.zoneId));
-    const z = best(Object.keys(p.zoneInterests).filter((x) => interest(x) >= P.minInterest && !covered.has(x) && i.geo.zones[x]?.terrain !== 'land'));
+    const z = best(interestZones().filter((x) => interest(x) >= P.minInterest && !covered.has(x) && i.geo.zones[x]?.terrain !== 'land'));
     if (z) addStance({ zoneId: z, stance: 'patrol', intensity: 1, score: P.score.routine, rule: 'routine', text: `Pattugliamento di routine in ${z} (zona d'interesse ${interest(z)})` });
   }
 
@@ -395,7 +447,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     else if (t?.fn === 'crisis') {
       const c = known.get(t.args[0]!);
       zoneId = c ? best(c.zoneIds) : null;
-      target = c?.involved.filter((x) => x !== me && others.has(x)).sort((a, b) => rel(a).trust - rel(b).trust || a.localeCompare(b))[0] ?? null;
+      target = c?.involved.filter((x) => x !== me && others.has(x)).sort((a, b) => opinion(a) - opinion(b) || a.localeCompare(b))[0] ?? null;
     } else if (t?.fn === 'infra') zoneId = i.geo.infrastructure[t.args[0]!]?.zoneId ?? null;
     else if (t?.fn === 'relation') { target = other(t.args[0] === me ? t.args[1] : t.args[0]); zoneId = target ? zoneOf(target) : null; }
     else if (t?.fn === 'faction') { zoneId = zoneOf(t.args[0]!); target = null; }
@@ -423,7 +475,10 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
       case 'REASSURANCE': return { id: '', kind, target, message: `Il Governo conferma a ${who} la volontà di cooperare e di evitare ogni escalation.`, visibility: 'public' };
       case 'BACKCHANNEL': return { id: '', kind, target, message: `Proposta riservata a ${who}: aprire un canale diretto per abbassare la tensione.` };
       case 'SANCTION': return { id: '', kind, target, scope: 'misure economiche mirate' };
-      case 'PROPOSE_AGREEMENT': return { id: '', kind, target: [target], agreement: { type: 'ceasefire', parties: [me, target], terms: `Tregua e canale militare diretto tra ${nm(me)} e ${who}`, endTurn: null, visibility: 'public' } };
+      case 'PROPOSE_AGREEMENT': {
+        const type = c.agreementType ?? 'ceasefire';
+        return { id: '', kind, target: [target], agreement: { type, parties: [me, target], terms: type === 'ceasefire' ? `Tregua e canale militare diretto tra ${nm(me)} e ${who}` : `Accordo (${type}) tra ${nm(me)} e ${who}`, endTurn: null, visibility: 'public' } };
+      }
       case 'RESOLUTION': return { id: '', kind, forum: c.forum ?? forumOf, subject: `Richiesta di ${nm(me)} dopo il superamento di una linea rossa`, topic: 'aggression', ...(target ? { target } : {}) };
       case 'ULTIMATUM': return { id: '', kind, target, demand: c.demand ?? 'Cessare le azioni ostili', deadlineTurns: 2 };
       case 'RECALL_AMBASSADOR': case 'RESTORE_RELATIONS': case 'IMPROVE_RELATIONS': case 'STOP_IMPROVE': return { id: '', kind, target };
