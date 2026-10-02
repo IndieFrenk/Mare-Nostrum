@@ -81,6 +81,16 @@ export function opinionBand(value: number): OpinionBand {
   return OPINION_BANDS[value < t0 ? 0 : value < t1 ? 1 : value < t2 ? 2 : value < t3 ? 3 : 4]!;
 }
 
+/**
+ * `opinionOf(a, b).value` in blocco: un indice dei modificatori per (da, a) costruito una volta, poi ogni valore è base + somma. Per chi ne
+ * calcola migliaia a turno (IA mondiale, reazioni): `opinionOf` filtra tutti i modificatori a ogni chiamata.
+ */
+export function opinionLookup(s: WorldState): (a: string, b: string) => number {
+  const sums = new Map<string, number>();
+  for (const m of s.diplomacy?.modifiers ?? []) { const k = `${m.from}>${m.to}`; sums.set(k, (sums.get(k) ?? 0) + m.value); }
+  return (a, b) => clamp(r1(baseOpinion(a, b).value + (sums.get(`${a}>${b}`) ?? 0)), -100, 100);
+}
+
 // ——— tensione di coppia ———
 
 export const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);

@@ -3,9 +3,10 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
 import { fillFromScenario, migrate, migrateDiplomacy } from './migrations/index.js';
-import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
+import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
+const PhaseTimingSchema = z.object({ turn: z.number(), phase: z.string(), ms: z.number() });
 
 /** Interfaccia astratta: il motore dipende solo da questa (swap futuro verso SQLite). */
 export interface Store {
@@ -26,6 +27,12 @@ export interface Store {
   saveOrders(id: string, o: FactionOrders): Promise<void>;
   getDecision(id: string, turn: number, faction: string): Promise<AgentDecision | null>;
   saveDecision(id: string, d: AgentDecision): Promise<void>;
+  /** decisioni del livello C (IA mondiale) di un turno: un file solo, `decisions/turn-N/_world.json` */
+  getWorldDecision(id: string, turn: number): Promise<WorldDecision | null>;
+  saveWorldDecision(id: string, d: WorldDecision): Promise<void>;
+  /** tempo (ms) di ogni fase del motore, una riga per fase in `timings.jsonl` */
+  appendTimings(id: string, rows: PhaseTiming[]): Promise<void>;
+  getTimings(id: string): Promise<PhaseTiming[]>;
   getMemory(id: string, faction: string): Promise<AgentMemory | null>;
   saveMemory(id: string, m: AgentMemory): Promise<void>;
   getNarrative(id: string, turn: number): Promise<TurnNarrative | null>;
@@ -39,6 +46,7 @@ export interface Store {
   fork(id: string, fromTurn: number, newId: string): Promise<Campaign>;
 }
 
+export interface PhaseTiming { turn: number; phase: string; ms: number }
 export interface LockInfo { op: string; since: number; pid: number }
 export class LockError extends Error {
   code = 'CAMPAIGN_LOCKED';
@@ -127,6 +135,10 @@ export class JsonStore implements Store {
   saveOrders(id: string, o: FactionOrders) { return this.write(this.dir(id, 'orders', `turn-${pad(o.turn)}`, `${o.factionId}.json`), o, S.FactionOrders); }
   getDecision(id: string, turn: number, f: string) { return this.read(this.dir(id, 'decisions', `turn-${pad(turn)}`, `${f}.json`), S.AgentDecision); }
   saveDecision(id: string, d: AgentDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, `${d.factionId}.json`), d, S.AgentDecision); }
+  getWorldDecision(id: string, turn: number) { return this.read(this.dir(id, 'decisions', `turn-${pad(turn)}`, '_world.json'), S.WorldDecision); }
+  saveWorldDecision(id: string, d: WorldDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, '_world.json'), d, S.WorldDecision); }
+  appendTimings(id: string, rows: PhaseTiming[]) { return this.append(this.dir(id, 'timings.jsonl'), rows, PhaseTimingSchema); }
+  getTimings(id: string) { return this.readLines(this.dir(id, 'timings.jsonl'), PhaseTimingSchema); }
   getMemory(id: string, f: string) { return this.read(this.dir(id, 'memory', `${f}.json`), S.AgentMemory); }
   async saveMemory(id: string, m: AgentMemory) {
     await this.write(this.dir(id, 'memory', `${m.factionId}.json`), m, S.AgentMemory);

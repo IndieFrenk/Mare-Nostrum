@@ -47,11 +47,13 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
     case 'BUDGET_CHANGED': { const b = s.factions[p.factionId].budget; b.discretionary = r1(b.discretionary + p.delta); break; }
     case 'OPINION_MODIFIER': {
       // aggiunge o aggiorna (stesso id) un modificatore di opinion(from→to) e ricalcola il valore derivato tra le fazioni
+      // (un modificatore, o un lotto `modifiers`: il passo di miglioramento degli Stati del mondo è un solo evento per turno)
       const d = (s.diplomacy ??= emptyDiplomacy());
-      const m = p.modifier as OpinionModifier;
-      const i = d.modifiers.findIndex((x) => x.id === m.id);
-      if (i >= 0) d.modifiers[i] = m; else d.modifiers.push(m);
-      syncRelation(s, m.from, m.to);
+      for (const m of (p.modifiers ?? [p.modifier]) as OpinionModifier[]) {
+        const i = d.modifiers.findIndex((x) => x.id === m.id);
+        if (i >= 0) d.modifiers[i] = m; else d.modifiers.push(m);
+        syncRelation(s, m.from, m.to);
+      }
       noteAct(s, p.act, e.turn);
       break;
     }
@@ -115,6 +117,16 @@ export function applyEvent(s: WorldState, e: GameEvent): void {
     case 'INSTITUTION_VOTE': {
       // l'esito di una votazione: se approvata e con effetti vincolanti dà una risoluzione che vale come mandato (legittimità)
       if (p.resolution) (s.diplomacy ??= emptyDiplomacy()).resolutions.push(p.resolution as Resolution);
+      break;
+    }
+    case 'INTERNATIONAL_REACTIONS': {
+      // un solo evento per atto grave: gli elenchi di ISO3 restano nel registro, qui entrano i modificatori d'opinione (aggregati, con un tetto)
+      const d = (s.diplomacy ??= emptyDiplomacy());
+      for (const m of (p.modifiers ?? []) as OpinionModifier[]) {
+        const i = d.modifiers.findIndex((x) => x.id === m.id);
+        if (i >= 0) d.modifiers[i] = m; else d.modifiers.push(m);
+        syncRelation(s, m.from, m.to);
+      }
       break;
     }
     case 'WORLD_TENSION_CHANGED': s.globalIndicators.worldTension = clamp(r1(p.to), 0, 100); break;

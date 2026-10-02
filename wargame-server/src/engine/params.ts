@@ -216,6 +216,42 @@ export const PARAMS = {
   autoResolveUncertainty: 0.3,
   /** posture per zona (engine/stances.ts): unità per livello di intensità (indice 1–3), prontezza minima, soglia di logoramento */
   stances: { unitsByIntensity: [0, 1, 3, 5], minReadiness: 50, wornReadiness: 35 },
+  /**
+   * IA mondiale (engine/world-ai.ts, docs/wargame/DIPLOMAZIA.md §10): gli Stati senza fazione reagiscono agli eventi pubblici gravi del turno
+   * precedente, adeguano le sanzioni di blocco e, a turno sfalsato, compiono una sola azione dell'agenda lenta. Tutto a regole, senza LLM.
+   */
+  worldAi: {
+    /** gravità degli atti pubblici (da `diploActs` e dagli eventi): da `reactionSeverity` in su gli Stati reagiscono */
+    severity: { strike: 5, engagement: 4, ultimatum: 4, multilateral_sanction: 4, break: 4, blockade: 3, sanction: 3, embargo: 3, cyber: 3, covert: 3 },
+    reactionSeverity: 3,
+    /** al massimo tanti eventi gravi per turno (i più gravi), per tenere leggero il registro */
+    maxReactedEvents: 6,
+    /**
+     * Reazione = punteggio di simpatia verso la vittima rispetto all'attore: `opinione` × (op. verso la vittima − op. verso l'attore)/100 +
+     * `ideal` × (distanza dall'attore − distanza dalla vittima)/2 sull'asse del voto ONU + `bloc` × (coesione dei blocchi in comune con la vittima
+     * − con l'attore). ≥ `threshold` condanna l'attore, ≤ −`threshold` lo sostiene, in mezzo silenzio. Con 0,25 un membro dell'UE condanna uno strike
+     * russo su un partner UE e i membri della CSTO no (test/ia-mondiale).
+     */
+    reaction: { weights: { opinion: 0.5, ideal: 0.4, bloc: 0.5 }, threshold: 0.25, opinion: 3, maxModifiersPerEvent: 12, modifiedEvents: 3 },
+    /** sanzioni di blocco: chi ha votato sì a sanzioni approvate le adotta con probabilità = coesione dell'istituzione; valore (sticky, come le sanzioni) */
+    blockSanctions: { opinion: -15, maxAdopters: 40, stability: { perAdopters: 10, max: 6 } },
+    /** agenda lenta: uno Stato agisce quando (indice + turno) % every == 0; tetto globale di azioni a turno, priorità a quelle verso le fazioni e il giocatore */
+    agenda: {
+      every: 4, maxActionsPerTurn: 20,
+      /** opinione sotto la quale un rivale dopo un atto ostile è «da richiamare», e probabilità (tiro registrato) */
+      rival: -30, recallChance: 0.5, recallSeverity: 4,
+      /** soglie: commercio da proporre con opinione ≥ tradeFrom; miglioramento delle relazioni sotto improveBelow */
+      tradeFrom: 10, improveBelow: 55, maxTrade: 2,
+      /** modificatori recenti negativi (turni) che contano come «opinione in calo» verso chi li ha causati */
+      decliningWithin: 2, decliningMin: -3,
+      /** peso del partner prioritario: commercio (per punto percentuale), blocco in comune, allineamento, essere una fazione, essere il giocatore */
+      partner: { perTradePoint: 0.5, perSharedBloc: 10, alignment: 15, faction: 5, player: 5 },
+      /** priorità del tipo di azione nell'ordinamento sotto tetto (più alto = prima), prima delle azioni verso fazioni e giocatore */
+      priority: { RECALL_AMBASSADOR: 4, REASSURANCE: 3, PROPOSE_AGREEMENT: 2, IMPROVE_RELATIONS: 1 } as Record<string, number>,
+    },
+    /** lettere di uno Stato del mondo al giocatore: solo come risposta o per un innesco forte, dentro `lettersPerTurn` */
+    letters: { maxPerTurn: 1 },
+  },
   /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
   letterTriggers: { tensionJump: 10 },
   /** Console Ordini (engine/parse-review.ts): fiducia da cui una fazione conta come alleata negli avvisi sulle azioni ostili */
@@ -247,10 +283,14 @@ export const PARAMS = {
     /** Ritiro: al massimo tanti ritiri per turno dalle zone dove la fazione ha forze ma nessuna regola le chiede più (le unità
      *  impegnate in una zona non si spostano da sole: senza ritiro restano lì finché non si logorano). */
     maxWithdrawals: 2,
-    /** Alleato: accordo di difesa in comune (NATO, UE, bilaterali) o fiducia ≥ allyTrust. Avversario (unico bersaglio cyber):
-     *  fiducia ≤ adversaryTrust e tensione ≥ adversaryTension. */
+    /** Alleato: accordo di difesa in comune (NATO, UE, bilaterali) o **opinione** ≥ allyOpinion. Avversario (unico bersaglio cyber):
+     *  opinione ≤ adversaryOpinion e tensione ≥ adversaryTension. Soglie tarate sulla distribuzione dell'opinione (non più sul `trust` della matrice
+     *  di prima): sulle 26 coppie di ogni fazione dello scenario med-2026, opinione ≥ 40 dà 0–13 alleati (mediana 7: NATO, UE e i partner storici
+     *  con +20 di alleanza e +10 di unione nella base), ≥ 60 dà 0–5, e «opinione ≤ −20 con tensione ≥ 50» dà 0–5 avversari (IRN 4, ISR 5,
+     *  USA 3, ITA 1). Con soglie più basse (30 / −10) quasi ogni fazione avrebbe più di 15 alleati e la rassicurazione dell'alleato sotto
+     *  pressione (regola 6) scatterebbe a ogni atto. */
     allyTrust: 40, adversaryTrust: -20, adversaryTension: 50,
-    /** Alleato stretto: accordo di difesa con al massimo 3 parti o fiducia ≥ closeAllyTrust. Solo loro sostengono un alleato dopo
+    /** Alleato stretto: accordo di difesa con al massimo 3 parti o opinione ≥ closeAllyOpinion. Solo loro sostengono un alleato dopo
      *  un atto senza zona (sanzioni, minacce, cyber): con tutta la NATO e l'UE una sanzione alla Francia portava 10 rassicurazioni
      *  a turno (56 in 10 turni nel playtest). Per un atto in una zona sostiene chi ha interesse in quella zona. */
     closeAllyTrust: 60,

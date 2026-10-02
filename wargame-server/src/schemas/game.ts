@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, TieStatus, Turn, Ultimatum, Unit, Visibility, ZoneId } from './world.js';
-import { FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
+import { DiploAction, FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
 
 /** Fasce con cui si vede l'opinione degli altri verso di sé (docs/wargame/DIPLOMAZIA.md §5.6); le soglie sono in PARAMS.opinion.bands. */
 export const OPINION_BANDS = ['ostile', 'fredda', 'neutra', 'cordiale', 'stretta'] as const;
@@ -114,6 +114,15 @@ export const FactionKnowledge = z.object({
     proposals: z.array(z.object({ agreementId: z.string(), from: FactionId, type: z.string(), score: z.number(), accept: z.boolean(), reasons: z.array(z.object({ label: z.string(), value: z.number() })) })).default([]),
   }).optional(),
   /**
+   * Come il mondo ha reagito (settore 10): le reazioni pubbliche degli Stati agli atti gravi di cui la fazione è attore o vittima, e le votazioni delle
+   * istituzioni che la riguardano (proponente o bersaglio), del turno precedente. Solo conteggi e i cinque più popolosi: gli elenchi interi stanno
+   * negli eventi pubblici.
+   */
+  world: z.object({
+    reactions: z.array(z.object({ turn: Turn, eventId: z.string(), kind: z.string(), actor: FactionId, victim: FactionId, condemn: z.number().int(), support: z.number().int(), silent: z.number().int(), topCondemners: z.array(z.string()).default([]), topSupporters: z.array(z.string()).default([]) })).default([]),
+    votes: z.array(z.object({ turn: Turn, forum: z.string(), subject: z.string(), proposer: FactionId, target: FactionId.optional(), passed: z.boolean(), yes: z.number().int(), no: z.number().int(), abstain: z.number().int() })).default([]),
+  }).optional(),
+  /**
    * L'opinione della fazione verso le altre (la sua riga: `trust` = opinionOf(lei → altra)) e la tensione di coppia. `opinionOfMe` è
    * come le altre la vedono, solo a fasce (ostile · fredda · neutra · cordiale · stretta); il numero esatto (`opinionOfMeExact`) solo
    * con un accordo di intelligence. Le coppie tra terzi non ci sono: si vedono solo dagli atti pubblici.
@@ -128,7 +137,9 @@ export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED'
   // diplomazia asimmetrica (RELATION_CHANGED resta leggibile per le campagne vecchie e il replay, ma non si emette più)
   'OPINION_MODIFIER', 'OPINION_DECAYED', 'TENSION_CHANGED', 'WORLD_TENSION_CHANGED',
   // capitale diplomatico, stato dei rapporti, ultimatum e votazioni delle istituzioni (settore 09)
-  'CAPITAL_CHANGED', 'DIPLOMACY_CHANGED', 'ULTIMATUM_MET', 'ULTIMATUM_EXPIRED', 'INSTITUTION_VOTE']);
+  'CAPITAL_CHANGED', 'DIPLOMACY_CHANGED', 'ULTIMATUM_MET', 'ULTIMATUM_EXPIRED', 'INSTITUTION_VOTE',
+  // IA mondiale (settore 10): reazioni degli Stati a un evento grave (un evento aggregato) e sanzioni di blocco
+  'INTERNATIONAL_REACTIONS']);
 export const GameEvent = z.object({
   id: z.string(), turn: Turn, seq: z.number().int(), phase: TurnPhase, type: EventType,
   actor: z.string(), targets: z.array(z.string()), payload: z.record(z.string(), z.unknown()),
@@ -139,6 +150,54 @@ export const DiceRoll = z.object({
   id: z.string(), turn: Turn, rngIndex: z.number().int(), purpose: z.string(), formula: z.string(),
   modifiers: z.array(z.object({ name: z.string(), value: z.number() })),
   raw: z.array(z.number()), total: z.number(), threshold: z.number().optional(), outcome: z.string(),
+});
+
+/**
+ * Direttiva strategica (docs/wargame/DIPLOMAZIA.md §11): intenzioni di una potenza per i prossimi turni. Oggi il decisore a regole riceve sempre
+ * quella deterministica (nessuna priorità, nessun effetto); il settore 11 la farà proporre a un LLM. Con tetti: è il motore a limitarla.
+ */
+export const DIRECTIVE_KINDS = ['improve', 'court', 'deter', 'isolate', 'contain'] as const;
+export const Directive = z.object({
+  horizonTurns: z.number().int().min(3).max(6),
+  priorities: z.array(z.object({ kind: z.enum(DIRECTIVE_KINDS), target: FactionId, weight: z.number().min(0).max(1) })).max(4).default([]),
+  zoneInterestDelta: z.record(ZoneId, z.number().min(-0.2).max(0.2)).refine((o) => Object.keys(o).length <= 3, 'al massimo 3 zone').default({}),
+  seekAgreements: z.array(z.object({ type: Agreement.shape.type, with: FactionId })).max(2).default([]),
+  avoid: z.array(FactionId).max(2).default([]),
+  rationale: z.string().max(420).default(''),
+});
+
+/** Atti gravi del turno che gli Stati del mondo vedono (engine/world-digest.ts) e a cui reagiscono. */
+export const GRAVE_KINDS = ['strike', 'engagement', 'blockade', 'ultimatum', 'sanction', 'multilateral_sanction', 'break', 'embargo', 'cyber', 'covert'] as const;
+export const GraveEvent = z.object({
+  id: z.string(), kind: z.enum(GRAVE_KINDS), a: z.string(), b: z.string(), severity: z.number(), turn: Turn, zoneId: ZoneId.optional(), text: z.string(),
+});
+/** Reazione di tutti gli Stati a un evento grave: tre elenchi di ISO3 e i modificatori (aggregati, con un tetto) che ne derivano. */
+export const Reaction = z.object({
+  eventId: z.string(), kind: z.enum(GRAVE_KINDS), actor: z.string(), victim: z.string(), severity: z.number(), zoneId: ZoneId.optional(),
+  /** contro chi ha compiuto l'atto · con lui · in silenzio */
+  condemn: z.array(z.string()), support: z.array(z.string()), silent: z.array(z.string()),
+  modifiers: z.array(z.object({ from: z.string(), to: z.string(), kind: z.string(), value: z.number() })),
+});
+/** Una votazione che gli Stati del mondo conoscono (la decisione di un'istituzione: pubblica) */
+export const DigestVote = z.object({
+  id: z.string(), turn: Turn, forum: z.string(), institutionId: z.string(), proposer: z.string(), target: z.string().optional(), topic: z.string(), subject: z.string(),
+  passed: z.boolean(), yes: z.array(z.string()), no: z.array(z.string()), abstain: z.array(z.string()),
+});
+export const WorldRationale = z.object({ rule: z.enum(['reaction', 'block_sanction', 'agenda', 'letter', 'cap']), actor: z.string().optional(), text: z.string() });
+/** Le decisioni del livello C di un turno: un solo file per turno (`decisions/turn-N/_world.json`), mai uno per Stato. */
+export const WorldDecision = z.object({
+  schemaVersion: z.literal(1), turn: Turn,
+  digest: z.object({ events: z.array(GraveEvent), votes: z.array(DigestVote) }),
+  /** azioni dell'agenda lenta e lettere: `actor` è l'ISO3 dello Stato (non ha CD: l'agenda è a tetto) */
+  actions: z.array(z.object({ actor: z.string(), action: DiploAction })),
+  reactions: z.array(Reaction),
+  /** sanzioni di blocco: gli Stati che si adeguano a una risoluzione con sanzioni e quelli che no */
+  blockSanctions: z.array(z.object({ voteId: z.string(), target: z.string(), adopters: z.array(z.string()), holdouts: z.array(z.string()) })).default([]),
+  rationale: z.array(WorldRationale),
+  /** lettere scritte nel turno dagli Stati del mondo al giocatore */
+  letters: z.array(z.object({ actionId: z.string(), actor: z.string(), to: z.string(), kind: z.enum(['reply', 'initiative']), trigger: z.string().optional(), inReplyTo: z.string().optional(), source: z.enum(['ai', 'template']), model: z.string(), errors: z.array(z.string()) })).default([]),
+  /** quanti Stati toccava all'agenda, quante azioni candidate e quante tagliate dal tetto globale */
+  stats: z.object({ eligible: z.number().int(), candidates: z.number().int(), capped: z.number().int() }),
 });
 
 /** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
@@ -166,6 +225,8 @@ export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   validation: z.object({ valid: z.boolean(), errors: z.array(z.string()), repairAttempts: z.number(), fallbackUsed: z.boolean() }),
   /** da dove viene ogni ordine militare generato dal motore: una postura per zona o il rientro delle unità logorate ('worn') */
   stanceOrders: z.array(z.object({ orderId: z.string(), stance: z.enum([...STANCES, 'worn']), zoneId: ZoneId.nullable() })).default([]),
+  /** direttiva strategica che ha guidato la decisione (facoltativa: oggi sempre la deterministica, cioè nessuna) */
+  directive: Directive.optional(),
   usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
   /** lettere scritte nel turno (risposte e iniziative): il testo è negli ordini (azioni LETTER), qui l'esito della scrittura */
   letters: z.array(z.object({
@@ -217,6 +278,11 @@ export type Incident = z.infer<typeof Incident>;
 export type Rationale = z.infer<typeof Rationale>;
 export type PolicyRule = (typeof POLICY_RULES)[number];
 export type AgentDecision = z.infer<typeof AgentDecision>;
+export type Directive = z.infer<typeof Directive>;
+export type GraveEvent = z.infer<typeof GraveEvent>;
+export type Reaction = z.infer<typeof Reaction>;
+export type DigestVote = z.infer<typeof DigestVote>;
+export type WorldDecision = z.infer<typeof WorldDecision>;
 export type AgentMemory = z.infer<typeof AgentMemory>;
 export type LlmCall = z.infer<typeof LlmCall>;
 export type NarrativeDoc = z.infer<typeof NarrativeDoc>;
