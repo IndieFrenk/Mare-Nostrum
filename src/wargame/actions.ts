@@ -35,6 +35,12 @@ export async function loadNations() {
   const nations = await api.nations().catch(() => null);
   if (nations) set({ nations });
 }
+/** Catalogo delle azioni diplomatiche (costi in CD, ricariche): una sola richiesta per sessione. */
+export async function loadDiploCatalog() {
+  if (state.diploCatalog.length) return;
+  const diploCatalog = await api.diploCatalog().catch(() => null);
+  if (diploCatalog) set({ diploCatalog });
+}
 /** Scheda completa di uno Stato (istituzioni, coppie storiche, fonti), in cache per ISO3. */
 export async function loadNation(iso3: string) {
   if (state.nationDetail[iso3]) return;
@@ -45,6 +51,7 @@ export async function loadNation(iso3: string) {
 export const openCampaign = (id: string) => guarded(async () => {
   remember(id);
   void loadNations();
+  void loadDiploCatalog();
   if (!llmTimer) llmTimer = setInterval(() => { if (state.campaignId) void checkLlm(); }, 60_000);
   void checkLlm();
   closeStream?.();

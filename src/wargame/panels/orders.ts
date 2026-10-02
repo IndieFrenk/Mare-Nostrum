@@ -1,11 +1,14 @@
-import type { DiploAction, Order } from '../api-client';
+import type { DiploAction, DiploCatalogRow, Order } from '../api-client';
 import { parseText, submitDraft, validateDraft } from '../actions';
 import { h, meur, select } from '../dom';
 import { newId, set, state, type UiState } from '../state/store';
 
 const KINDS = ['PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'MOVE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'AIR_DEFENSE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'EVACUATION', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN'];
 const ROE = ['WEAPONS_HOLD', 'WEAPONS_TIGHT', 'WEAPONS_FREE'];
-const DIPLO = ['DEMARCHE', 'THREAT', 'REASSURANCE', 'BACKCHANNEL', 'SANCTION', 'LIFT_SANCTION', 'NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT', 'AID'];
+/** azioni con un modulo semplice (un destinatario e un testo): le altre (accordi, accordi energetici, risposte) restano alla Console in linguaggio naturale */
+const DIPLO = ['DEMARCHE', 'THREAT', 'REASSURANCE', 'BACKCHANNEL', 'SANCTION', 'LIFT_SANCTION', 'AID', 'IMPROVE_RELATIONS', 'STOP_IMPROVE', 'RECALL_AMBASSADOR', 'EXPEL_DIPLOMATS', 'BREAK_RELATIONS', 'RESTORE_RELATIONS', 'ARMS_EMBARGO', 'LIFT_ARMS_EMBARGO', 'ULTIMATUM', 'MEDIATE', 'RESOLUTION'];
+const FORUMS = [['UNGA', 'Assemblea generale ONU'], ['UNSC', 'Consiglio di sicurezza ONU'], ['EU_COUNCIL', 'Consiglio UE'], ['NATO', 'NATO'], ['ARAB_LEAGUE', 'Lega Araba'], ['AU', 'Unione Africana']] as [string, string][];
+const TOPICS = ['aggression', 'sanctions', 'humanitarian', 'maritime', 'nonproliferation', 'other'];
 
 const val = (f: HTMLFormElement, n: string) => (f.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '';
 
@@ -29,14 +32,27 @@ function buildOrder(f: HTMLFormElement): Order {
 
 function buildDiplo(f: HTMLFormElement): DiploAction {
   const id = newId('d'); const kind = val(f, 'dkind'); const target = val(f, 'dtarget'); const message = val(f, 'dtext') || '—';
-  if (kind === 'NATO_ART4' || kind === 'EU_COUNCIL' || kind === 'UNSC_DRAFT') return { id, kind, subject: message };
+  if (kind === 'RESOLUTION') return { id, kind, forum: val(f, 'dforum') as 'UNGA', subject: message, topic: val(f, 'dtopic') as 'other', ...(target ? { target } : {}) };
+  if (kind === 'ULTIMATUM') return { id, kind, target, demand: message, deadlineTurns: Math.max(1, Math.min(4, Number(val(f, 'dturns') || 2))) };
+  if (kind === 'MEDIATE') return { id, kind, crisisId: val(f, 'dcrisis'), parties: [target, val(f, 'dtarget2')] };
+  if (['IMPROVE_RELATIONS', 'STOP_IMPROVE', 'RECALL_AMBASSADOR', 'EXPEL_DIPLOMATS', 'BREAK_RELATIONS', 'RESTORE_RELATIONS', 'ARMS_EMBARGO', 'LIFT_ARMS_EMBARGO'].includes(kind)) return { id, kind: kind as 'STOP_IMPROVE', target };
   if (kind === 'SANCTION' || kind === 'LIFT_SANCTION') return { id, kind, target, scope: message };
   if (kind === 'AID') return { id, kind, target, amount: Number(val(f, 'damount') || 10), type: 'economic' };
   if (kind === 'BACKCHANNEL') return { id, kind, target, message };
   return { id, kind: kind as 'DEMARCHE', target, message, visibility: 'public' };
 }
 
+/** «Démarche (1 CD)»: il nome e il costo dal catalogo del server (per le azioni a costo variabile il minimo) */
+const costLabel = (cat: DiploCatalogRow[], kind: string) => { const r = cat.find((x) => x.kind === kind); if (!r) return kind; const c = r.cost ?? Math.min(...Object.values(r.costBy ?? { x: 0 })); return `${r.label} (${r.cost === null ? 'da ' : ''}${c} CD${r.cooldown > 1 ? `, ricarica ${r.cooldown}` : ''})`; };
+
 const describe = (o: { kind: string } & Record<string, unknown>) => o.kind === 'LETTER' ? `✉ LETTERA a ${o.target} «${o.subject}» (${o.visibility === 'public' ? 'pubblica' : 'riservata'})` : `${o.kind} ${['unitIds', 'assetIds'].map((k) => (o[k] as string[] | undefined)?.join(',')).filter(Boolean).join(' ')} ${o.zoneId ?? o.to ?? o.targetRef ?? o.target ?? o.itemId ?? ''} ${o.roe ?? ''}`;
+
+/** CD della bozza: costi dal catalogo (per le azioni a costo variabile il costo più basso: la cifra esatta la dà «Valida») */
+function draftCost(s: UiState): number {
+  let n = 0;
+  for (const d of s.draft.diplomacy) { const r = s.diploCatalog.find((x) => x.kind === d.kind); if (r) n += r.cost ?? (d.kind === 'RESOLUTION' ? r.costBy?.[(d as { forum: string }).forum] : d.kind === 'PROPOSE_AGREEMENT' ? r.costBy?.[(d as { agreement: { type: string } }).agreement.type] : undefined) ?? 0; else if (d.kind === 'LETTER') n += 1; }
+  return n;
+}
 
 export function ordersPanel(s: UiState) {
   const k = s.knowledge;
@@ -66,7 +82,10 @@ export function ordersPanel(s: UiState) {
       h('input', { name: 'text', placeholder: 'Obiettivo SOF' }), h('button', { type: 'submit' }, 'Aggiungi')),
     h('h4', {}, 'Azione diplomatica'),
     h('p', { class: 'wg-dim' }, 'Le lettere ai capi di Stato si scrivono nel pannello ✉ Lettere ed entrano qui nella bozza.'),
-    h('form', { onsubmit: addDiplo, class: 'wg-form' }, select('dkind', DIPLO), select('dtarget', factions), h('input', { name: 'dtext', placeholder: 'Messaggio / oggetto' }), h('input', { name: 'damount', type: 'number', placeholder: 'M€ (aiuti)' }), h('button', { type: 'submit' }, 'Aggiungi')),
+    k.diplomacy ? h('p', { class: 'wg-dim' }, `Capitale diplomatico: ${k.diplomacy.capital} CD (+${k.diplomacy.rent} a settimana) · bozza ${draftCost(s)} CD`) : null,
+    h('form', { onsubmit: addDiplo, class: 'wg-form' }, select('dkind', DIPLO.map((x) => [x, costLabel(s.diploCatalog, x)] as [string, string])), select('dtarget', [['', '— destinatario —'], ...factions]), select('dtarget2', [['', '— seconda parte (mediazione) —'], ...factions]),
+      select('dforum', FORUMS, 'UNGA'), select('dtopic', TOPICS, 'other'), select('dcrisis', k.knownCrises.map((c) => [c.id, c.title] as [string, string])),
+      h('input', { name: 'dtext', placeholder: 'Messaggio / oggetto / richiesta (ultimatum)' }), h('input', { name: 'dturns', type: 'number', min: 1, max: 4, placeholder: 'Turni (ultimatum)' }), h('input', { name: 'damount', type: 'number', placeholder: 'M€ (aiuti)' }), h('button', { type: 'submit' }, 'Aggiungi')),
     h('h4', {}, 'Bozza'),
     h('ul', { class: 'wg-draft' },
       d.military.map((o) => h('li', {}, describe(o as never), h('button', { onclick: () => remove('military', o.id) }, '×'))),
@@ -75,6 +94,9 @@ export function ordersPanel(s: UiState) {
     h('div', { class: 'wg-row' }, h('button', { onclick: validateDraft }, 'Valida'), h('button', { onclick: submitDraft, disabled: !phaseOk }, s.submitted ? 'Inviati ✓' : 'Invia ordini')),
     s.validation ? h('div', { class: 'wg-card' },
       h('p', {}, s.validation.valid ? 'Ordini validi.' : 'Ordini non validi.', ` Costo stimato ${meur(s.validation.estCost)}.`),
+      s.validation.capitalCost ? h('p', { class: 'wg-dim' }, `Capitale diplomatico: ${s.validation.capitalCost} CD in bozza su ${k.diplomacy?.capital ?? '?'} disponibili.`) : null,
+      ...(s.validation.acceptance ?? []).map((a) => h('details', { class: 'wg-dim' }, h('summary', {}, `${a.type} → ${a.target}: ${a.accept ? 'accetterebbe' : 'rifiuterebbe'} (punteggio ${a.score})`),
+        h('ul', {}, a.reasons.map((r) => h('li', {}, `${r.value > 0 ? '+' : ''}${r.value} ${r.label}`))))),
       s.validation.errors.length ? h('ul', { class: 'wg-err' }, s.validation.errors.map((e) => h('li', {}, e))) : null,
       s.validation.risks.length ? h('ul', { class: 'wg-warn' }, s.validation.risks.map((e) => h('li', {}, e))) : null) : null);
 }

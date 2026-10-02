@@ -26,8 +26,8 @@ export interface ActionSpec {
   effects: string;
 }
 
-const agreementCost: Record<string, number> = { ceasefire: 2, migration: 3, energy: 3, trade: 3, non_aggression: 3, arms_sale: 4, intel_sharing: 4, defense_cooperation: 5, defense: 6, guarantee: 5, military_access: 5, basing: 5, secret: 3 };
-const forumCost: Record<string, number> = { UNSC: 8, UNGA: 6, EU_COUNCIL: 5, NATO: 5, ARAB_LEAGUE: 4, AU: 4 };
+export const AGREEMENT_COST: Record<string, number> = { ceasefire: 2, migration: 3, energy: 3, trade: 3, non_aggression: 3, arms_sale: 4, intel_sharing: 4, defense_cooperation: 5, defense: 6, guarantee: 5, military_access: 5, basing: 5, secret: 3 };
+export const FORUM_COST: Record<string, number> = { UNSC: 8, UNGA: 6, EU_COUNCIL: 5, NATO: 5, ARAB_LEAGUE: 4, AU: 4 };
 const legacyForum = { NATO_ART4: 'NATO', EU_COUNCIL: 'EU_COUNCIL', UNSC_DRAFT: 'UNSC' } as const;
 
 export const DIPLO_CATALOG: Record<DiploKind, ActionSpec> = {
@@ -38,7 +38,7 @@ export const DIPLO_CATALOG: Record<DiploKind, ActionSpec> = {
   LETTER: { label: 'Lettera', cost: 1, cooldown: 0, targets: 'faction', effects: 'dal tono: da +3 (conciliante) a −5 (minacciosa); una minacciosa è una minaccia da verificare' },
   IMPROVE_RELATIONS: { label: 'Migliorare le relazioni', cost: 1, cooldown: 0, targets: 'actor', effects: 'continuativa: 1 CD a turno, +2 a turno all\'opinione del destinatario fino a +30; occupa uno slot (2–4 secondo la potenza)' },
   STOP_IMPROVE: { label: 'Smettere di migliorare le relazioni', cost: 0, cooldown: 0, targets: 'actor', effects: 'libera lo slot; il vantaggio accumulato decade di 0,5 a settimana' },
-  PROPOSE_AGREEMENT: { label: 'Proposta di trattato', cost: (a) => (a.kind === 'PROPOSE_AGREEMENT' ? agreementCost[a.agreement.type] ?? 3 : 3), cooldown: 2, targets: 'actor', effects: 'gli Stati del mondo rispondono subito con acceptance(), le fazioni nel turno dopo; le accettate danno «Trattato attivo» +10' },
+  PROPOSE_AGREEMENT: { label: 'Proposta di trattato', cost: (a) => (a.kind === 'PROPOSE_AGREEMENT' ? AGREEMENT_COST[a.agreement.type] ?? 3 : 3), cooldown: 2, targets: 'actor', effects: 'gli Stati del mondo rispondono subito con acceptance(), le fazioni nel turno dopo; le accettate danno «Trattato attivo» +10' },
   RESPOND_AGREEMENT: { label: 'Risposta a un trattato', cost: 0, cooldown: 0, targets: 'none', effects: 'accetta, respinge o controproposta' },
   SANCTION: { label: 'Sanzioni', cost: 6, cooldown: 3, coercive: true, targets: 'actor', effects: 'opinione −15 (si accumula, tetto −40), tensione +10, stabilità del destinatario −2' },
   LIFT_SANCTION: { label: 'Revoca delle sanzioni', cost: 1, cooldown: 1, targets: 'actor', effects: 'le sanzioni diventano un residuo che decade' },
@@ -50,12 +50,12 @@ export const DIPLO_CATALOG: Record<DiploKind, ActionSpec> = {
   RESTORE_RELATIONS: { label: 'Ripristino delle relazioni', cost: 5, cooldown: 4, targets: 'actor', effects: 'riapre i canali: opinione +4, tensione −10' },
   ARMS_EMBARGO: { label: 'Embargo sulle armi', cost: 5, cooldown: 3, coercive: true, targets: 'actor', effects: 'vieta aiuti militari e vendite di armi verso il destinatario; opinione −6, tensione +5' },
   LIFT_ARMS_EMBARGO: { label: 'Revoca dell\'embargo sulle armi', cost: 1, cooldown: 1, targets: 'actor', effects: 'toglie l\'embargo; opinione +2' },
-  ULTIMATUM: { label: 'Ultimatum', cost: 8, cooldown: 6, coercive: true, targets: 'actor', effects: 'scadenza di 1–4 turni; scaduto dà legittimità alla forza contro il destinatario e alza di 5 la tensione mondiale; richiede una tensione di coppia ≥ 30' },
+  ULTIMATUM: { label: 'Ultimatum', cost: 8, cooldown: 6, coercive: true, targets: 'actor', effects: 'opinione −5, tensione +10; scadenza di 1–4 turni: scaduto dà legittimità alla forza contro il destinatario (6 turni) e alza di 5 la tensione mondiale, soddisfatto (il destinatario cerca la distensione) no' },
   MEDIATE: { label: 'Mediazione in una crisi', cost: 4, cooldown: 3, targets: 'none', effects: 'solo un terzo con opinione ≥ 0 verso entrambe le parti: la crisi scende di 1, le parti apprezzano il mediatore' },
-  RESOLUTION: { label: 'Risoluzione', cost: (a) => (a.kind === 'RESOLUTION' ? forumCost[a.forum] ?? 5 : 5), cooldown: 2, targets: 'none', effects: 'votazione dell\'istituzione con le sue regole (CdS: veto; AG: maggioranza; UE: unanimità o QMV; NATO: consenso); se approvata dà legittimità' },
-  NATO_ART4: { label: 'Consultazioni NATO (art. 4)', cost: forumCost.NATO!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede NATO' },
-  EU_COUNCIL: { label: 'Consiglio europeo', cost: forumCost.EU_COUNCIL!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede Consiglio UE' },
-  UNSC_DRAFT: { label: 'Bozza al Consiglio di sicurezza', cost: forumCost.UNSC!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede CdS' },
+  RESOLUTION: { label: 'Risoluzione', cost: (a) => (a.kind === 'RESOLUTION' ? FORUM_COST[a.forum] ?? 5 : 5), cooldown: 2, targets: 'none', effects: 'votazione dell\'istituzione con le sue regole (CdS: veto; AG: maggioranza; UE: unanimità o QMV; NATO: consenso); se approvata dà legittimità' },
+  NATO_ART4: { label: 'Consultazioni NATO (art. 4)', cost: FORUM_COST.NATO!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede NATO' },
+  EU_COUNCIL: { label: 'Consiglio europeo', cost: FORUM_COST.EU_COUNCIL!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede Consiglio UE' },
+  UNSC_DRAFT: { label: 'Bozza al Consiglio di sicurezza', cost: FORUM_COST.UNSC!, cooldown: 2, targets: 'none', effects: 'alias di RESOLUTION con sede CdS' },
 };
 
 /** Gli alias in lettura delle risoluzioni → la sede. */
@@ -230,4 +230,16 @@ export function actionInfo(s: WorldState, actor: string, a: DiploAction) {
   const capital = s.diplomacy?.capital[actor] ?? 0;
   if (cost > capital) errors.push(`capitale diplomatico insufficiente (${cost} CD necessari, ${Math.round(capital * 10) / 10} disponibili)`);
   return { kind: a.kind, label: DIPLO_CATALOG[a.kind].label, cost, cooldownUntil: until > s.turn ? until : null, available: errors.length === 0, errors };
+}
+
+/**
+ * Il catalogo come lo legge l'interfaccia (`GET /diplomacy/catalog`): una riga per azione ordinabile, con costo (o costo per tipo di trattato /
+ * per sede), ricarica, se è coercitiva e cosa fa. Gli alias in lettura delle risoluzioni e la lettera (ha il suo pannello) non ci sono.
+ */
+export function diploCatalogView() {
+  return (Object.entries(DIPLO_CATALOG) as [DiploKind, ActionSpec][]).filter(([k]) => !['NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT', 'LETTER'].includes(k)).map(([kind, s]) => ({
+    kind, label: s.label, cost: typeof s.cost === 'number' ? s.cost : null,
+    ...(kind === 'PROPOSE_AGREEMENT' ? { costBy: AGREEMENT_COST } : kind === 'RESOLUTION' ? { costBy: FORUM_COST } : {}),
+    cooldown: s.cooldown, coercive: !!s.coercive, targets: s.targets, effects: s.effects,
+  }));
 }

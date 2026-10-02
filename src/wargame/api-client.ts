@@ -15,7 +15,11 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
-export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number }
+/** `acceptance`: come risponderebbe ogni destinatario a una proposta di trattato (punteggio ≥ 0 accetta) e perché; `capitalCost`: CD della bozza */
+export interface AcceptanceView { actionId: string; type: string; target: string; score: number; accept: boolean; reasons: { label: string; value: number }[] }
+export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number; capitalCost?: number; acceptance?: AcceptanceView[] }
+/** riga del catalogo delle azioni diplomatiche (`GET /diplomacy/catalog`) */
+export interface DiploCatalogRow { kind: string; label: string; cost: number | null; costBy?: Record<string, number>; cooldown: number; coercive: boolean; targets: 'actor' | 'faction' | 'none'; effects: string }
 export interface Overview { campaign: Campaign; indicators: WorldState['globalIndicators']; relations: Record<string, Relation>; pendingDeliveries: PendingDelivery[]; pendingCmo: string[]; infrastructure: { id: string; name: string; type: string; status: string; flowShareIta?: number }[] }
 export interface CatalogView { budget: number; items: (CatalogItem & { available: boolean })[]; bases: { id: string; name: string }[]; deliveries: PendingDelivery[] }
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
@@ -35,6 +39,7 @@ const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
 export const api = {
   scenarios: () => req<{ id: string; name: string }[]>('GET', '/scenarios'),
   nations: () => req<NationSummary[]>('GET', '/nations'),
+  diploCatalog: () => req<DiploCatalogRow[]>('GET', '/diplomacy/catalog'),
   nation: (iso3: string) => req<NationDetail>('GET', `/nations/${encodeURIComponent(iso3)}`),
   campaigns: () => req<{ id: string; name: string; parent: Campaign['parent'] }[]>('GET', '/campaigns'),
   create: (b: { scenarioId: string; name: string; seed?: string; debugGodView?: boolean; cmoOnRequest?: boolean; turnLength?: 'week' | 'month' }) => req<Campaign>('POST', '/campaigns', b),

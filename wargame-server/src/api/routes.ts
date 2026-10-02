@@ -4,6 +4,7 @@ import { ZodError, z } from 'zod';
 import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody } from '../schemas/index.js';
 import { letterVisibleTo } from '../engine/knowledge.js';
 import { cmoText } from '../engine/cmo.js';
+import { diploCatalogView } from '../engine/diplo-actions.js';
 import { listScenarios, loadScenario } from '../engine/scenario.js';
 import { worldData } from '../engine/world-data.js';
 import { factionModeOf, GameError, type Engine } from '../engine/turn-machine.js';
@@ -70,6 +71,8 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
    * e le coppie storiche. Sono dati statici (scenarios/_world), non stato di gioco.
    */
   app.get(`${P}/nations`, async () => worldData().summaries());
+  /** catalogo delle azioni diplomatiche (engine/diplo-actions.ts): costo in CD, ricarica, effetti */
+  app.get(`${P}/diplomacy/catalog`, async () => diploCatalogView());
   app.get<{ Params: { iso3: string } }>(`${P}/nations/:iso3`, async (req) => {
     const w = worldData();
     const n = w.nation(req.params.iso3.toUpperCase());

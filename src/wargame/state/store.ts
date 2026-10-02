@@ -1,4 +1,4 @@
-import type { LlmStatus, Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, NationDetail, NationSummary, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
+import type { LlmStatus, Campaign, CatalogView, DiploCatalogRow, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, NationDetail, NationSummary, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
 
 export interface UiState {
   campaignId: string | null;
@@ -27,6 +27,8 @@ export interface UiState {
   /** registro dei 197 Stati (dati statici, caricati una volta) e schede complete già lette per ISO3 */
   nations: NationSummary[];
   nationDetail: Record<string, NationDetail>;
+  /** catalogo delle azioni diplomatiche (costi in CD, ricariche, effetti): dati statici, caricati una volta */
+  diploCatalog: DiploCatalogRow[];
   /** pedina impilata aperta */
   stack: string[] | null;
   draft: OrdersBody;
@@ -50,7 +52,7 @@ const listeners = new Set<Listener>();
 
 export const state: UiState = {
   campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [], letters: [], lettersSeen: [],
-  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, nations: [], nationDetail: {}, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null, llm: null, parseNote: null,
+  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, nations: [], nationDetail: {}, diploCatalog: [], stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null, llm: null, parseNote: null,
 };
 
 export function set(patch: Partial<UiState>) {
