@@ -26,4 +26,19 @@ describe('capitale diplomatico nel motore (modalità a regole)', () => {
     expect(k!.diplomacy!.capital).toBeGreaterThan(0);
     expect(JSON.stringify(k).includes('"rent"')).toBe(true);
   });
+
+  it('una campagna creata senza capitale diplomatico (settore 08) si apre con la dotazione iniziale; lo snapshot resta contenuto', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'migra', seed: 'migra' });
+    const s = await e.store.getState(c.id);
+    const before = JSON.stringify(s).length;
+    s.diplomacy!.capital = {}; s.diplomacy!.cooldowns = {};
+    await e.store.saveState(c.id, s);
+    const again = await e.store.getState(c.id);
+    expect(Object.keys(again.diplomacy!.capital).length).toBeGreaterThan(20);
+    expect(again.diplomacy!.capital.ITA).toBeCloseTo(4 * 3.03, 0);
+    expect(again.diplomacy!.capital.NATO).toBeUndefined();
+    // il capitale pesa poco nello snapshot (una mappa di ~26 numeri)
+    expect(before - JSON.stringify({ ...s, diplomacy: { ...s.diplomacy, capital: {} } }).length).toBeLessThan(2_000);
+  });
 });
