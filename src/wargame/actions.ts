@@ -29,8 +29,22 @@ export async function checkLlm(fresh = false) {
 /** true se ▶ va bloccato: modelli irraggiungibili e server che non gioca senza (WARGAME_ALLOW_OFFLINE non impostato) */
 export const llmBlocked = (s = state) => !!s.llm && !s.llm.reachable && !s.llm.offlineAllowed;
 
+/** Registro dei 197 Stati (elenco compatto): dati statici dello scenario, una sola richiesta per sessione. */
+export async function loadNations() {
+  if (state.nations.length) return;
+  const nations = await api.nations().catch(() => null);
+  if (nations) set({ nations });
+}
+/** Scheda completa di uno Stato (istituzioni, coppie storiche, fonti), in cache per ISO3. */
+export async function loadNation(iso3: string) {
+  if (state.nationDetail[iso3]) return;
+  const d = await api.nation(iso3).catch(() => null);
+  if (d) set({ nationDetail: { ...state.nationDetail, [iso3]: d } });
+}
+
 export const openCampaign = (id: string) => guarded(async () => {
   remember(id);
+  void loadNations();
   if (!llmTimer) llmTimer = setInterval(() => { if (state.campaignId) void checkLlm(); }, 60_000);
   void checkLlm();
   closeStream?.();

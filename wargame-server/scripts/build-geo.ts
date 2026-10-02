@@ -12,7 +12,10 @@ const dataDir = path.join(root, '..', 'public', 'data');
 const dir = path.join(root, 'scenarios', process.argv[2] ?? 'med-2026');
 const src = JSON.parse(readFileSync(path.join(dir, 'geo-src.json'), 'utf8'));
 // ISO3 per nome, dal geojson a bassa risoluzione che ha i codici
-const isoByName: Record<string, string> = Object.fromEntries(JSON.parse(readFileSync(path.join(dataDir, 'countries.geojson'), 'utf8')).features.map((f: any) => [f.properties.name, f.properties['ISO3166-1-Alpha-3']]));
+// i nomi del geojson a bassa risoluzione e del topojson 1:50m non coincidono per una ventina di Stati (Serbia, Tanzania, Congo…):
+// geo-iso-overrides.json (nome 1:50m → ISO3) colma i buchi, così tutti gli Stati del registro sono cliccabili sulla mappa
+const isoOverrides: Record<string, string> = JSON.parse(readFileSync(path.join(root, 'scripts', 'geo-iso-overrides.json'), 'utf8'));
+const isoByName: Record<string, string> = { ...Object.fromEntries(JSON.parse(readFileSync(path.join(dataDir, 'countries.geojson'), 'utf8')).features.map((f: any) => [f.properties.name, f.properties['ISO3166-1-Alpha-3']])), ...isoOverrides };
 const topo = JSON.parse(readFileSync(path.join(dataDir, 'countries-50m.json'), 'utf8'));
 const countries = (topoFeature(topo, topo.objects.countries) as unknown as { features: { properties: Record<string, string>; geometry: { type: string; coordinates: any } | null }[] }).features
   .filter((f) => f.geometry).map((f) => ({ ...f, properties: { name: f.properties.name!, 'ISO3166-1-Alpha-3': isoByName[f.properties.name!] ?? '' } })) as { properties: Record<string, string>; geometry: { type: string; coordinates: any } }[];
