@@ -44,6 +44,8 @@ export const FactionPolicy = z.object({
 export const Faction = z.object({
   id: FactionId, name: z.string(), kind: z.enum(['state', 'bloc', 'nonstate']),
   controller: z.enum(['human', 'ai', 'scripted']), agentRole: AgentRole.nullable(), profileRef: z.string(),
+  /** `A` = grande potenza con una direttiva strategica proposta dall'LLM ogni 3–6 turni (oltre a USA, CHN, RUS; docs/wargame/DIPLOMAZIA.md §11) */
+  tier: z.enum(['A']).optional(),
   posture: z.number().int().min(1).max(5),
   budget: z.object({ discretionary: MEur, perTurnIncome: MEur }),
   stocks: z.record(z.string(), z.number()),

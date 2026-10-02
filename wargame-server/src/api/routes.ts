@@ -196,6 +196,6 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
     const factions = req.query.faction ? [req.query.faction] : Object.keys((await store.getState(c.id)).factions);
     const decisions = (await Promise.all(factions.map((f) => store.getDecision(c.id, t, f)))).filter(Boolean);
     const tree = (await store.listCampaigns()).filter((x) => x.id === c.id || x.parent?.campaignId === c.id || c.parent?.campaignId === x.id);
-    return { turn: t, decisions, world: await store.getWorldDecision(c.id, t), rolls: await store.getRolls(c.id, t), events: await store.getEvents(c.id, t), state: await store.getState(c.id, t).catch(() => store.getState(c.id)), branches: tree };
+    return { turn: t, decisions, directives: (await store.listDirectives(c.id, t)).filter((d) => !req.query.faction || d.factionId === req.query.faction), world: await store.getWorldDecision(c.id, t), rolls: await store.getRolls(c.id, t), events: await store.getEvents(c.id, t), state: await store.getState(c.id, t).catch(() => store.getState(c.id)), branches: tree };
   });
 }

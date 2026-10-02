@@ -168,6 +168,27 @@ export const Directive = z.object({
   rationale: z.string().max(420).default(''),
 });
 
+/**
+ * Registro di una direttiva (`directives/turn-N/F.json`): la richiesta, la risposta del modello, la proposta letta e la versione **limitata** dal motore,
+ * che è l'unica a contare (il replay rilegge quella, senza chiamare l'LLM). `source: 'none'` = nessuna direttiva (budget finito, modelli in 429,
+ * risposta non valida dopo il repair): effetto nullo, il decisore a regole va come sempre.
+ */
+export const DirectiveRecord = z.object({
+  schemaVersion: z.literal(1), turn: Turn, factionId: FactionId,
+  source: z.enum(['llm', 'none']), model: z.string(), promptHash: z.string(),
+  /** token stimati del contesto costruito dal motore (≤ 1.200) */
+  contextTokens: z.number(),
+  request: z.object({ system: z.string(), user: z.string() }).nullable(),
+  response: z.string().nullable(),
+  /** la proposta del modello, come l'ha letta il motore (prima dei limiti) */
+  proposed: z.unknown().nullable(),
+  limited: Directive.nullable(),
+  /** cosa ha cambiato o scartato il motore (pesi, scarti, bersagli inesistenti…) */
+  limits: z.array(z.string()).default([]),
+  errors: z.array(z.string()).default([]),
+  usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
+});
+
 /** Atti gravi del turno che gli Stati del mondo vedono (engine/world-digest.ts) e a cui reagiscono. */
 export const GRAVE_KINDS = ['strike', 'engagement', 'blockade', 'ultimatum', 'sanction', 'multilateral_sanction', 'break', 'embargo', 'cyber', 'covert'] as const;
 export const GraveEvent = z.object({
@@ -203,7 +224,7 @@ export const WorldDecision = z.object({
 });
 
 /** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
-export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'relations', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
+export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'directive', 'ally', 'relations', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
 export const Rationale = z.object({ rule: z.enum(POLICY_RULES), text: z.string() });
 
 export const DecisionOutput = z.object({
@@ -309,6 +330,7 @@ export type Rationale = z.infer<typeof Rationale>;
 export type PolicyRule = (typeof POLICY_RULES)[number];
 export type AgentDecision = z.infer<typeof AgentDecision>;
 export type Directive = z.infer<typeof Directive>;
+export type DirectiveRecord = z.infer<typeof DirectiveRecord>;
 export type GraveEvent = z.infer<typeof GraveEvent>;
 export type Reaction = z.infer<typeof Reaction>;
 export type DigestVote = z.infer<typeof DigestVote>;

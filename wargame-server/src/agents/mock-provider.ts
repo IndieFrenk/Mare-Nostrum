@@ -33,6 +33,7 @@ function generate(role: string, m: M): unknown {
     case 'order_parser': return parser(m);
     case 'reflection': return reflection(m);
     case 'diplomat': return letter(m);
+    case 'strategist': return strategist(m);
     default: return {};
   }
 }
@@ -150,4 +151,27 @@ function letter(m: M) {
     : `desidero farLe conoscere il pensiero del mio Governo. ${m.gist ?? 'La situazione nel Mediterraneo richiede prudenza da parte di tutti.'} Confido che i nostri Governi sapranno mantenere aperto il dialogo.`;
   const subject = m.replySubject ? `Risposta: ${String(m.replySubject).replace(/^(Risposta:\s*)+/i, '')}`.slice(0, 120) : ['Dialogo sulle questioni di comune interesse', 'Sicurezza del Mediterraneo', 'Cooperazione e stabilità regionale'][h % 3];
   return { subject, body: `${open}\n${core}\nVoglia accogliere i sensi della mia più alta considerazione.`, tone };
+}
+
+/**
+ * Direttiva plausibile e deterministica dalle righe d'opinione che il motore ha messo nel contesto: pressione sul più ostile, avvicinamento al più
+ * amichevole, a volte un accordo commerciale e un po' più di interesse per una zona. Solo id del contesto: il motore la accetta senza scarti.
+ */
+function strategist(m: M) {
+  const h = hashString(`${m.seed}:${m.factionId}:${m.turn}:direttiva`);
+  const rows = (m.rows as M[]).filter((r) => r.x !== m.factionId);
+  const worst = [...rows].sort((a, b) => a.opinion - b.opinion || a.x.localeCompare(b.x))[0];
+  const best = [...rows].sort((a, b) => b.opinion - a.opinion || a.x.localeCompare(b.x))[0];
+  const priorities: M[] = [];
+  if (worst && worst.opinion < 0) priorities.push({ kind: h % 2 ? 'deter' : 'contain', target: worst.x, weight: 0.5 });
+  if (best && best.opinion > -20 && best.x !== worst?.x) priorities.push({ kind: h % 3 === 0 ? 'court' : 'improve', target: best.x, weight: 0.6 });
+  const zones = (m.zones as string[]);
+  return {
+    horizonTurns: 3 + (h % 4),
+    priorities,
+    zoneInterestDelta: zones.length && h % 2 === 0 ? { [zones[h % zones.length]!]: 0.1 } : {},
+    seekAgreements: best && best.opinion > 0 && h % 3 === 1 ? [{ type: 'trade', with: best.x }] : [],
+    avoid: [],
+    rationale: `Linea per i prossimi turni: ${worst && worst.opinion < 0 ? 'fermezza con i rivali' : 'distensione'} e rapporti più stretti con i partner.`,
+  };
 }

@@ -1,9 +1,10 @@
-import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldDecision, WorldState, Directive } from '../schemas/index.js';
+import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldDecision, WorldState, Directive, DirectiveRecord } from '../schemas/index.js';
 import { isDeepStrictEqual } from 'node:util';
 import { AgentDecision as AgentDecisionSchema, FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
 import { leaderOf } from './diplomacy.js';
 import { opinionLookup, tensionOf } from './opinion.js';
 import { buildDigest, type WorldDigest } from './world-digest.js';
+import { activeDirective, limitDirective, strategistContext, strategistPowers, strategistsOfTurn, type LimitInput, type StrategistContext } from './directive.js';
 import { stateProfile, worldAiTurn, type WorldAiOutput } from './world-ai.js';
 import { worldData } from './world-data.js';
 import { letterTriggers, type LetterTriggerKind } from './letter-triggers.js';
@@ -46,6 +47,16 @@ export interface LetterJob {
   intent?: string; replyTo?: DiploLetter; gist?: string; tone?: LetterTone;
 }
 export interface LetterResult { subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
+/** Una direttiva da chiedere (ruolo strategist): il motore sceglie la potenza e costruisce il contesto dalla sua Knowledge; l'LLM propone, il motore limita. */
+export interface StrategistJob {
+  campaign: Campaign; factionId: string; turn: number; knowledge: FactionKnowledge; profile: string; context: StrategistContext; limit: LimitInput;
+}
+/** `proposed` è la proposta così com'è (null: nessuna direttiva, per budget finito, modelli in 429 o risposta non valida); in replay la versione limitata registrata. */
+export interface StrategistResult {
+  proposed: unknown | null; source: 'llm' | 'none'; model: string; promptHash: string;
+  request: { system: string; user: string } | null; response: string | null; errors: string[];
+  usage: { promptTokens: number; completionTokens: number; latencyMs: number };
+}
 export interface DecideInput { campaign: Campaign; factionId: string; knowledge: FactionKnowledge; memory: AgentMemory; profile: string; state: WorldState; scenario: Scenario; /** direttiva strategica (§11), facoltativa: oggi sempre assente = nessun effetto */ directive?: Directive }
 /** Porta verso gli agenti: il motore non conosce LLM, solo questo contratto. */
 export interface AgentsPort {
@@ -59,6 +70,8 @@ export interface AgentsPort {
   writeLetters(jobs: LetterJob[], onProgress: (factionId: string, status: string) => void): Promise<LetterResult[]>;
   /** Bozza di lettera per il giocatore (non cambia lo stato). */
   draftLetter(job: LetterJob): Promise<LetterResult>;
+  /** Direttiva strategica di una grande potenza (§11); in replay rilegge quella registrata, senza LLM. */
+  strategize(job: StrategistJob): Promise<StrategistResult>;
   drainLlmCalls(): LlmCall[];
   /** Il motore consegna lo store: i contatori e la cache delle chiamate LLM stanno nel registro della campagna (facoltativo: replay e agenti finti non ne hanno). */
   attach?(store: JsonStore): void;
@@ -259,11 +272,16 @@ export class Engine {
   private async decisions(ctx: TurnCtx, c: Campaign, progress: (m: Record<string, unknown>) => void) {
     const sc = loadScenario(c.scenarioId);
     const who = deciders(ctx.state, c);
+    // il budget LLM: le risposte alle lettere del giocatore (P1) sono sicure, la direttiva (P3) che viene per prima lascia loro il posto
+    await this.agents.expect?.(c, ctx.turn, { 1: await this.repliesExpected(ctx, c) });
+    // direttive strategiche (§11): una grande potenza per turno a rotazione; il motore limita, il decisore a regole applica
+    const active = await this.directives(ctx, c, who.rules, progress);
     const inputs: DecideInput[] = [];
     for (const f of [...who.llm, ...who.rules].sort()) {
       const knowledge = (await this.store.getKnowledge(c.id, f, ctx.turn))!;
       const memory = (await this.store.getMemory(c.id, f)) ?? { schemaVersion: 1 as const, factionId: f, updatedTurn: 0, strategicGoals: [], commitments: [], grievances: [], lessons: [], relationshipNotes: {}, rollingSummary: '' };
-      inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc });
+      const directive = active.get(f)?.limited;
+      inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc, ...(directive ? { directive } : {}) });
     }
     // a regole: nessuna chiamata LLM, dado registrato del motore, in ordine di id (stessa sequenza di tiri nel replay)
     const byRules: AgentDecision[] = [];
@@ -286,7 +304,7 @@ export class Engine {
     const called = withAi.filter((i) => withLlm(i.factionId));
     const decisions = [...byRules, ...skipped, ...(called.length ? await this.agents.decideAll(called, (factionId, status) => progress({ agent: factionId, status })) : [])];
     // IA mondiale (livello C, engine/world-ai.ts): dopo le fazioni, con lo stesso dado registrato; un digest pubblico e un solo file di decisioni per turno
-    const { digest, out: world } = await this.worldAi(ctx, c);
+    const { digest, out: world } = await this.worldAi(ctx, c, [...active].flatMap(([faction, r]) => (r.limited ? [{ faction, directive: r.limited }] : [])));
     progress({ agent: 'MONDO', status: `IA mondiale: ${world.actions.length} azioni, ${world.reactions.length} reazioni` });
     await this.letters(ctx, c, decisions, inputs, progress);
     const worldLetters = await this.worldLetters(ctx, c, world, progress);
@@ -299,14 +317,59 @@ export class Engine {
       actions: [...world.actions, ...worldLetters.actions], reactions: world.reactions, blockSanctions: world.blockSanctions, rationale: world.rationale,
       letters: worldLetters.meta, stats: world.stats,
     });
+    // fine della fase: le riserve di budget non usate si liberano
+    await this.agents.expect?.(c, ctx.turn, { 1: 0, 3: 0, 4: 0, 5: 0 });
+  }
+
+  /** Risposte alle lettere del giocatore che le IA scriveranno (una per destinatario): il budget le tiene da parte. */
+  private async repliesExpected(ctx: TurnCtx, c: Campaign): Promise<number> {
+    if (ctx.turn < 2) return 0;
+    const prev = await this.store.getLetters(c.id, ctx.turn - 1);
+    return new Set(prev.filter((l) => l.from === c.playerFaction && ctx.state.factions[l.to]?.kind !== 'bloc').map((l) => l.to)).size;
+  }
+
+  /**
+   * Direttive strategiche (§11). Una potenza per turno a rotazione (USA, CHN, RUS e le fazioni `tier: 'A'` che decidono a regole): il motore costruisce il
+   * contesto dalla sua Knowledge, il ruolo strategist propone, il motore **limita** (bersagli esistenti, pesi, scarti) e registra richiesta, risposta e
+   * versione limitata in `directives/turn-N/F.json`. Restituisce per ogni potenza la direttiva in vigore (quella più recente ancora nell'orizzonte).
+   * In replay l'agente rilegge la versione limitata registrata: nessun LLM, stesso effetto.
+   */
+  private async directives(ctx: TurnCtx, c: Campaign, rules: string[], progress: (m: Record<string, unknown>) => void): Promise<Map<string, DirectiveRecord>> {
+    const sc = loadScenario(c.scenarioId);
+    const powers = strategistPowers(ctx.state).filter((f) => rules.includes(f));
+    const history = new Map<string, DirectiveRecord[]>();
+    for (const f of powers) {
+      const recs: DirectiveRecord[] = [];
+      for (let t = Math.max(1, ctx.turn - PARAMS.strategist.period.max); t <= ctx.turn; t++) { const r = await this.store.getDirective(c.id, t, f); if (r) recs.push(r); }
+      history.set(f, recs);
+    }
+    const names = Object.fromEntries(Object.values(ctx.state.factions).map((f) => [f.id, f.name]));
+    for (const f of strategistsOfTurn(ctx.turn, powers)) {
+      const recs = history.get(f)!;
+      if (recs.some((r) => r.turn === ctx.turn)) continue; // fase ripresa dopo un'interruzione: già fatta
+      const knowledge = await this.store.getKnowledge(c.id, f, ctx.turn);
+      if (!knowledge) continue;
+      progress({ agent: f, status: 'direttiva strategica' });
+      const context = strategistContext(knowledge, activeDirective(recs, ctx.turn - 1)?.limited ?? null, names);
+      const limit: LimitInput = { state: ctx.state, factionId: f, zones: new Set(Object.keys(sc.world.zones)) };
+      const res = await this.agents.strategize({ campaign: c, factionId: f, turn: ctx.turn, knowledge, profile: sc.profiles[f] ?? '', context, limit });
+      const limited = res.proposed ? limitDirective(res.proposed, limit) : null;
+      const rec: DirectiveRecord = {
+        schemaVersion: 1, turn: ctx.turn, factionId: f, source: limited ? 'llm' : 'none', model: res.model, promptHash: res.promptHash, contextTokens: context.tokens,
+        request: res.request, response: res.response, proposed: res.proposed, limited: limited?.directive ?? null, limits: limited?.notes ?? [], errors: res.errors, usage: res.usage,
+      };
+      await this.store.saveDirective(c.id, rec);
+      recs.push(rec);
+    }
+    return new Map(powers.flatMap((f) => { const a = activeDirective(history.get(f)!, ctx.turn); return a ? [[f, a] as const] : []; }));
   }
 
   /** Il digest pubblico del turno precedente e le decisioni del livello C; in replay controlla che siano identiche a quelle registrate. */
-  private async worldAi(ctx: TurnCtx, c: Campaign): Promise<{ digest: WorldDigest; out: WorldAiOutput }> {
+  private async worldAi(ctx: TurnCtx, c: Campaign, directives: { faction: string; directive: Directive }[]): Promise<{ digest: WorldDigest; out: WorldAiOutput }> {
     const prev = ctx.turn > 1 ? await this.store.getEvents(c.id, ctx.turn - 1) : [];
     const digest = buildDigest(prev, ctx.turn - 1);
     const playerLettersPrev = ctx.turn > 1 ? (await this.store.getLetters(c.id, ctx.turn - 1)).filter((l) => l.from === c.playerFaction) : [];
-    const out = worldAiTurn({ state: ctx.state, digest, player: c.playerFaction, rng: ctx.rng, playerLettersPrev });
+    const out = worldAiTurn({ state: ctx.state, digest, player: c.playerFaction, rng: ctx.rng, playerLettersPrev, directives });
     const saved = await this.agents.recordedWorld?.(ctx.turn);
     if (saved) {
       const fp = (w: { actions: unknown[]; reactions: unknown; blockSanctions: unknown; rationale: unknown; stats: unknown }) => JSON.stringify({ a: (w.actions as { action: { kind: string } }[]).filter((x) => x.action.kind !== 'LETTER'), r: w.reactions, b: w.blockSanctions, t: w.rationale, s: w.stats });

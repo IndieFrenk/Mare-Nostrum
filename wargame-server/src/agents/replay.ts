@@ -1,5 +1,5 @@
 import type { AgentMemory } from '../schemas/index.js';
-import type { AgentsPort, LetterJob, LetterResult } from '../engine/turn-machine.js';
+import type { AgentsPort, LetterJob, LetterResult, StrategistJob, StrategistResult } from '../engine/turn-machine.js';
 import type { JsonStore } from '../store/json-store.js';
 
 /** Rilegge decisioni, narrativa e memoria salvate: nessuna chiamata LLM. */
@@ -45,6 +45,13 @@ export class ReplayAgents implements AgentsPort {
       const info = (d ? d.letters : w!.letters).find((l) => l.actionId === a.id);
       return { subject: a.subject, body: a.body, tone: a.tone, source: info?.source ?? (a.model === 'template' ? 'template' : 'ai'), model: a.model ?? 'replay', errors: info?.errors ?? [] };
     }));
+  }
+
+  /** La direttiva registrata (versione limitata dal motore): nessuna chiamata LLM; senza file, nessuna direttiva. */
+  async strategize(job: StrategistJob): Promise<StrategistResult> {
+    const d = await this.store.getDirective(this.sourceId, job.turn, job.factionId);
+    if (!d) return { proposed: null, source: 'none', model: 'replay', promptHash: '', request: null, response: null, errors: [], usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 } };
+    return { proposed: d.limited, source: d.source, model: d.model, promptHash: d.promptHash, request: d.request, response: d.response, errors: d.errors, usage: d.usage };
   }
 
   /** Decisioni del livello C registrate: il motore le ricalcola (stesso dado) e controlla che siano identiche. */

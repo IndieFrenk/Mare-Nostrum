@@ -74,7 +74,7 @@ const FALLBACK: Record<Exclude<Stance, 'withdraw'>, Exclude<Stance, 'withdraw'>[
 interface Cand { score: number; rule: PolicyRule; text: string }
 interface StanceCand extends Cand { zoneId: string; stance: Exclude<Stance, 'withdraw'>; intensity: 1 | 2 | 3 }
 /** `target` può mancare solo per una RESOLUTION senza bersaglio (la sede e il tema stanno nei campi propri) */
-interface DiploCand extends Cand { key: string; kind: DiploKind; target: string; forum?: 'UNSC' | 'UNGA'; demand?: string; agreementType?: Agreement['type'] }
+interface DiploCand extends Cand { key: string; kind: DiploKind; target: string; forum?: 'UNSC' | 'UNGA'; demand?: string; agreementType?: Agreement['type']; /** bonus di punteggio dato da una direttiva (> 0: la direttiva ha spinto questa azione) */ dirBonus?: number }
 interface LetterCand { to: string; gist: string; tone: LetterTone; score: number }
 
 /** le azioni che ogni tipo di priorità della direttiva favorisce */
@@ -144,10 +144,11 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     const fav = dir.priorities.filter((x) => x.target === target && DIRECTIVE_ACTIONS[x.kind].includes(kind)).reduce((n, x) => n + x.weight, 0);
     return Math.round(fav * P.directive.bonus) - (dir.avoid.includes(target) && kind !== 'REASSURANCE' && kind !== 'BACKCHANNEL' ? P.directive.avoid : 0);
   };
-  const addDiplo = (kind: DiploKind, target: string, c0: Cand, extra: { demand?: string; agreementType?: Agreement['type'] } = {}) => {
+  const addDiplo = (kind: DiploKind, target: string, c0: Cand, extra: { demand?: string; agreementType?: Agreement['type']; dirBonus?: number } = {}) => {
     const bonus = dirBonus(kind, target);
     const c: Cand = bonus ? { ...c0, score: c0.score + bonus, text: `${c0.text} [direttiva ${bonus > 0 ? '+' : ''}${bonus}]` } : c0;
-    if (kind === 'RESOLUTION' || others.has(target)) diplo.push({ ...c, kind, target, key: kind === 'RESOLUTION' ? `RES:${forumOf}` : `${kind === 'STOP_IMPROVE' || kind === 'IMPROVE_RELATIONS' ? 'IMP' : 'ACT'}:${target}`, ...(kind === 'RESOLUTION' ? { forum: forumOf } : {}), ...extra });
+    const pushed = Math.max(bonus, extra.dirBonus ?? 0);
+    if (kind === 'RESOLUTION' || others.has(target)) diplo.push({ ...c, kind, target, key: kind === 'RESOLUTION' ? `RES:${forumOf}` : `${kind === 'STOP_IMPROVE' || kind === 'IMPROVE_RELATIONS' ? 'IMP' : 'ACT'}:${target}`, ...(kind === 'RESOLUTION' ? { forum: forumOf } : {}), ...extra, ...(pushed > 0 ? { dirBonus: pushed } : {}) });
   };
   const dip = k.diplomacy;
   const capital = dip?.capital ?? Infinity;
@@ -283,7 +284,7 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
   // 5c) direttiva: gli accordi che cerca (candidati con un bonus, come ogni altra azione; ricarica e capitale li filtra la scelta)
   for (const sk of dir?.seekAgreements ?? []) {
     if (!others.has(sk.with) || k.knownAgreements.some((a) => a.type === sk.type && a.status !== 'expired' && a.parties.includes(me) && a.parties.includes(sk.with))) continue;
-    addDiplo('PROPOSE_AGREEMENT', sk.with, { score: P.score.objective + 10, rule: 'objective', text: `Direttiva: cercare un accordo ${sk.type} con ${nm(sk.with)}` }, { agreementType: sk.type });
+    addDiplo('PROPOSE_AGREEMENT', sk.with, { score: P.score.objective + 10, rule: 'objective', text: `Direttiva: cercare un accordo ${sk.type} con ${nm(sk.with)}` }, { agreementType: sk.type, dirBonus: 10 });
   }
 
   // 5d) isolamento internazionale (IA mondiale): se un atto della fazione ha avuto la condanna di molti Stati o un'istituzione l'ha condannata,
@@ -394,6 +395,9 @@ export function decideByRules(i: PolicyInput): DecisionOutput {
     left -= costOf(a);
     chosenDiplo.push(c);
   }
+  // le mosse che la direttiva ha spinto (bonus di punteggio sull'azione, accordo cercato, scarto d'interesse sulla zona): una riga `directive` ciascuna
+  for (const c of chosenDiplo) if (c.dirBonus) extra.push({ rule: 'directive', text: `Direttiva: ${DIPLO_IT[c.kind]}${c.target ? ` verso ${nm(c.target)}` : ''} (+${c.dirBonus} di punteggio)` });
+  for (const c of chosenStances) { const d = dir?.zoneInterestDelta[c.zoneId]; if (d) extra.push({ rule: 'directive', text: `Direttiva: interesse per ${zoneName(c.zoneId)} ${d > 0 ? '+' : ''}${d}: ${STANCE_IT[c.stance]}` }); }
   for (const c of unaffordable.slice(0, 1)) extra.push({ rule: c.rule, text: `Rinuncia a ${DIPLO_IT[c.kind]}${c.target ? ` verso ${c.target}` : ''}: capitale diplomatico ${Math.round(capital * 10) / 10} CD, ne servono ${costOf(diploAction(c))}` });
   // una lettera per destinatario (la ragione più forte), al massimo due: il tetto per fazione e per turno lo applica il motore
   const chosenLetters = [...letters].sort((a, b) => b.score - a.score || a.to.localeCompare(b.to))

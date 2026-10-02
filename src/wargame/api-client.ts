@@ -1,4 +1,4 @@
-import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, Nation, NationSummary, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
+import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, DirectiveRecord, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, Nation, NationSummary, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
 
 export type * from '../../wargame-server/src/schemas/index';
 export type { LlmStatus } from '../../wargame-server/src/agents/llm-status';
@@ -23,7 +23,7 @@ export interface DiploCatalogRow { kind: string; label: string; cost: number | n
 export interface Overview { campaign: Campaign; indicators: WorldState['globalIndicators']; relations: Record<string, Relation>; pendingDeliveries: PendingDelivery[]; pendingCmo: string[]; infrastructure: { id: string; name: string; type: string; status: string; flowShareIta?: number }[] }
 export interface CatalogView { budget: number; items: (CatalogItem & { available: boolean })[]; bases: { id: string; name: string }[]; deliveries: PendingDelivery[] }
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
-export interface Postmortem { turn: number; decisions: AgentDecision[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
+export interface Postmortem { turn: number; decisions: AgentDecision[]; directives: DirectiveRecord[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
 export type FC = GeoJSON.FeatureCollection;
 /** scheda completa di uno Stato (`GET /nations/:iso3`): dati del registro, istituzioni di cui è membro e coppie storiche */
 export interface NationDetail extends Nation {

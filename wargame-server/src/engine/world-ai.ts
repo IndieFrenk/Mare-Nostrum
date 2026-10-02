@@ -1,4 +1,4 @@
-import type { DiploAction, DiploLetter, GraveEvent, LetterTone, Reaction, WorldDecision, WorldState } from '../schemas/index.js';
+import type { Directive, DiploAction, DiploLetter, GraveEvent, LetterTone, Reaction, WorldDecision, WorldState } from '../schemas/index.js';
 import { LETTER_LIMITS } from '../schemas/index.js';
 import type { Nation } from '../schemas/nations.js';
 import { acceptance } from './acceptance.js';
@@ -17,7 +17,14 @@ import { worldData } from './world-data.js';
  * (le fazioni agli Stati del mondo si risolvono già in aggiudicazione, con acceptance()), sanzioni di blocco e agenda lenta sfalsata.
  * Nebbia: ogni Stato vede solo `viewOf(digest, suo id)`; mai la verità di terra.
  */
-export interface WorldAiInput { state: WorldState; digest: WorldDigest; player: string; rng: Rng; playerLettersPrev: DiploLetter[] }
+export interface WorldAiInput {
+  state: WorldState; digest: WorldDigest; player: string; rng: Rng; playerLettersPrev: DiploLetter[];
+  /**
+   * Direttive in vigore delle grandi potenze (§11, già limitate dal motore; facoltative: senza, nessun effetto). Una potenza che vuole `improve` o `court`
+   * uno Stato del mondo ne fa un partner più probabile per quello Stato: il bonus di punteggio entra nella scelta del partner prioritario dell'agenda.
+   */
+  directives?: { faction: string; directive: Directive }[];
+}
 export interface WorldLetterTrigger { iso: string; kind: 'reply' | 'initiative'; trigger?: string; tone: LetterTone; gist: string; replyTo?: DiploLetter }
 export type WorldAiOutput = Pick<WorldDecision, 'actions' | 'reactions' | 'blockSanctions' | 'rationale' | 'stats'> & { letterTriggers: WorldLetterTrigger[] };
 
@@ -113,7 +120,7 @@ function blockSanctions(s: WorldState, d: WorldDigest, op: (a: string, b: string
 interface Cand { actor: string; action: DiploAction; target: string; text: string }
 
 /** Il partner prioritario di uno Stato: commercio, blocchi in comune, vicinanza di allineamento; le fazioni e il giocatore contano un po' di più. */
-function partnersOf(s: WorldState, n: Nation, player: string): { actor: string; score: number }[] {
+export function partnersOf(s: WorldState, n: Nation, player: string, dirs: WorldAiInput['directives'] = []): { actor: string; score: number }[] {
   const w = worldData(); const A = PARAMS.worldAi.agenda.partner;
   const score = new Map<string, number>();
   const add = (actor: string, v: number) => { if (actor !== n.iso3) score.set(actor, (score.get(actor) ?? 0) + v); };
@@ -121,6 +128,8 @@ function partnersOf(s: WorldState, n: Nation, player: string): { actor: string; 
   for (const inst of w.institutions) if (inst.members.includes(n.iso3) && (inst.effects.includes('collective_defense') || inst.kind === 'union' || inst.kind === 'regional'))
     for (const l of inst.leaders) { const x = w.nation(l); if (x && l !== n.iso3) add(actorOfNation(x), A.perSharedBloc); }
   add(player, 0);
+  // una potenza che vuole avvicinare questo Stato (direttiva): per lui è un partner più probabile, in proporzione al peso
+  for (const { faction, directive } of dirs) for (const p of directive.priorities) if ((p.kind === 'improve' || p.kind === 'court') && (p.target === n.iso3 || p.target === actorOfNation(n))) add(faction, p.weight * A.directive);
   const out: { actor: string; score: number }[] = [];
   for (const [actor, base] of score) {
     const iso = w.isoOf(actor); const x = iso ? w.nation(iso) : undefined;
@@ -154,7 +163,7 @@ function agenda(i: WorldAiInput, op: (a: string, b: string) => number, rationale
     const actor = n.iso3;
     const mine = viewOf(i.digest, actor);
     const valid = (a: DiploAction) => checkAction(s, actor, a).length === 0;
-    const partners = partnersOf(s, n, i.player);
+    const partners = partnersOf(s, n, i.player, i.directives);
     const improving = s.diplomacy?.improving.filter((x) => x.actor === actor) ?? [];
     const nm = (x: string) => nameOf(x, s);
     const pick = (): Cand | null => {

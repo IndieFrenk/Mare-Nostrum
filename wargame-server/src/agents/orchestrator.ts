@@ -1,5 +1,5 @@
 import type { AgentDecision, Campaign, LlmCall } from '../schemas/index.js';
-import type { AgentsPort, DecideInput, LetterJob, LetterResult } from '../engine/turn-machine.js';
+import type { AgentsPort, DecideInput, LetterJob, LetterResult, StrategistJob } from '../engine/turn-machine.js';
 import { LlmBudget, type BudgetStatus, type Priority, type UsageStore } from './budget.js';
 import { loadScenario } from '../engine/scenario.js';
 import { decide } from './faction-agent.js';
@@ -9,6 +9,7 @@ import { letterPrompt, templateLetter, writeLetter } from './letter-writer.js';
 import type { LlmProvider } from './llm-client.js';
 import { parseOrders } from './order-parser.js';
 import { reflect } from './reflection.js';
+import { writeDirective } from './strategist.js';
 import { promptHash } from './repair.js';
 
 export async function pool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
@@ -86,6 +87,9 @@ export class LlmAgents implements AgentsPort {
   }
 
   draftLetter(job: LetterJob) { return writeLetter(this.view(job.campaign, job.campaign.currentTurn, 1), this.log, job); }
+
+  /** Direttiva strategica (P3): una chiamata, senza ripieghi oltre al repair; senza risposta valida nessuna direttiva. */
+  strategize(job: StrategistJob) { return writeDirective(this.view(job.campaign, job.turn, 3), this.log, job); }
 
   reflect(i: Parameters<AgentsPort['reflect']>[0]) { return reflect(this.view(i.campaign, i.campaign.currentTurn, 5), this.log, i.campaign, i); }
 

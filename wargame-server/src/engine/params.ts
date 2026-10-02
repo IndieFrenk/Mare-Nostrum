@@ -245,12 +245,28 @@ export const PARAMS = {
       /** modificatori recenti negativi (turni) che contano come «opinione in calo» verso chi li ha causati */
       decliningWithin: 2, decliningMin: -3,
       /** peso del partner prioritario: commercio (per punto percentuale), blocco in comune, allineamento, essere una fazione, essere il giocatore */
-      partner: { perTradePoint: 0.5, perSharedBloc: 10, alignment: 15, faction: 5, player: 5 },
+      partner: { perTradePoint: 0.5, perSharedBloc: 10, alignment: 15, faction: 5, player: 5, /** per punto di peso di una direttiva `improve`/`court` di una potenza verso lo Stato: lo Stato la considera più volentieri partner */ directive: 25 },
       /** priorità del tipo di azione nell'ordinamento sotto tetto (più alto = prima), prima delle azioni verso fazioni e giocatore */
       priority: { RECALL_AMBASSADOR: 4, REASSURANCE: 3, PROPOSE_AGREEMENT: 2, IMPROVE_RELATIONS: 1 } as Record<string, number>,
     },
     /** lettere di uno Stato del mondo al giocatore: solo come risposta o per un innesco forte, dentro `lettersPerTurn` */
     letters: { maxPerTurn: 1 },
+  },
+  /**
+   * Direttive strategiche delle grandi potenze (§11, engine/directive.ts): l'LLM propone, il motore limita. Una potenza per turno a rotazione, ognuna ogni
+   * `period` turni (tanti quante sono le potenze, tra min e max); tetti su liste, pesi e scarti dell'interesse per zona; contesto in token (stima a caratteri).
+   */
+  strategist: {
+    period: { min: 3, max: 6 },
+    /** potenze di livello A di sempre; altre fazioni si aggiungono con `tier: 'A'` nello scenario */
+    powers: ['USA', 'CHN', 'RUS'] as readonly string[],
+    maxPriorities: 4, maxZones: 3, maxAgreements: 2, maxAvoid: 2,
+    /** somma dei pesi delle priorità: oltre, si riducono in proporzione */
+    maxTotalWeight: 2,
+    zoneDelta: 0.2, rationaleWords: 60,
+    /** accordi che una direttiva può cercare (niente alleanze formali, basi, vendite di armi, accordi segreti) */
+    agreementTypes: ['trade', 'non_aggression', 'defense_cooperation', 'military_access', 'guarantee', 'intel_sharing', 'ceasefire'] as readonly string[],
+    contextTokens: 1200, charsPerToken: 3.4, opinionRows: 10, incidentTurns: 2,
   },
   /** inneschi delle lettere IA di iniziativa (engine/letter-triggers.ts): salto di tensione in un turno che fa scrivere una fazione */
   letterTriggers: { tensionJump: 10 },

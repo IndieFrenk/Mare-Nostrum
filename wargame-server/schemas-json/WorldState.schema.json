@@ -64,7 +64,9 @@
          "order_parser",
          "reflection",
          "repair",
-         "diplomat"
+         "diplomat",
+         "strategist",
+         "chancery"
         ]
        },
        {
@@ -74,6 +76,12 @@
      },
      "profileRef": {
       "type": "string"
+     },
+     "tier": {
+      "type": "string",
+      "enum": [
+       "A"
+      ]
      },
      "posture": {
       "type": "integer",

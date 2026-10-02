@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
 import { fillFromScenario, migrate, migrateDiplomacy } from './migrations/index.js';
-import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, LlmUsage, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
+import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, DirectiveRecord, LedgerEntry, LlmCall, LlmUsage, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
 const PhaseTimingSchema = z.object({ turn: z.number(), phase: z.string(), ms: z.number() });
@@ -33,6 +33,11 @@ export interface Store {
   /** decisioni del livello C (IA mondiale) di un turno: un file solo, `decisions/turn-N/_world.json` */
   getWorldDecision(id: string, turn: number): Promise<WorldDecision | null>;
   saveWorldDecision(id: string, d: WorldDecision): Promise<void>;
+  /** direttive strategiche (§11): un file per turno e potenza, `directives/turn-N/F.json`, con richiesta, risposta e versione limitata */
+  getDirective(id: string, turn: number, faction: string): Promise<DirectiveRecord | null>;
+  saveDirective(id: string, d: DirectiveRecord): Promise<void>;
+  /** le direttive registrate in un turno (tutte le potenze) */
+  listDirectives(id: string, turn: number): Promise<DirectiveRecord[]>;
   /** tempo (ms) di ogni fase del motore, una riga per fase in `timings.jsonl` */
   appendTimings(id: string, rows: PhaseTiming[]): Promise<void>;
   getTimings(id: string): Promise<PhaseTiming[]>;
@@ -145,6 +150,14 @@ export class JsonStore implements Store {
   saveDecision(id: string, d: AgentDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, `${d.factionId}.json`), d, S.AgentDecision); }
   getWorldDecision(id: string, turn: number) { return this.read(this.dir(id, 'decisions', `turn-${pad(turn)}`, '_world.json'), S.WorldDecision); }
   saveWorldDecision(id: string, d: WorldDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, '_world.json'), d, S.WorldDecision); }
+  getDirective(id: string, turn: number, f: string) { return this.read(this.dir(id, 'directives', `turn-${pad(turn)}`, `${f}.json`), S.DirectiveRecord); }
+  saveDirective(id: string, d: DirectiveRecord) { return this.write(this.dir(id, 'directives', `turn-${pad(d.turn)}`, `${d.factionId}.json`), d, S.DirectiveRecord); }
+  async listDirectives(id: string, turn: number) {
+    const dir = this.dir(id, 'directives', `turn-${pad(turn)}`);
+    if (!existsSync(dir)) return [];
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json')).sort();
+    return (await Promise.all(files.map((f) => this.read(path.join(dir, f), S.DirectiveRecord)))).filter((d): d is DirectiveRecord => !!d);
+  }
   appendTimings(id: string, rows: PhaseTiming[]) { return this.append(this.dir(id, 'timings.jsonl'), rows, PhaseTimingSchema); }
   getTimings(id: string) { return this.readLines(this.dir(id, 'timings.jsonl'), PhaseTimingSchema); }
   getLlmUsage(id: string) { return this.read(this.dir(id, 'llm-usage.json'), S.LlmUsage); }

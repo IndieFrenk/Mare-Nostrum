@@ -1,4 +1,4 @@
-import type { AfterActionReport, PendingCmo } from '../api-client';
+import type { AfterActionReport, PendingCmo, Postmortem } from '../api-client';
 import { api } from '../api-client';
 import { configure, endCampaign, forkFrom, resolveCmo } from '../actions';
 import { h, pct, select } from '../dom';
@@ -51,6 +51,14 @@ export function cmoPanel(s: UiState) {
   }));
 }
 
+/** La direttiva in vigore per la decisione e, se è stata data in questo turno, cosa ha proposto il modello e cosa ha limitato il motore. */
+function directiveBlock(d: NonNullable<Postmortem['decisions'][number]['directive']>, rec?: Postmortem['directives'][number]) {
+  const line = [...d.priorities.map((p) => `${p.kind} ${p.target} (${p.weight})`), ...d.seekAgreements.map((a) => `accordo ${a.type} con ${a.with}`), ...Object.entries(d.zoneInterestDelta).map(([z, v]) => `${z} ${v > 0 ? '+' : ''}${v}`), ...d.avoid.map((a) => `evitare ${a}`)];
+  return h('details', {}, h('summary', {}, `Direttiva strategica (${d.horizonTurns} turni)${rec ? ` · data al turno ${rec.turn} da ${rec.model}` : ''}`),
+    h('p', {}, line.join(' · ') || 'nessun effetto'), d.rationale ? h('p', { class: 'wg-dim' }, d.rationale) : null,
+    rec?.limits.length ? h('ul', { class: 'wg-dim' }, rec.limits.map((l) => h('li', {}, `limite: ${l}`))) : null);
+}
+
 let pm: { turn: number; data: Awaited<ReturnType<typeof api.postmortem>> | null; error?: string } = { turn: 1, data: null };
 
 export function postmortemPanel(s: UiState, rerender: () => void) {
@@ -70,7 +78,8 @@ export function postmortemPanel(s: UiState, rerender: () => void) {
         h('h4', {}, 'Rami'), h('ul', {}, pm.data.branches.map((b) => h('li', {}, `${b.name}${b.parent ? ` ← ${b.parent.campaignId} T${b.parent.turn}` : ''}`))),
         ...pm.data.decisions.map((d) => h('details', { class: 'wg-card' }, h('summary', {}, `${d.factionId} · ${d.model === 'regole' ? 'regole del motore' : d.model} · conf. ${pct(d.confidence)}${d.validation.fallbackUsed ? ' · FALLBACK' : ''}`),
           h('p', {}, d.situationAssessment), h('p', {}, h('strong', {}, 'Intento privato: '), d.privateIntent),
-          // decisioni a regole: una motivazione per scelta
+          d.directive ? directiveBlock(d.directive, pm.data!.directives.find((x) => x.factionId === d.factionId)) : null,
+          // decisioni a regole: una motivazione per scelta (le righe `directive` sono le mosse spinte dalla direttiva)
           d.rationale?.length ? h('ul', {}, d.rationale.map((r) => h('li', {}, h('span', { class: 'wg-dim' }, `${r.rule} · `), r.text))) : null,
           h('ul', {}, d.optionsConsidered.map((o) => h('li', {}, `${o.chosen ? '✔ ' : ''}${o.label}: ${o.summary} (guadagno ${o.expectedGain}, rischio ${o.risk})`))),
           h('p', { class: 'wg-dim' }, `${d.orders.military.length} ordini militari, ${d.orders.diplomacy.length} diplomatici, ${d.orders.procurement.length} acquisti · token ${d.usage.promptTokens}+${d.usage.completionTokens}`))),
