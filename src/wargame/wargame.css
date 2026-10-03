@@ -63,7 +63,7 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-drawer:not(:empty) ~ .wg-selection { left: 508px; }
 
 /* modalità mappa e log */
-#wg-modes { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 3px; }
+#wg-modes { position: absolute; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: calc(100vw - 20px); }
 #wg-modes button { text-transform: capitalize; background: rgba(20,22,18,.9); } #wg-modes .on { border-color: var(--gold); color: var(--gold); }
 #wg-log { position: absolute; left: 58px; bottom: 12px; color: var(--dim); max-width: 50vw; pointer-events: none; text-shadow: 0 1px 2px #000; }
 
@@ -112,3 +112,21 @@ textarea { width: 100%; }
 .wg-letter-to { color: var(--ink-dim); } .wg-letter-subject { margin: 8px 0 10px !important; }
 .wg-letter-body p { text-indent: 1.2em; } .wg-letter-body p:first-child { text-indent: 0; }
 .wg-letter-sign { text-align: right; font-style: italic; margin-top: 14px !important; }
+
+/* diplomazia: palette in variabili (la mappa le legge). Scala divergente blu–arancio per l'opinione, leggibile anche da chi non distingue rosso e verde;
+   ogni voce di legenda ha comunque il nome scritto, il colore non è l'unico segnale. */
+:root {
+  --wg-op-0: #c4501b; --wg-op-1: #f0a04b; --wg-op-2: #8c8c80; --wg-op-3: #6fb1e8; --wg-op-4: #2b6cc4; /* ostile · fredda · neutra · cordiale · stretta */
+  --wg-self: #f2e9c4; --wg-none: #3c3c36;
+  --wg-tr-defense: #6ec1ff; --wg-tr-guarantee: #ffd166; --wg-tr-access: #ff9f5a; --wg-tr-trade: #7fe0a8; --wg-tr-energy: #f08ad0; --wg-tr-migration: #c3b1ff; --wg-tr-other: #b8b8b0;
+  --wg-vote-yes: #4a8fe0; --wg-vote-no: #e8832e; --wg-vote-abstain: #cfcab0; --wg-vote-absent: #33332f;
+  --wg-tension-0: #6fb1e8; --wg-tension-1: #cfcab0; --wg-tension-2: #f0a04b; --wg-tension-3: #c4501b; /* distensione · normale · alta · critica */
+}
+#wg-legend { right: 10px; bottom: 52px; width: 300px; padding: 6px 10px 8px; display: grid; gap: 5px; }
+#wg-legend > b { color: var(--gold); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; }
+#wg-legend select { width: 100%; }
+.wg-seg { display: flex; } .wg-seg button { flex: 1; border-radius: 0; } .wg-seg button.on { border-color: var(--gold); color: var(--gold); }
+.wg-sw { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; }
+.wg-sw li { display: flex; align-items: center; gap: 5px; } .wg-sw i { width: 14px; height: 10px; display: inline-block; border: 1px solid #000; } .wg-sw i.wg-ln { height: 0; border: 0; width: 22px; }
+.wg-vote-title { margin: 0; font-size: 12px; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }

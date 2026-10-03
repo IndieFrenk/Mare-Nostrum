@@ -118,7 +118,7 @@ export function diplomacyOverview(s: WorldState, me: string, o: OverviewOpts): D
     tension: { value, band: tensionBand(value), bands: TENSION_BANDS, from: typeof ev?.from === 'number' ? ev.from : null, causes: (ev?.causes ?? []).map((c) => ({ label: c.label, value: c.value })) },
     ultimatums,
     agreements: Object.values(s.agreements).filter((a) => a.parties.includes(me) && (a.status === 'active' || a.status === 'proposed')).sort((a, b) => a.id.localeCompare(b.id)).map(agreementView),
-    opinion: { bands: OPINION_BANDS, out, in: inn, exact },
+    opinion: { bands: OPINION_BANDS, thresholds: PARAMS.opinion.bands, out, in: inn, exact },
   };
 }
 

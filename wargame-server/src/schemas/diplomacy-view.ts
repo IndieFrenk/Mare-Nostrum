@@ -27,7 +27,7 @@ export interface DiplomacyOverview {
    * Opinione dell'Italia verso ogni Stato (`out`, valore: la sua riga) e degli Stati verso l'Italia (`in`, solo fascia: l'indice in `bands`; il
    * numero esatto solo con un accordo di intelligence, in `exact`). Chiavi: id dell'attore (fazione o ISO3). Mai le coppie tra terzi.
    */
-  opinion: { bands: readonly string[]; out: Record<string, number>; in: Record<string, BandIndex>; exact: Record<string, number> };
+  opinion: { bands: readonly string[]; /** soglie tra le fasce (4 valori): sotto la prima ostile, sopra l'ultima stretta */ thresholds: readonly number[]; out: Record<string, number>; in: Record<string, BandIndex>; exact: Record<string, number> };
 }
 
 export interface ActionRow {

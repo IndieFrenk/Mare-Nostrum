@@ -1,4 +1,5 @@
 import { api, ApiError, type LetterAction, type LetterTone } from './api-client';
+import { FACTIONS } from './layers/factions';
 import { emptyDraft, set, state } from './state/store';
 
 const LAYERS = ['units', 'contacts', 'crises', 'infrastructure', 'lanes', 'zones', 'control'];
@@ -48,6 +49,42 @@ export async function loadNation(iso3: string) {
   if (d) set({ nationDetail: { ...state.nationDetail, [iso3]: d } });
 }
 
+/** ISO3 di un attore (id di fazione o ISO3 di uno Stato senza fazione): dalla mappa delle fazioni o dal registro; i non statali (LBY_LNA) non ne hanno. */
+export const isoOfActor = (actor: string): string | null => FACTIONS[actor]?.iso ?? state.nations.find((n) => (n.factionId ?? n.iso3) === actor)?.iso3 ?? null;
+
+/**
+ * Scheda diplomatica del paese selezionato (opinione nei due sensi, trattati, azioni con costo, accettazione stimata): la calcola il server dalla Knowledge
+ * dell'Italia. Si ricarica a ogni refresh; se nel frattempo la selezione è cambiata il risultato si scarta.
+ */
+export async function loadCountry(actor: string | null) {
+  const id = state.campaignId;
+  if (!actor || !id || actor === state.campaign?.playerFaction) { set({ countryDiplo: null }); return; }
+  const v = await api.diploCountry(id, actor).catch(() => null);
+  if (state.country === actor && state.campaignId === id) set({ countryDiplo: v });
+}
+
+/** Apre (o chiude, con `null`) la scheda di un paese: i dati del registro e la scheda diplomatica arrivano subito dopo. */
+export function selectCountry(actor: string | null) {
+  set({ country: actor, countryDiplo: null });
+  if (!actor) return;
+  void loadCountry(actor);
+  const iso = isoOfActor(actor);
+  if (iso) void loadNation(iso);
+}
+
+let loadingReactions = false;
+/** Reazioni internazionali degli ultimi turni (eventi pubblici INTERNATIONAL_REACTIONS), lette solo quando si apre il pannello. */
+export async function loadReactions() {
+  const id = state.campaignId; const t = state.campaign?.currentTurn;
+  if (!id || !t || loadingReactions || state.reactions) return;
+  loadingReactions = true;
+  try {
+    const turns = [1, 2, 3, 4].map((i) => t - i).filter((n) => n >= 1);
+    const rows = await Promise.all(turns.map(async (turn) => (await api.events(id, turn).catch(() => [])).filter((e) => e.type === 'INTERNATIONAL_REACTIONS').map((event) => ({ turn, event }))));
+    set({ reactions: rows.flat() });
+  } finally { loadingReactions = false; }
+}
+
 export const openCampaign = (id: string) => guarded(async () => {
   remember(id);
   void loadNations();
@@ -91,16 +128,19 @@ export async function refresh() {
   if (!id) return;
   const campaign = await api.campaign(id);
   const t = campaign.currentTurn;
-  const [knowledge, overview, narrative, previous, ledger, catalog, events, cmo, letters, ...layers] = await Promise.all([
+  const [knowledge, overview, narrative, previous, ledger, catalog, events, cmo, letters, diplo, votes, ...layers] = await Promise.all([
     api.knowledge(id), api.overview(id), api.narrative(id, t), t > 1 ? api.narrative(id, t - 1) : Promise.resolve(null), api.ledger(id), api.catalog(id),
-    api.events(id, Math.max(1, t - 1)), api.cmo(id), api.letters(id), ...LAYERS.map((l) => api.layer(id, l)),
+    api.events(id, Math.max(1, t - 1)), api.cmo(id), api.letters(id), api.diploOverview(id), api.votes(id), ...LAYERS.map((l) => api.layer(id, l)),
   ]);
   const layerMap = Object.fromEntries(LAYERS.map((l, i) => [l, layers[i]!]));
   const alive = new Set(knowledge.ownUnits.filter((u) => u.status !== 'destroyed').map((u) => u.id));
   state.selection = state.selection.filter((x) => alive.has(x));
   state.selectedUnitId = state.selection[0] ?? null;
   if (state.selectedUnitId) layerMap.ranges = await api.layer(id, 'ranges', state.selectedUnitId);
-  set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, letters, layers: layerMap });
+  // il voto mostrato nella modalità «voto» resta lo stesso finché esiste, altrimenti l'ultimo
+  const voteId = votes.some((v) => v.id === state.voteId) ? state.voteId : votes[0]?.id ?? null;
+  set({ campaign, knowledge, overview, narrative: narrative.briefing ? narrative : null, previous: previous?.briefing ? previous : null, ledger, catalog, events, cmo, letters, diplo, votes, voteId, reactions: null, layers: layerMap });
+  if (state.country) void loadCountry(state.country);
 }
 
 export const createCampaign = (name: string, seed: string, opts: { debugGodView: boolean; cmoOnRequest: boolean; turnLength: 'week' | 'month' }) => guarded(async () => {
