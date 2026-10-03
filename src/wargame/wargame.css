@@ -16,10 +16,10 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 #wg-top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 10px;
   background: linear-gradient(#262a24, #121511); border-bottom: 2px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,.7); }
 .wg-flag { width: 58px; height: 38px; font-weight: 800; letter-spacing: .08em; background: linear-gradient(90deg, #1f7a3f 0 33%, #eee 33% 66%, #c33 66%); color: #111; text-shadow: 0 0 3px #fff; border: 2px solid var(--gold); }
-.wg-res { display: flex; flex-direction: column; padding: 2px 10px; border-left: 1px solid #3b3526; min-width: 76px; }
+.wg-res { display: flex; flex-direction: column; padding: 2px 8px; border-left: 1px solid #3b3526; min-width: 0; white-space: nowrap; }
 .wg-res small { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; } .wg-res b { color: var(--gold); font-size: 14px; }
 .wg-spacer { flex: 1; }
-.wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
+.wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; white-space: nowrap; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
 .wg-len { font-size: 11px; margin-right: 6px; }
 /* stato dei modelli: verde = rispondono, giallo = rispondono ma manca un modello o sono lenti, rosso = irraggiungibili */
 .wg-llm { display: flex; align-items: center; gap: 5px; margin-right: 6px; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 12px; padding: 3px 8px; color: var(--dim); cursor: help; }
@@ -147,4 +147,6 @@ body:has(#wg-legend) .wg-cc { max-height: max(200px, calc(100vh - 470px)); } /* 
 /* elenco degli Stati */
 .wg-states { list-style: none; margin: 6px 0 0; padding: 0; } .wg-states button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border-color: transparent; background: none; }
 .wg-states button.on { border-color: var(--gold); } .wg-states small { color: var(--dim); display: flex; align-items: center; gap: 4px; } .wg-states small i { width: 10px; height: 10px; display: inline-block; border: 1px solid #000; }
+/* barra in alto: tensione mondiale (quattro fasce, indicatore sul valore) */
+.wg-tension { min-width: 128px; } .wg-tbar { position: relative; display: flex; height: 5px; margin-top: 2px; } .wg-tbar i { display: block; height: 100%; opacity: .85; } .wg-tbar u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; box-shadow: 0 0 2px #000; }
 

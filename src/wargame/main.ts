@@ -45,6 +45,28 @@ function llmDot(s: UiState) {
   return h('button', { class: `wg-llm ${cls}`, title, 'aria-label': title, onclick: () => void checkLlm(true) }, h('i', {}), l.mode === 'mock' ? 'mock' : !l.reachable ? 'LLM spenti' : l.missing.length ? `${l.missing.length} mancanti` : 'LLM');
 }
 
+const n1 = (n: number) => n.toLocaleString('it-IT', { maximumFractionDigits: 1 });
+const sg = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${n1(Math.abs(v))}`;
+
+/** Capitale diplomatico: valore e rendita a turno; slot di «Migliorare le relazioni» e costo doppio delle azioni coercitive nel suggerimento. */
+function cdRes(d: NonNullable<UiState['diplo']>) {
+  const c = d.capital;
+  const title = [`Capitale diplomatico: ${n1(c.value)} CD`, `Rendita: ${n1(c.rent)} a settimana × ${c.weeks} a turno = +${n1(c.rent * c.weeks)} a turno`,
+    `Slot «Migliorare le relazioni»: ${c.improving.length}/${c.improvingSlots}${c.improving.length ? ` (${c.improving.map((x) => x.target).join(', ')})` : ''}, 1 CD a turno ciascuno`,
+    c.coerciveCost > 1 ? 'Tensione mondiale bassa: le azioni coercitive di una democrazia costano il doppio.' : null].filter(Boolean).join('\n');
+  return h('div', { class: 'wg-res', title, tabindex: '0', 'aria-label': title }, h('small', {}, 'CD'), h('b', {}, `${n1(c.value)} (+${n1(c.rent * c.weeks)}/turno)`));
+}
+
+/** Tensione mondiale 0–100: valore e fascia scritti, barra a quattro fasce con l'indicatore, cause dell'ultimo turno nel suggerimento. */
+function tensionRes(d: NonNullable<UiState['diplo']>) {
+  const t = d.tension;
+  const title = [`Tensione mondiale ${n1(t.value)}/100: ${t.band.label}. ${t.band.effect}`, ...t.bands.map((b) => `${b.from}–${b.to} ${b.label}: ${b.effect}`),
+    t.causes.length ? `Ultimo turno${t.from !== null ? ` (da ${n1(t.from)})` : ''}:\n${t.causes.map((c) => `  ${sg(c.value)} ${c.label}`).join('\n')}` : 'Nessuna variazione registrata nell\'ultimo turno.'].join('\n');
+  return h('div', { class: 'wg-res wg-tension', title, tabindex: '0', 'aria-label': title },
+    h('small', {}, 'Tensione mondiale'), h('b', { style: `color:var(--wg-tension-${t.band.index})` }, `${n1(t.value)} · ${t.band.label}`),
+    h('span', { class: 'wg-tbar' }, t.bands.map((b) => h('i', { style: `flex:${b.to - b.from + 1};background:var(--wg-tension-${b.index})` })), h('u', { style: `left:${Math.max(0, Math.min(100, t.value))}%` })));
+}
+
 function topbar(s: UiState) {
   const c = s.campaign!;
   const f = s.knowledge?.ownFaction;
@@ -54,7 +76,9 @@ function topbar(s: UiState) {
   const res = (label: string, value: string, title: string) => h('div', { class: 'wg-res', title }, h('small', {}, label), h('b', {}, value));
   return h('header', { id: 'wg-top' },
     h('button', { class: 'wg-flag', title: 'Italia', onclick: () => set({ country: 'ITA' }) }, 'ITA'),
-    f ? [res('FOED', meur(f.budget.discretionary), 'Fondo Operazioni & Emergenze Difesa'), res('Stabilità', String(f.stability), 'Stabilità interna'), res('Credibilità', String(f.credibility), 'Credibilità militare e diplomatica')] : null,
+    f ? res('FOED', meur(f.budget.discretionary), 'Fondo Operazioni & Emergenze Difesa') : null,
+    s.diplo ? [cdRes(s.diplo), tensionRes(s.diplo)] : null,
+    f ? [res('Stabilità', String(f.stability), 'Stabilità interna'), res('Credibilità', String(f.credibility), 'Credibilità militare e diplomatica')] : null,
     g ? [res('TTF', `${g.ttfEurMwh} €/MWh`, 'Prezzo gas'), res('Brent', `${g.brentUsd} $`, 'Prezzo petrolio'), res('Rotte', `${g.medShippingRisk}/100`, 'Rischio navigazione'), res('Migrazioni', `${g.migrationPressure}/100`, 'Pressione migratoria')] : null,
     h('div', { class: 'wg-spacer' }),
     h('div', { class: 'wg-date' }, h('b', {}, c.date), h('small', {}, `T${c.currentTurn} · ${c.phase}`)),

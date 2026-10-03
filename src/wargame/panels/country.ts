@@ -125,7 +125,8 @@ function actionsSection(s: UiState, v: CountryView, me: string) {
         h('b', { class: p.accept ? 'pos' : 'neg' }, `Accetterebbe: ${p.accept ? 'sì' : 'no'} (${signed(p.score)})`), p.exact ? null : h('small', { class: 'wg-dim' }, ' stima'),
         h('details', {}, h('summary', {}, 'perché'), h('ul', { class: 'wg-reasons' }, p.reasons.map((r) => reason(r)))))))),
     h('div', { class: 'wg-actions' },
-      h('button', { onclick: () => composeTo(v.actor), title: 'Lettera formale al capo di Stato' }, '✉ Lettera'),
+      // le lettere si compongono verso le fazioni (il pannello Lettere elenca solo quelle)
+      v.isFaction ? h('button', { onclick: () => composeTo(v.actor), title: 'Lettera formale al capo di Stato' }, '✉ Lettera') : null,
       v.isFaction ? h('button', { disabled: !phaseOk, onclick: () => set({ draft: { ...state.draft, diplomacy: [...state.draft.diplomacy, { id: newId('d'), kind: 'AID', target: v.actor, amount: 50, type: 'economic' }] }, validation: null, submitted: false }) }, 'Aiuto 50 M€') : null));
 }
 
