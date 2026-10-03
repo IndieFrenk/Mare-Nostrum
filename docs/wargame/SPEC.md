@@ -49,6 +49,7 @@
 ```
 
 Scelte tecnologiche (motivate, non cambiarle senza annotarlo in PROGRESS.md):
+
 - **Backend:** Node (versione da `.nvmrc`), TypeScript strict, Fastify, Zod (+ `zod-to-json-schema`), Vitest. Nessun database esterno: file JSON/JSONL con scritture atomiche.
 - **Perché JSON su file:** leggibile a mano, versionabile, diffabile tra rami, requisito esplicito del progetto. Astrarre dietro un'interfaccia `Store` per poter passare in futuro a SQLite senza toccare il motore.
 - **LLM:** un solo client OpenAI-compatible puntato a OmniRoute; ogni ruolo agente ha un alias di modello configurabile.
@@ -134,6 +135,7 @@ wargame-server/data/campaigns/{campaignId}/
 ```
 
 ### 5.2 Regole dello store
+
 - Scritture atomiche: scrivi `*.tmp` e poi `rename`. Lock per campagna (file `.lock` con PID + timeout) durante `advance`.
 - Ogni file ha `schemaVersion`. Validazione Zod in lettura e scrittura; migrazioni in `store/migrations/`.
 - `state/current.json` deve essere sempre ricostruibile: `snapshot(turn N) + reduce(events turn N+1)`. Scrivi un test che lo verifica.
@@ -171,6 +173,7 @@ OPEN → INTEL → BRIEFING → PLAYER_ORDERS → AI_DECISIONS → ADJUDICATION 
 Implementa questi tipi come **schemi Zod** in `wargame-server/src/schemas/` (i tipi TS si derivano con `z.infer`), esporta anche i JSON Schema in `wargame-server/schemas-json/` (script `npm run schemas:export`) e condividi i tipi con il frontend. I nomi dei campi sono vincolanti; puoi aggiungere campi, non rimuoverli.
 
 ### 7.1 Primitivi e identificatori
+
 ```ts
 type FactionId = string;   // "ITA","FRA","USA","GBR","DEU","GRC","ESP","TUR","RUS","CHN","EGY","ISR","IRN","ALG","TUN","LBY_GNU","LBY_LNA","NATO","EU","WAGNER_AC" ...
 type UnitId = string; type ContactId = string; type CrisisId = string; type EngagementId = string;
@@ -183,6 +186,7 @@ type Reliability = `${"A"|"B"|"C"|"D"|"E"|"F"}${1|2|3|4|5|6}`; // codice NATO Ad
 ```
 
 ### 7.2 Campagna
+
 ```ts
 interface Campaign {
   schemaVersion: 1;
@@ -208,6 +212,7 @@ type AgentRole = "faction_major" | "faction_minor" | "gm_narrator" | "intel_anal
 ```
 
 ### 7.3 Stato del mondo (verità di terra)
+
 ```ts
 interface WorldState {
   schemaVersion: 1; turn: Turn; date: string;
@@ -280,6 +285,7 @@ interface Zone { id: ZoneId; name: string; polygonRef: string; seaState: number;
 ```
 
 ### 7.4 Relazioni, accordi, crisi
+
 ```ts
 type RelationMatrix = Record<FactionId, Record<FactionId, Relation>>;
 interface Relation { trust: number /*-100..100*/; tension: number /*0-100*/; tradeDependency: number /*0-1*/; lastIncidentTurn: Turn | null; notes: string[] }
@@ -300,6 +306,7 @@ interface Crisis {
 ```
 
 ### 7.5 Economia e procurement
+
 ```ts
 interface LedgerEntry {
   turn: Turn; factionId: FactionId;
@@ -317,6 +324,7 @@ interface PendingDelivery { id: string; factionId: FactionId; itemId: string; qt
 ```
 
 ### 7.6 Ordini (schema unico umano/IA)
+
 ```ts
 interface FactionOrders {
   schemaVersion: 1; factionId: FactionId; turn: Turn;
@@ -351,6 +359,7 @@ interface PublicStatement { id: string; audience: "domestic" | "international" |
 ```
 
 ### 7.7 Conoscenza (fog of war)
+
 ```ts
 interface FactionKnowledge {
   schemaVersion: 1; factionId: FactionId; turn: Turn;
@@ -384,6 +393,7 @@ interface NewsItem { id: string; turn: Turn; outlet: string; outletFaction: Fact
 ```
 
 ### 7.8 Eventi, dadi, ingaggi
+
 ```ts
 interface GameEvent {
   id: string; turn: Turn; seq: number; phase: TurnPhase;
@@ -427,6 +437,7 @@ interface AfterActionReport {
 Nota: l'AAR contiene le perdite nemiche *dichiarate*; il motore le riconcilia con la verità di terra (le unità nemiche coinvolte ricevono gli esiti dichiarati se plausibili, altrimenti esito ridotto con tiro registrato) e produce `enemyLossesConfirmed` solo tramite ISR successivo.
 
 ### 7.9 Agenti: decisioni e memoria (il "path" dell'IA)
+
 ```ts
 interface AgentDecision {
   schemaVersion: 1; id: string; factionId: FactionId; turn: Turn;
@@ -453,6 +464,7 @@ interface LlmCall { id: string; turn: Turn; role: AgentRole; factionId?: Faction
 ```
 
 ### 7.10 Narrativa
+
 ```ts
 interface TurnNarrative {
   turn: Turn;
@@ -467,6 +479,7 @@ interface TurnNarrative {
 ## 8. SCENARIO INIZIALE `med-2026` E REGOLE DEL MOTORE
 
 ### 8.1 File dello scenario
+
 ```
 scenarios/med-2026/
 ├─ scenario.json          # data iniziale, turnLength, fazioni attive, crisi iniziali, indicatori globali
@@ -480,6 +493,7 @@ Fazioni minime: ITA (umano); IA maggiori: USA, FRA, TUR, RUS, CHN; IA minori: GR
 Crisi iniziali di esempio (latenti): sicurezza offshore Libia/ENI, instabilità Mar Rosso e rotte Suez, tensioni Egeo/Mediterraneo orientale, pressione migratoria dal Sahel, protezione cavi sottomarini.
 
 ### 8.2 OOB iniziale Italia (da `world.json`)
+
 - **Marina:** Portaerei Cavour con gruppo imbarcato (F-35B, AV-8B+); LHD Trieste; 8 FREMM classe Bergamini; 3 PPA classe Thaon di Revel; 2 cacciatorpediniere classe Orizzonte (Andrea Doria, Caio Duilio); 4 sottomarini U212A classe Todaro; Reggimento San Marco.
 - **Aeronautica:** 4 stormi Eurofighter (Trapani-Birgi, Grosseto, Gioia del Colle, Istrana); 2 gruppi F-35A/B (Amendola, Ghedi); 1 gruppo Tornado IDS/ECR (Ghedi, fine vita: readiness ridotta); 2 G550 CAEW (Pratica di Mare); flotta MQ-9 (Sigonella/Amendola); batterie SAMP/T.
 - **Forze speciali / intelligence:** COFS (9° Col Moschin, GOI, 17° Stormo) come unità `sof_team`; reti AISE come `IsrAsset` HUMINT su Mediterraneo allargato, Golfo, Balcani; Cosmo-SkyMed come `SAR_SAT`.
@@ -487,6 +501,7 @@ Crisi iniziali di esempio (latenti): sicurezza offshore Libia/ENI, instabilità 
 Le forze delle altre fazioni sono stime plausibili, marcate nel file come `"estimated": true`, da rifinire a mano.
 
 ### 8.3 Catalogo acquisti (`catalog.json`, costi in M€)
+
 | Item | Lotto | Costo | Lead time (turni) |
 |---|---|---|---|
 | MBDA Meteor | 10 | 25 | 0–1 |
@@ -509,6 +524,7 @@ Le forze delle altre fazioni sono stime plausibili, marcate nel file come `"esti
 Le munizioni con lead time "0–1": disponibili il turno successivo in base a un tiro di disponibilità industriale (probabilità configurabile, peggiora con ordini ripetuti nello stesso turno).
 
 ### 8.4 Regole di risoluzione (prima versione, tutte parametrizzate in `engine/params.ts`)
+
 - **Costi operativi:** ogni unità `deployed`/`transit` consuma `opCostPerTurn` (scala per turno settimanale/mensile); sortite di strike/ISR aggiungono costo per missione. Upkeep di base escluso dal FOED (è bilancio ordinario).
 - **Usura:** `usageHours` cresce con lo schieramento; oltre soglia la readiness cala e aumenta la probabilità di avaria; `REPAIR`/`STAND_DOWN` recupera readiness.
 - **Rilevamento:** per ogni coppia (sensore/ISR, unità) nella stessa zona o in copertura: `p = f(qualità sensore, firma, EMCON, meteo, distanza)`; esito determina confidenza ed errore in km del contatto. Sottomarini quasi invisibili senza ASW dedicato. Tutti i tiri in `rolls/`.
@@ -523,12 +539,14 @@ Le munizioni con lead time "0–1": disponibili il turno successivo in base a un
 ## 9. AGENTI LLM E BACKEND API
 
 ### 9.1 Client LLM (OmniRoute)
+
 - `LLM_BASE_URL` (default `http://localhost:20128/v1`), `LLM_API_KEY` (opzionale), alias modelli per ruolo in config campagna (es. `faction_major` → modello più capace, `faction_minor`/`order_parser` → modello leggero).
 - Output strutturato: usa `response_format: { type: "json_schema", ... }` se il modello lo supporta, altrimenti JSON mode + estrazione robusta del primo oggetto JSON. Validazione sempre con Zod.
 - Timeout, 2 retry con backoff, log completo in `llm-log/`. Se tutto fallisce: `fallback_doctrine` (ordini minimi coerenti con la postura, generati dal motore).
 - `MockLLMProvider`: risposte deterministiche derivate dal seed e dalla Knowledge; usato da test e da `--mock`.
 
 ### 9.2 Agenti
+
 | Agente | Input | Output | Vincoli |
 |---|---|---|---|
 | **FactionAgent** (uno per fazione IA) | profilo `factions/{ID}.md`, `FactionKnowledge`, `AgentMemory`, elenco azioni lecite con costi e unità disponibili, inbox diplomatica | `AgentDecision` | Può usare solo unità/asset propri e item del catalogo che può permettersi; niente conoscenza oltre la Knowledge |
@@ -544,6 +562,7 @@ Template dei prompt in `agents/prompts/*.md`, con variabili `{{...}}`. Il prompt
 Orchestrazione: agenti di fazione in parallelo con `maxConcurrentAgents` (default 2 per non saturare un modello locale), ordine deterministico di scrittura dei risultati. Progressi emessi via SSE.
 
 ### 9.3 API REST (Fastify, prefisso `/api/wg`)
+
 | Metodo | Path | Descrizione |
 |---|---|---|
 | GET | `/scenarios` | scenari disponibili |
@@ -632,7 +651,7 @@ Test e2e (Playwright, già presente nella repo) di un turno con mock, `docs/warg
 ---
 
 ## 12. FUORI SCOPE (per ora)
+
 Multigiocatore umano, politica interna dettagliata, integrazione automatica con CMO (niente scripting Lua: il flusso CMO è manuale via pacchetto/AAR), dati reali in tempo reale nella variante wargame, deploy cloud. Progetta però lo `Store` e il client LLM in modo che queste estensioni non richiedano di riscrivere il motore.
 
 ---
-

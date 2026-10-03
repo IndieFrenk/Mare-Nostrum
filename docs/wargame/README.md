@@ -3,6 +3,7 @@
 Wargame geopolitico a turni (Mediterraneo allargato, 2026). Tu comandi l'Italia; gli altri 25 Stati decidono con le regole deterministiche del motore (o, a scelta, con agenti LLM) e un LLM scrive lettere, notizie e briefing. Interfaccia derivata da World Monitor (AGPL-3.0).
 
 ## Installazione (≈5 minuti)
+
 ```bash
 nvm use                       # Node 24 (.nvmrc)
 npm ci --ignore-scripts       # dipendenze frontend
@@ -10,20 +11,24 @@ npm --prefix wargame-server install
 ```
 
 ## Primo turno con LLM finto (senza rete)
+
 ```bash
 WARGAME_MOCK=1 npm run wargame:all    # server :8787 + frontend su http://localhost:5173/wargame.html
 ```
+
 1. **Crea** una campagna.
 2. Leggi il **Briefing**, poi apri **Console Ordini**: scrivi una direttiva ("Manda la Bergamini a pattugliare il Canale di Sicilia e chiedi alla Tunisia più controlli") → *Interpreta* → *Valida*, oppure usa il costruttore.
 3. **Esegui turno**. Se un ingaggio supera la soglia CMO, apri **Coda CMO**: scarica il pacchetto, gioca su CMO e compila l'AAR (oppure *Risoluzione automatica*), poi **Prosegui**.
 
 ## Comandi dell'interfaccia
+
 - **Clic su una pedina**: seleziona (pila: apre l'elenco). **Maiusc+clic**: selezione multipla.
 - **Tasto destro su una zona di mare** con unità selezionate: ordine di pattugliamento (tratteggio oro sulla mappa).
 - **Clic su un paese**: per le fazioni, scheda con fiducia/tensione, stime e azioni diplomatiche rapide; per **tutti gli altri Stati del registro** (197 in tutto) scheda in sola lettura con i dati del paese (vedi «Dati del mondo»). Dipendenze e Antartide non rispondono.
 - In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi, **allineamento**) e globo/mappa piana. *Allineamento* colora ogni Stato per polo prevalente (blu Occidente, oro Cina, rosso Russia, grigio non allineato), più intenso = più allineato. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
 
 ## Con modelli reali (OmniRoute)
+
 Gli agenti parlano con un solo endpoint OpenAI-compatible (OmniRoute); per ogni ruolo scegli un modello, un alias o una combo di OmniRoute.
 ```bash
 cp wargame-server/.env.example wargame-server/.env   # imposta LLM_BASE_URL, LLM_MODEL e gli override per ruolo
@@ -38,7 +43,9 @@ npm run wargame:all
 - Consigli: in modalità `rules` un turno fa ~7–8 chiamate (3 di narrazione e notizie, 1 di intel, 3–4 lettere): con qwen3.5 4B/9B su 8 GB è circa un minuto, e i paesi in più non lo allungano. In modalità `llm` un modello da 30B+ con buon JSON per `FACTION_MAJOR` e `GM_NARRATOR`, 7–14B per gli altri ruoli; tieni `maxConcurrentAgents` a 2 (ogni turno: 14 decisioni di fazione + 14 riflessioni + 3–4 chiamate di narrazione e intel, ~36 chiamate).
 
 ## Stato dei modelli (pallino accanto a ▶)
+
 Il server prova `LLM_BASE_URL/models` (timeout 3 s, risultato in cache 30 s) e la UI lo mostra nella barra in alto, aggiornato ogni 60 s e prima di ▶; clic sul pallino = ricontrolla subito.
+
 - **Verde** «LLM»: i modelli rispondono e quelli configurati ci sono. **Giallo** «N mancanti»: il server risponde ma non elenca N modelli configurati (o la latenza supera 2 s): controlla i nomi nel tooltip (`ollama list`). **Rosso** «LLM spenti»: il server non risponde (PC con Ollama spento, indirizzo sbagliato, chiave rifiutata); ▶ è disattivato. «mock»: `WARGAME_MOCK=1`, nessuna rete.
 - Tooltip: indirizzo, latenza, errore, modello per ruolo (quelli della campagna), modelli mancanti, ora del controllo.
 - Se i modelli non rispondono, `advance` (▶), la creazione di una campagna, *Interpreta* e la bozza di lettera rispondono subito **503 `LLM_UNREACHABLE`** («I modelli non rispondono: accendi il PC con Ollama…») invece di giocare un turno tutto in dottrina.
@@ -46,7 +53,9 @@ Il server prova `LLM_BASE_URL/models` (timeout 3 s, risultato in cache 30 s) e l
 - API: `GET /api/wg/llm/status[?campaignId=…&fresh=1]` → `{ reachable, baseUrl, models: { ruolo: modello }, missing, listed, latencyMs, error, enforced, offlineAllowed, factionMode }`. In modalità `rules` `models` elenca solo i ruoli che usano ancora l'LLM (niente `faction_major`, `faction_minor`, `reflection`).
 
 ## Console Ordini: da testo a ordini
+
 *Interpreta* (`POST /campaigns/:id/orders/parse`) passa per quattro fasi; tutte tranne la seconda sono deterministiche.
+
 1. **Nomi → id, prima dell'LLM** (`engine/names.ts`): unità proprie per nome, nome breve, sigla e classe, con o senza articolo («la Bergamini», «l'Andrea Doria» → ITA-D553, «il Todaro» → ITA-S526, «F 590»), zone e paesi con gli alias italiani di `scenarios/<scenario>/names.json` («Mar Ionio»/«Ionio» → IONIO, «Tunisia» → TUN, «Libia orientale»/«Cirenaica»/«Bengasi» → LBY_LNA, «Libia occidentale»/«Tripolitania»/«Tripoli» → LBY_GNU). Il modello riceve il testo con l'id tra parentesi quadre («la Bergamini [ITA-F590]») e una tabella nome → id. Gli alias di più voci non si sostituiscono («Libia» da sola → ambiguità GNU/LNA).
 2. **LLM** (ruolo `ORDER_PARSER`): stesso elenco di campi degli ordini delle fazioni (`prompts/order-fields.md`), solo id delle AZIONI LECITE. **Regola principale** in testa al prompt: se il testo ha l'id di una tua unità tra parentesi quadre, un ordine in `orders.military` con quell'id; `zoneStances` solo se il testo non nomina unità («più presenza nel Canale di Sicilia»: il motore sceglie le unità come per le fazioni IA). Cyber solo se il testo parla di cyber/hacking, come CYBER_OP (non ISR) con `effect` dal testo: spionaggio → `espionage`, attacco/sabotaggio → `disruption`, difesa delle reti → `defense_hardening`. Niente lettere dal parser (hanno il loro pannello).
    - **Schema limitato** (niente JSON troncati): `maxItems` su ogni lista (4 ordini militari, 3 diplomatici, 1 dichiarazione, 3 ambiguità, 5 unità per ordine…) e `maxLength` su ogni testo libero (`message` 160, `ambiguities` 150, identificatori 24…), mandati al modello (`keepLengths`: con Ollama/llama.cpp la grammatica ferma il testo). Il caso peggiore dello schema (`maxJsonChars`: ~4.900 caratteri) sta sotto i 2000 token di `LLM_MAX_TOKENS_ORDER_PARSER` anche a 2,5 caratteri per token. In lettura le liste più lunghe si tagliano.
@@ -85,14 +94,18 @@ Un modello piccolo (es. `qwen3.5:4b`) non riesce a scrivere ordini con gli id di
 - Nel prompt le AZIONI LECITE includono `unitsPerSeaZone` (quante unità la fazione può impiegare in ogni zona di mare). Parametri in `PARAMS.stances`.
 
 ## Crisi: escalation e distensione
+
 Le crisi (0–10) salgono per deriva casuale (2d6), eventi casuali della zona e ordini (blocchi, strike, ingaggi) e scendono con la calma, gli accordi e la diplomazia (`engine/crises.ts`, parametri in `engine/params.ts`).
+
 - **Tetto dagli ordini**: al massimo +1 per crisi per turno dovuto agli ordini (`crisisOrderCapPerTurn`), qualunque sia il numero di blocchi, strike e ingaggi; le singole azioni continuano a spostare fiducia e tensione.
 - **Saturazione degli eventi casuali**: un incidente alza la crisi con probabilità 1 − escalation/12 (`randomEventSaturation`); l'evento resta nelle notizie e negli indicatori.
 - **Distensione**: ogni REASSURANCE, BACKCHANNEL, lettera cordiale o conciliante e accordo accettato tra due fazioni coinvolte in una crisi aggiunge +15% (fino a 3 azioni, `detenteCoolBonus`) alla probabilità che la crisi scenda di 1 nel turno dopo, anche se nel turno precedente era salita.
 - **Pressione migratoria**: tende a 15 + 6 × escalation di SAHEL_MIG, −10 per ogni accordo migratorio attivo (`PARAMS.migration`); le ondate casuali la spingono su per un turno e poi rientra.
 
 ## Lettere tra capi di Stato
+
 Pannello **✉ Lettere**: corrispondenza per interlocutore (con le non lette), lettere impaginate come lettere vere (carica del mittente, «Roma, 9 marzo 2026», oggetto, testo, firma con la carica, riservata/pubblica) e **Rispondi**.
+
 - **Scrivere**: destinatario, tono (cordiale, formale, conciliante, ferma, minacciosa), oggetto (≤ 120 caratteri), testo (≤ 1.800), riservata o pubblica. *Fai scrivere una bozza* chiede al consigliere (ruolo `DIPLOMAT`) un testo da rivedere. La lettera entra negli ordini del turno (al massimo 2 per turno) e parte con ▶.
 - **Effetti** (li decide il motore, non l'LLM): il tono sposta fiducia e tensione (conciliante e cordiale le distendono, ferma e minacciosa le alzano); una lettera minacciosa è una minaccia e, se non ha seguito entro due turni, costa credibilità; una lettera pubblica è anche una dichiarazione e finisce nelle notizie.
 - **Risposte**: ogni fazione IA risponde nel turno successivo alle lettere del giocatore (una per fazione per turno, anche le minori nei turni «senza IA»), coerente con profilo, memoria e decisione del turno. Le fazioni scrivono anche di propria iniziativa: al massimo `WARGAME_LETTERS_PER_TURN` lettere per turno (predefinito 3; si cambia anche in corsa con `POST /config {"agentCadence": {"lettersPerTurn": 1}}`).
@@ -112,6 +125,7 @@ Il registro di tutti gli Stati (193 ONU + Santa Sede, Palestina, Taiwan e Kosovo
 - **Mappa**: `scripts/geo-iso-overrides.json` completa gli ISO3 di `countries.geojson` (una ventina di Stati avevano il campo vuoto); `geo:build` lo applica. Resta senza poligono solo Tuvalu; i territori non Stato (Groenlandia, Porto Rico, Antartide…) restano grigi e non cliccabili.
 
 ## Comandi
+
 | Comando | Cosa fa |
 |---|---|
 | `npm run wargame:server` | API su `:8787` (`WARGAME_MOCK=1` per il mock, `WARGAME_DATA_DIR` per il DB) |
@@ -134,4 +148,5 @@ Il database è in `wargame-server/data/campaigns/{id}/` (JSON/JSONL leggibili, v
 Aggiungi `scenarios/<scenario>/factions/<ID>.md` con: interessi (riga `Interessi:` → obiettivi iniziali della memoria), dottrina, linee rosse, stile, propensione al rischio. Poi aggiungi la fazione in `world.json` (`factions`, `controller: "scripted"` per le regole o `"ai"` per un agente LLM in modalità `llm`, `agentRole`, `leaderTitle` solo con la carica, `capital`, e il blocco `policy` con la `_nota` del perché), le sue unità (solo dove pesa), le relazioni in `relations.pairs`, gli alias italiani in `names.json` (`factions` e `units`) e colore, `iso` ed etichetta in `src/wargame/layers/factions.ts` (togliendo il paese da `EU_ISO` se è un membro UE).
 
 ## Nuovo scenario
+
 Copia `scenarios/med-2026/` e modifica: `scenario.json` (data, turno, indicatori), `geo-src.json` (linee di separazione dei mari, poi `geo:build`), `world.json` (zone con `terrain`, obiettivi e linee rosse delle fazioni, basi, infrastrutture, unità compatte `{id, factionId, name, classId, count, homeBaseId}`, relazioni, crisi, accordi), `catalog.json` (classi e acquisti), `event-tables.json`, `geo/*.geojson`. Le linee rosse usano la mini-DSL di `engine/conditions.ts`.

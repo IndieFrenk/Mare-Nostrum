@@ -18,6 +18,9 @@
         },
         {
           "path": "src/services/runtime.ts"
+        },
+        {
+          "path": "src/wargame/api-client.ts"
         }
       ]
     },

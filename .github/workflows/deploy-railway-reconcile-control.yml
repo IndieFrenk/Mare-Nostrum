@@ -44,7 +44,8 @@ jobs:
   deploy:
     name: Wrangler deploy
     needs: [unit-test]
-    if: github.ref == 'refs/heads/main'
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: ${{ github.repository == 'koala73/worldmonitor' && (github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

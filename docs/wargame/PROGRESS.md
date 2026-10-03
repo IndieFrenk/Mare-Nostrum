@@ -1,6 +1,7 @@
 # PROGRESS
 
 ## Fatto
+
 - **Fase 0** — Import di WorldMonitor, `RECON.md`, `SPEC.md`, `CLAUDE.md`.
 - **Fasi 1–4** — `wargame-server/`: schemi Zod + `schemas-json/`, `JsonStore` (scritture atomiche, lock, snapshot, fork), RNG mulberry32 con cursore e log dei tiri, scenario `med-2026`, motore event-sourced, agenti (OmniRoute/mock/replay), API Fastify + SSE + GeoJSON, CLI `sim`. 23 test Vitest verdi.
 - **Fase 5** — `wargame.html` + `src/wargame/` (mappa MapLibre, simboli `milsymbol`, 11 pannelli, SSE). Typecheck root pulito; biome e safe-html ok.
@@ -21,6 +22,7 @@
 - **Tutti gli Stati del mondo: dati e scheda paese** (settore 1 di 6 della diplomazia, `docs/wargame/DIPLOMAZIA.md`): registro di 197 Stati in `scenarios/_world/` (`nations.json`, `institutions.json` con 32 istituzioni e il CdS 2026, `pairs.json` con 106 coppie storiche direzionali), schema in `schemas/nations.ts`, `npm run world:build` (sorgenti leggibili in `scripts/world-src/`, Banca Mondiale opzionale), `engine/world-data.ts` e API `GET /nations` e `/nations/:iso3`; sulla mappa tutti gli Stati sono cliccabili con scheda in sola lettura e c'è la modalità «Allineamento»; ISO3 mancanti di 19 Stati colmati in `countries.geojson`. Nessuna regola di gioco cambia: replay identico. 153 test backend verdi.
 
 ## Decisioni
+
 - Ogni mutazione dello stato è un `GameEvent` applicato da `engine/reducer.ts`: `state(N) = snapshot(N-1) + events(N)` (test dedicato).
 - Aggiunti campi/tipi (ammessi dalla spec): `WorldState.rngCursor`, `Faction.crossedRedLines`, `Base.zoneId`, `Infrastructure.zoneId`, `Zone.center`, `Contact.zoneId`, `CatalogItem.platformClassId`, eventi `UNIT_CREATED`, `FACTION_CHANGED`, `INDICATORS_CHANGED`, `TURN_ADVANCED`, `TURN_CLOSED`, `STATEMENT`.
 - Verità dei contatti salvata a parte in `truth/turn-N.json` (solo motore; serve a STRIKE/CMO dopo una pausa).

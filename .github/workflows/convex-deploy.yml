@@ -49,6 +49,8 @@ concurrency:
 
 jobs:
   changes:
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: github.repository == 'koala73/worldmonitor'
     # Distinct check-run name — see the note in typecheck.yml (#5822). This
     # workflow is push-to-main only, so it never competes on a PR head SHA, but
     # the deploy gate evaluates main pushes too and `changes` is one of its

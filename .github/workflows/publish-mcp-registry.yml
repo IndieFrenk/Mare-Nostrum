@@ -41,7 +41,8 @@ concurrency:
 
 jobs:
   publish:
-    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/main' }}
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: ${{ github.repository == 'koala73/worldmonitor' && (github.event_name == 'release' || github.ref == 'refs/heads/main') }}
     environment: mcp-registry-publish
     runs-on: ubuntu-latest
     timeout-minutes: 10

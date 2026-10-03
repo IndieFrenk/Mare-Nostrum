@@ -26,6 +26,8 @@ permissions:
 
 jobs:
   reconcile:
+    # Production-only (upstream secrets/infra): skipped in forks instead of failing.
+    if: github.repository == 'koala73/worldmonitor'
     name: Reconcile registry to live configuration
     runs-on: ubuntu-latest
     # Apply: three bounded attempts (5 min each) plus 20 s of backoff. Verify:
