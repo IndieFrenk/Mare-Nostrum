@@ -1,10 +1,12 @@
 import { EventEmitter } from 'node:events';
 import type { FastifyInstance } from 'fastify';
 import { ZodError, z } from 'zod';
-import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody } from '../schemas/index.js';
+import { AfterActionReport, LETTER_LIMITS, LetterTone, OrdersBody, type Campaign, type GameEvent, type VoteView } from '../schemas/index.js';
 import { letterVisibleTo } from '../engine/knowledge.js';
 import { cmoText } from '../engine/cmo.js';
 import { diploCatalogView } from '../engine/diplo-actions.js';
+import { countryView, diplomacyOverview, voteViews } from '../engine/diplo-view.js';
+import { addDays } from '../engine/geo.js';
 import { listScenarios, loadScenario } from '../engine/scenario.js';
 import { worldData } from '../engine/world-data.js';
 import { factionModeOf, GameError, type Engine } from '../engine/turn-machine.js';
@@ -109,6 +111,49 @@ export function registerRoutes(app: FastifyInstance, engine: Engine, llm: LlmSta
       pendingCmo: Object.values(s.engagements).filter((e) => e.status === 'pending_cmo').map((e) => e.id),
       infrastructure: Object.values(s.infrastructure).map((i) => ({ id: i.id, name: i.name, type: i.type, status: i.status, flowShareIta: i.flowShareIta })),
     };
+  });
+  /**
+   * Viste diplomatiche del giocatore (sola lettura, engine/diplo-view.ts): niente che non stia nella sua Knowledge o non sia pubblico.
+   * `overview`: CD, tensione mondiale con le cause, ultimatum, trattati e l'opinione verso/di tutti gli Stati (valore, fascia). `country`: la scheda
+   * di uno Stato (id di fazione o ISO3). `institutions/votes`: le votazioni pubbliche con l'esito per Stato (`?turn=` o le ultime 20).
+   */
+  const lastTensionEvent = async (c: Campaign): Promise<GameEvent | undefined> => {
+    for (let t = c.currentTurn; t >= Math.max(0, c.currentTurn - 5); t--) {
+      const e = (await store.getEvents(c.id, t)).filter((x) => x.type === 'WORLD_TENSION_CHANGED' && x.visibility === 'public').pop();
+      if (e) return e;
+    }
+    return undefined;
+  };
+  app.get<Id>(`${P}/campaigns/:id/diplomacy/overview`, async (req) => {
+    const c = await store.getCampaign(req.params.id);
+    return diplomacyOverview(await store.getState(c.id), c.playerFaction, { turnLength: c.turnLength, tensionEvent: await lastTensionEvent(c) });
+  });
+  app.get<Id & { Params: { actor: string } }>(`${P}/campaigns/:id/diplomacy/country/:actor`, async (req) => {
+    const c = await store.getCampaign(req.params.id);
+    const v = countryView(await store.getState(c.id), c.playerFaction, worldData().actorOf(req.params.actor.toUpperCase()), c.turnLength);
+    if (!v) throw new GameError('NOT_FOUND', `${req.params.actor} non è uno Stato con cui si fa diplomazia`);
+    return v;
+  });
+  /** Votazioni di un turno chiuso: non cambiano più, quindi in memoria (la data si ricava dal turno corrente). */
+  const voteCache = new Map<string, VoteView[]>();
+  const votesOfTurn = async (c: Campaign, t: number) => {
+    const key = `${c.id}:${t}`;
+    const hit = voteCache.get(key);
+    if (hit) return hit;
+    const votes = voteViews(await store.getEvents(c.id, t), (x) => addDays(c.date, (x - c.currentTurn) * (c.turnLength === 'week' ? 7 : 30)));
+    if (t < c.currentTurn) voteCache.set(key, votes);
+    return votes;
+  };
+  const RECENT_VOTES = 20;
+  app.get<Id & { Querystring: { turn?: string } }>(`${P}/campaigns/:id/institutions/votes`, async (req) => {
+    const c = await store.getCampaign(req.params.id);
+    if (req.query.turn !== undefined) {
+      const t = Number(req.query.turn);
+      return Number.isInteger(t) && t >= 0 && t <= c.currentTurn ? (await votesOfTurn(c, t)).slice().reverse() : [];
+    }
+    const out: VoteView[] = [];
+    for (let t = c.currentTurn; t >= 0 && out.length < RECENT_VOTES; t--) out.push(...(await votesOfTurn(c, t)).slice().reverse());
+    return out.slice(0, RECENT_VOTES);
   });
   app.get<Id & { Params: { turn: string } }>(`${P}/campaigns/:id/narrative/:turn`, async (req) => {
     const c = await store.getCampaign(req.params.id);
