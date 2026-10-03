@@ -1,5 +1,6 @@
 import type { AfterActionReport, AgentRole, AgentDecision, AgentMemory, Campaign, Contact, DiploLetter, DiploMessage, LetterAction, LetterTone, FactionKnowledge, FactionOrders, GameEvent, IntelReport, LlmCall, NewsItem, OrdersBody, TurnNarrative, WorldState } from '../schemas/index.js';
-import { FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
+import { isDeepStrictEqual } from 'node:util';
+import { AgentDecision as AgentDecisionSchema, FactionOrders as FactionOrdersSchema, LETTER_LIMITS } from '../schemas/index.js';
 import { leaderOf } from './diplomacy.js';
 import { letterTriggers, type LetterTriggerKind } from './letter-triggers.js';
 import type { JsonStore } from '../store/json-store.js';
@@ -19,9 +20,10 @@ import { Rng } from './rng.js';
 import { loadScenario, type Scenario } from './scenario.js';
 import { validateOrders } from './validators.js';
 import { finishParsed, type ParsedDirective } from './parse-review.js';
-import { AGENT_ROLES, cadenceDefaults, llmDefaults } from '../config.js';
-import { doctrineDecision } from '../agents/faction-agent.js';
-import { quickMemory } from '../agents/reflection.js';
+import { AGENT_ROLES, cadenceDefaults, factionModeDefault, llmDefaults, type FactionMode } from '../config.js';
+import { doctrineDecision, rulesDecision } from '../agents/faction-agent.js';
+import { quickMemory, rulesMemory } from '../agents/reflection.js';
+import { incidentsFrom } from './knowledge.js';
 import { checkThreats, confirmEnemyLosses, contactEvents, updateObjectives } from './review.js';
 
 /** Una lettera da scrivere (una chiamata al ruolo diplomat): il motore sceglie chi scrive a chi, l'LLM solo testo e tono. */
@@ -48,6 +50,8 @@ export interface AgentsPort {
   /** Bozza di lettera per il giocatore (non cambia lo stato). */
   draftLetter(job: LetterJob): Promise<LetterResult>;
   drainLlmCalls(): LlmCall[];
+  /** Solo in replay: la decisione registrata, per verificare che quella ricalcolata a regole sia identica. */
+  recordedDecision?(turn: number, factionId: string): Promise<AgentDecision | null>;
 }
 
 type LlmRoleConfig = NonNullable<Campaign['config']['llm']['diplomat']>;
@@ -60,6 +64,19 @@ type Cadence = Campaign['config']['agentCadence'];
 export interface CreateOpts { scenarioId: string; name: string; seed?: string; turnLength?: 'week' | 'month'; id?: string; config?: Omit<Partial<Campaign['config']>, 'agentCadence'> & { agentCadence?: Partial<Cadence> } }
 /** Cadenza della campagna con i default per i campi aggiunti dopo (campagne vecchie). */
 export const cadenceOf = (c: Campaign): Cadence => Object.assign({ minorEvery: 1, reflectEvery: 1, lettersPerTurn: 3 }, c.config.agentCadence);
+/** Modalità delle fazioni della campagna (le campagne vecchie senza il campo: quella del server). */
+export const factionModeOf = (c: Campaign): FactionMode => c.config.factionMode ?? factionModeDefault();
+/** Fazioni non giocate dall'umano che decidono (i blocchi reagiscono solo alle consultazioni). */
+export const agentFactions = (s: WorldState) => Object.values(s.factions).filter((f) => f.controller !== 'human' && f.kind !== 'bloc').map((f) => f.id).sort();
+/**
+ * Chi decide come: in modalità `rules` tutte a regole; in modalità `llm` l'LLM per le fazioni con controller «ai» e le regole per
+ * quelle «scripted» (i paesi aggiunti senza agente LLM: non allungano il turno).
+ */
+export function deciders(s: WorldState, c: Campaign): { llm: string[]; rules: string[] } {
+  const all = agentFactions(s);
+  if (factionModeOf(c) === 'rules') return { llm: [], rules: all };
+  return { llm: all.filter((f) => s.factions[f]!.controller === 'ai'), rules: all.filter((f) => s.factions[f]!.controller !== 'ai') };
+}
 
 
 export class Engine {
@@ -77,12 +94,15 @@ export class Engine {
         fogLevel: 'realistic', debugGodView: false, cmoThreshold: { majorShips: 1, aircraftPerSide: 4, missileSalvo: 8 },
         llm: llmDefaults(),
         maxConcurrentAgents: 2, cmoOnRequest: false, ...o.config, agentCadence: { ...cadenceDefaults(), ...o.config?.agentCadence },
+        factionMode: o.config?.factionMode ?? factionModeDefault(),
       },
     };
     const s = sc.world;
+    // modalità a regole: le fazioni IA diventano «scripted» (le decide il motore, engine/policy.ts)
+    if (campaign.config.factionMode === 'rules') for (const f of Object.values(s.factions)) if (f.controller === 'ai') f.controller = 'scripted';
     await this.store.saveState(id, s, 0);
     await this.store.appendLedger(id, Object.values(s.factions).filter((f) => f.kind !== 'bloc').map((f) => ({ turn: 0, factionId: f.id, category: 'income' as const, amount: f.budget.discretionary, balanceAfter: f.budget.discretionary, ref: 'initial', note: 'Dotazione iniziale' })));
-    for (const f of Object.values(s.factions).filter((f) => f.controller === 'ai')) {
+    for (const f of agentFactions(s).map((id) => s.factions[id]!)) {
       const goals = (sc.profiles[f.id] ?? '').match(/Interessi:\s*(.+)/)?.[1].split(/[,;]\s*/).slice(0, 5) ?? [];
       await this.store.saveMemory(id, { schemaVersion: 1, factionId: f.id, updatedTurn: 0, strategicGoals: goals, commitments: [], grievances: [], lessons: [], relationshipNotes: {}, rollingSummary: '' });
     }
@@ -170,7 +190,7 @@ export class Engine {
     const inbox = prevEvents.filter((e) => e.type === 'DIPLO_MESSAGE').map((e) => (e.payload as { message: DiploMessage }).message);
     const news = (await this.store.getNarrative(c.id, ctx.turn - 1))?.news ?? [];
     const letters = (await Promise.all([3, 2, 1].filter((d) => ctx.turn - d >= 1).map((d) => this.store.getLetters(c.id, ctx.turn - d)))).flat();
-    return { inbox, news, letters };
+    return { inbox, news, letters, prevEvents };
   }
 
   private async intel(ctx: TurnCtx, c: Campaign) {
@@ -204,22 +224,33 @@ export class Engine {
 
   private async decisions(ctx: TurnCtx, c: Campaign, progress: (m: Record<string, unknown>) => void) {
     const sc = loadScenario(c.scenarioId);
-    const ai = Object.values(ctx.state.factions).filter((f) => f.controller === 'ai').map((f) => f.id).sort();
+    const who = deciders(ctx.state, c);
     const inputs: DecideInput[] = [];
-    for (const f of ai) {
+    for (const f of [...who.llm, ...who.rules].sort()) {
       const knowledge = (await this.store.getKnowledge(c.id, f, ctx.turn))!;
-      const memory = (await this.store.getMemory(c.id, f))!;
+      const memory = (await this.store.getMemory(c.id, f)) ?? { schemaVersion: 1 as const, factionId: f, updatedTurn: 0, strategicGoals: [], commitments: [], grievances: [], lessons: [], relationshipNotes: {}, rollingSummary: '' };
       inputs.push({ campaign: c, factionId: f, knowledge, memory, profile: sc.profiles[f] ?? '', state: ctx.state, scenario: sc });
     }
-    // cadenza: le fazioni minori saltano l'IA a turni alterni (sfalsate), con ordini di dottrina deterministici
+    // a regole: nessuna chiamata LLM, dado registrato del motore, in ordine di id (stessa sequenza di tiri nel replay)
+    const byRules: AgentDecision[] = [];
+    for (const i of inputs.filter((x) => who.rules.includes(x.factionId))) {
+      const d = rulesDecision(i, ctx.rng);
+      const saved = await this.agents.recordedDecision?.(ctx.turn, i.factionId);
+      if (saved && !isDeepStrictEqual(rulesFingerprint(saved), rulesFingerprint(AgentDecisionSchema.parse(JSON.parse(JSON.stringify(d)))))) throw new GameError('REPLAY_DIVERGENT', `decisione a regole di ${i.factionId} al turno ${ctx.turn} diversa da quella registrata`);
+      progress({ agent: i.factionId, status: 'regole' });
+      byRules.push(d);
+    }
+    // cadenza (modalità llm): le fazioni minori saltano l'IA a turni alterni (sfalsate), con ordini di dottrina deterministici
+    const withAi = inputs.filter((x) => who.llm.includes(x.factionId));
     const cad = cadenceOf(c);
-    const minors = ai.filter((f) => ctx.state.factions[f]!.agentRole === 'faction_minor');
+    const minors = who.llm.filter((f) => ctx.state.factions[f]!.agentRole === 'faction_minor');
     const withLlm = (f: string) => { const i = minors.indexOf(f); return i < 0 || (cad.minorEvery > 0 && (ctx.turn + i) % cad.minorEvery === 0); };
-    const skipped = inputs.filter((i) => !withLlm(i.factionId)).map((i) => {
+    const skipped = withAi.filter((i) => !withLlm(i.factionId)).map((i) => {
       progress({ agent: i.factionId, status: 'dottrina (turno senza IA)' });
       return doctrineDecision(i, `Turno senza IA (cadenza 1 ogni ${cad.minorEvery || '∞'}): ordini di dottrina.`);
     });
-    const decisions = [...skipped, ...await this.agents.decideAll(inputs.filter((i) => withLlm(i.factionId)), (factionId, status) => progress({ agent: factionId, status }))];
+    const called = withAi.filter((i) => withLlm(i.factionId));
+    const decisions = [...byRules, ...skipped, ...(called.length ? await this.agents.decideAll(called, (factionId, status) => progress({ agent: factionId, status })) : [])];
     await this.letters(ctx, c, decisions, inputs, progress);
     for (const d of decisions.sort((a, b) => a.factionId.localeCompare(b.factionId))) {
       await this.store.saveDecision(c.id, d);
@@ -301,13 +332,15 @@ export class Engine {
     const narrative = (await this.store.getNarrative(c.id, ctx.turn))!;
     await this.store.saveNarrative(c.id, ctx.turn, { ...narrative, debriefing, news });
     const cad = cadenceOf(c);
-    const ai = Object.values(ctx.state.factions).filter((f) => f.controller === 'ai').map((f) => f.id).sort();
-    for (const f of Object.values(ctx.state.factions).filter((f) => f.controller === 'ai')) {
-      const memory = (await this.store.getMemory(c.id, f.id))!;
-      const decision = await this.store.getDecision(c.id, ctx.turn, f.id);
-      const m = (ctx.turn + ai.indexOf(f.id)) % cad.reflectEvery === 0
-        ? await this.agents.reflect({ campaign: c, factionId: f.id, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f.id)), memory })
-        : quickMemory(memory, decision, ctx.turn);
+    const who = deciders(ctx.state, c);
+    for (const f of [...who.llm, ...who.rules].sort()) {
+      const memory = (await this.store.getMemory(c.id, f)) ?? { schemaVersion: 1 as const, factionId: f, updatedTurn: 0, strategicGoals: [], commitments: [], grievances: [], lessons: [], relationshipNotes: {}, rollingSummary: '' };
+      const decision = await this.store.getDecision(c.id, ctx.turn, f);
+      // a regole: riassunto deterministico (cosa ho subito, cosa ho fatto), nessuna chiamata reflection
+      const m = who.rules.includes(f) ? rulesMemory(memory, decision, incidentsFrom(events, f), ctx.turn)
+        : (ctx.turn + who.llm.indexOf(f)) % cad.reflectEvery === 0
+          ? await this.agents.reflect({ campaign: c, factionId: f, decision, visibleEvents: events.filter((e) => ctx.isVisibleTo(e, f)), memory })
+          : quickMemory(memory, decision, ctx.turn);
       await this.store.saveMemory(c.id, { ...m, updatedTurn: ctx.turn });
     }
   }
@@ -405,4 +438,9 @@ export class Engine {
     await this.store.saveCampaign(c);
     return c;
   }
+}
+
+/** Parte di una decisione a regole che il replay ricalcola (le lettere si aggiungono dopo, dal ruolo diplomat o dal registro). */
+function rulesFingerprint(d: AgentDecision) {
+  return { zoneStances: d.zoneStances, rationale: d.rationale, letterIntents: d.letterIntents, stanceOrders: d.stanceOrders, military: d.orders.military, diplomacy: d.orders.diplomacy.filter((x) => x.kind !== 'LETTER') };
 }

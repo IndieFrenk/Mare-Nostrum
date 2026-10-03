@@ -9,11 +9,14 @@ import type { LlmCall } from '../schemas/index.js';
 import type { LlmProvider } from './llm-client.js';
 import { template } from './prompts.js';
 import { callStructured } from './repair.js';
+import { decideByRules } from '../engine/policy.js';
+import type { Rng } from '../engine/rng.js';
 
 /** Tetti per turno: i modelli piccoli a volte ripetono ordini all'infinito finché finiscono i token (JSON troncato). */
 export const ORDER_CAPS = { military: 8, diplomacy: 4, procurement: 3, statements: 2, threats: 5, options: 4, letterIntents: 2, zoneStances: 4 } as const;
 // schema inviato al modello: maxItems ferma la generazione (grammatica di Ollama/llama.cpp)
-const DecisionForModel = DecisionOutput.extend({
+// le motivazioni (rationale) sono solo del decisore a regole: non si chiedono al modello
+const DecisionForModel = DecisionOutput.omit({ rationale: true }).extend({
   threats: DecisionOutput.shape.threats.unwrap().max(ORDER_CAPS.threats).default([]),
   optionsConsidered: DecisionOutput.shape.optionsConsidered.unwrap().max(ORDER_CAPS.options).default([]),
   zoneStances: z.array(ZoneStance).max(ORDER_CAPS.zoneStances).default([]),
@@ -77,22 +80,24 @@ export function doctrineDecision(i: DecideInput, reason: string): AgentDecision 
     situationAssessment: reason, threats: [], optionsConsidered: [], privateIntent: 'mantenere la postura',
     orders: { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: 'fallback_doctrine', ...doctrineOrders(i) }, confidence: 0.3,
     validation: { valid: true, errors: [], repairAttempts: 0, fallbackUsed: false },
-    usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, letterIntents: [], letters: [], zoneStances: [], stanceOrders: [],
+    usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, letterIntents: [], letters: [], zoneStances: [], stanceOrders: [], rationale: [],
   };
 }
 
-export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInput): Promise<AgentDecision> {
+const roleOf = (i: DecideInput) => (i.knowledge.ownFaction.agentRole === 'faction_major' ? 'faction_major' as const : 'faction_minor' as const);
+
+/**
+ * Dalla decisione (dell'LLM o delle regole) agli ordini registrati, uguale per tutte le fazioni non umane: posture per zona
+ * tradotte in ordini dal motore (engine/stances.ts) PRIMA della validazione, poi lo stesso validatore e lo stesso scarto degli
+ * ordini impossibili del giocatore. `check` va passato a callStructured (o chiamato direttamente), `finish` costruisce l'AgentDecision.
+ */
+export function decisionPipeline(i: DecideInput) {
   const k = i.knowledge;
   const f = k.ownFaction;
-  const role = f.agentRole === 'faction_major' ? 'faction_major' : 'faction_minor';
-  const cfg = i.campaign.config.llm[role];
-  const legal = legalActions(k, i.scenario);
   const refs = new Set(k.contacts.map((c) => c.id));
   // Gli ordini impossibili (unità/asset/zone inesistenti, unità già impegnata…) vengono scartati uno per uno, come farebbe
   // uno stato maggiore, invece di buttare l'intera decisione e chiedere un «repair» al modello: restano nel registro.
   const dropped: string[] = [];
-  // Posture per zona → ordini militari, PRIMA della validazione: il motore sceglie le unità (engine/stances.ts), poi gli ordini
-  // tradotti passano dallo stesso validatore e dallo stesso scarto degli ordini impossibili di quelli scritti dal modello.
   const origins = new WeakMap<object, StanceOrigin>();
   const stanceNotes = new WeakMap<object, string[]>();
   const translate = (d: DecisionOutputT) => {
@@ -136,25 +141,59 @@ export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInp
     }
     return errorsOf();
   };
+  const finish = (out: DecisionOutputT | null, m: { model: string; promptHash: string; usage: AgentDecision['usage']; repairAttempts: number; errors: string[] }): AgentDecision => {
+    const orders: FactionOrders = { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: out ? 'ai' : 'fallback_doctrine', ...(out ? normalize(out.orders, i.factionId, k.turn) : doctrineOrders(i)) };
+    // registro: quale ordine (con l'id definitivo) viene da quale postura; gli ordini scartati dal validatore non ci sono
+    const stanceOrders = out ? out.orders.military.flatMap((o, j) => { const g = origins.get(o); return g ? [{ orderId: orders.military[j]!.id, ...g }] : []; }) : [];
+    const notes = out ? (stanceNotes.get(out) ?? []).map((n) => `postura — ${n}`) : [];
+    return {
+      schemaVersion: 1, id: `DEC-${k.turn}-${i.factionId}`, factionId: i.factionId, turn: k.turn, model: m.model, role: roleOf(i), promptHash: m.promptHash,
+      knowledgeRef: `knowledge/${i.factionId}/turn-${String(k.turn).padStart(4, '0')}.json`, memoryRef: `memory/${i.factionId}.json@${i.memory.updatedTurn}`,
+      situationAssessment: out?.situationAssessment ?? 'Fallback dottrinale: nessuna decisione valida dal modello.',
+      threats: out?.threats ?? [], optionsConsidered: out?.optionsConsidered ?? [], privateIntent: out?.privateIntent ?? 'mantenere la postura',
+      orders, confidence: out?.confidence ?? 0.2, letterIntents: out?.letterIntents ?? [], letters: [], zoneStances: out?.zoneStances ?? [], stanceOrders,
+      rationale: out?.rationale ?? [],
+      validation: { valid: !!out, errors: [...notes, ...dropped.map((e) => `scartato — ${e}`), ...m.errors], repairAttempts: m.repairAttempts, fallbackUsed: !out },
+      usage: m.usage,
+    };
+  };
+  return { check, finish };
+}
+
+export async function decide(provider: LlmProvider, log: LlmCall[], i: DecideInput): Promise<AgentDecision> {
+  const k = i.knowledge;
+  const f = k.ownFaction;
+  const role = roleOf(i);
+  const cfg = i.campaign.config.llm[role];
+  const legal = legalActions(k, i.scenario);
+  const pipe = decisionPipeline(i);
   const r = await callStructured(provider, log, { turn: k.turn, factionId: i.factionId }, {
     role, ...cfg,
     system: trimFormat(template('faction', { factionName: f.name, factionId: f.id, date: i.campaign.date, profile: i.profile, maxLetters: role === 'faction_major' ? '2' : '1' }), legal.orderKinds),
     user: template('faction-user', { turn: String(k.turn), date: i.campaign.date, situation: JSON.stringify(situation(k)), memory: memoryText(i.memory), legal: JSON.stringify(legal) }),
     schemaName: 'AgentDecision', jsonSchema: DECISION_SCHEMA,
     meta: { factionId: i.factionId, turn: k.turn, seed: i.campaign.seed, legal, situation: situation(k), posture: f.posture },
-  }, DecisionLenient, check);
-  const out = r.value;
-  const orders: FactionOrders = { schemaVersion: 1, factionId: i.factionId, turn: k.turn, source: out ? 'ai' : 'fallback_doctrine', ...(out ? normalize(out.orders, i.factionId, k.turn) : doctrineOrders(i)) };
-  // registro: quale ordine (con l'id definitivo) viene da quale postura; gli ordini scartati dal validatore non ci sono
-  const stanceOrders = out ? out.orders.military.flatMap((o, j) => { const g = origins.get(o); return g ? [{ orderId: orders.military[j]!.id, ...g }] : []; }) : [];
-  const notes = out ? (stanceNotes.get(out) ?? []).map((n) => `postura — ${n}`) : [];
-  return {
-    schemaVersion: 1, id: `DEC-${k.turn}-${i.factionId}`, factionId: i.factionId, turn: k.turn, model: r.model, role, promptHash: r.promptHash,
-    knowledgeRef: `knowledge/${i.factionId}/turn-${String(k.turn).padStart(4, '0')}.json`, memoryRef: `memory/${i.factionId}.json@${i.memory.updatedTurn}`,
-    situationAssessment: out?.situationAssessment ?? 'Fallback dottrinale: nessuna decisione valida dal modello.',
-    threats: out?.threats ?? [], optionsConsidered: out?.optionsConsidered ?? [], privateIntent: out?.privateIntent ?? 'mantenere la postura',
-    orders, confidence: out?.confidence ?? 0.2, letterIntents: out?.letterIntents ?? [], letters: [], zoneStances: out?.zoneStances ?? [], stanceOrders,
-    validation: { valid: !!out, errors: [...notes, ...dropped.map((e) => `scartato — ${e}`), ...r.errors], repairAttempts: r.repairAttempts, fallbackUsed: !out },
-    usage: r.usage,
-  };
+  }, DecisionLenient, pipe.check);
+  // le motivazioni sono solo del decisore a regole (stesso oggetto: la pipeline ricorda le note delle posture per riferimento)
+  if (r.value) r.value.rationale = [];
+  return pipe.finish(r.value, { model: r.model, promptHash: r.promptHash, usage: r.usage, repairAttempts: r.repairAttempts, errors: r.errors });
+}
+
+/** Nome del «modello» nelle decisioni a regole (registro, post-mortem, playtest). */
+export const RULES_MODEL = 'regole';
+
+/**
+ * Decisione a regole (engine/policy.ts): nessuna chiamata LLM. Solo la Knowledge della fazione, la geografia pubblica dello
+ * scenario e il dado registrato del motore; poi lo stesso traduttore delle posture, lo stesso validatore e lo stesso registro
+ * delle decisioni LLM.
+ */
+export function rulesDecision(i: DecideInput, rng: Rng): AgentDecision {
+  const pipe = decisionPipeline(i);
+  const out = decideByRules({
+    knowledge: i.knowledge, rng,
+    geo: { zones: i.scenario.world.zones, bases: i.scenario.world.bases, infrastructure: i.scenario.world.infrastructure },
+    names: Object.fromEntries(Object.values(i.state.factions).map((x) => [x.id, x.name])),
+  });
+  const errors = pipe.check(out);
+  return pipe.finish(out, { model: RULES_MODEL, promptHash: '', usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, repairAttempts: 0, errors });
 }

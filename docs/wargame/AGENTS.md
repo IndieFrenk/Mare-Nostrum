@@ -1,6 +1,7 @@
 # Agenti LLM — scelte di prompt design
 
-- **Un solo contratto**: il motore parla con `AgentsPort` (`engine/turn-machine.ts`). Implementazioni: `LlmAgents` (OmniRoute o mock) e `ReplayAgents` (rilegge `decisions/`, `narrative/`, `memory/history/`).
+- **Chi decide**: con `WARGAME_FACTION_MODE=rules` (predefinita) le decisioni e la memoria delle fazioni le fa il motore (`engine/policy.ts`, `agents/faction-agent.ts` → `rulesDecision`, `agents/reflection.ts` → `rulesMemory`), senza prompt; i prompt di fazione e di riflessione servono solo in modalità `llm`. Restano LLM: `diplomat`, `gm_narrator`, `intel_analyst`, `order_parser` e il loro `repair`.
+- **Un solo contratto**: il motore parla con `AgentsPort` (`engine/turn-machine.ts`). Implementazioni: `LlmAgents` (OmniRoute o mock) e `ReplayAgents` (rilegge `decisions/`, `narrative/`, `memory/history/`; per le decisioni a regole dà `recordedDecision`, il motore le ricalcola e le confronta).
 - **Input strutturati separati dal prompt**: ogni `LlmRequest` ha `system`/`user` (testo per il modello) e `meta` (dati per il mock). I modelli reali ignorano `meta`.
 - **Contesto di fazione** (`context-builder.ts`): solo `FactionKnowledge` + memoria + azioni lecite (id unità/asset/zone/basi, articoli acquistabili, accordi pendenti). Lo `WorldState` passato all'agente serve solo alla validazione, mai al prompt.
 - **Output**: `response_format: json_schema` (schema da Zod); su HTTP 400 il client passa a `json_object`. `extractJson` estrae il primo oggetto bilanciato.

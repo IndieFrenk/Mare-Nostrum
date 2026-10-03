@@ -28,6 +28,7 @@ function llmDot(s: UiState) {
       !l.reachable ? (l.offlineAllowed ? 'WARGAME_ALLOW_OFFLINE: i turni si giocano con gli ordini di dottrina.' : 'Accendi il PC con Ollama: ▶ è disattivato finché non rispondono.') : null,
       l.missing.length ? `Modelli mancanti sul server: ${l.missing.join(', ')}` : null,
       l.listed === null && l.reachable ? 'Il server non elenca i modelli (/models): presenza non verificata.' : null,
+      l.factionMode === 'rules' ? 'Fazioni: regole del motore (l\'LLM scrive lettere, notizie e briefing e interpreta la Console Ordini).' : l.factionMode === 'llm' ? 'Fazioni: agenti LLM.' : null,
       `Modelli per ruolo:\n${roles}`,
       `Controllato alle ${new Date(l.checkedAt).toLocaleTimeString('it-IT')} · clic per ricontrollare`,
     ].filter(Boolean).join('\n');

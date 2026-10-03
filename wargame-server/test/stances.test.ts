@@ -198,7 +198,7 @@ describe('posture per zona in una decisione IA', () => {
       return { text, usage: { promptTokens: 1, completionTokens: 1 }, latencyMs: 0, model: 'fisso' };
     } };
     const e = makeEngine(provider);
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 's', seed: 'stances' });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 's', seed: 'stances', config: { factionMode: 'llm' } });
     await e.advance(c.id);
     const d = (await e.store.getDecision(c.id, 1, 'TUR'))!;
     expect(d.validation).toMatchObject({ valid: true, fallbackUsed: false });

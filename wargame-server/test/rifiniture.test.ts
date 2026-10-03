@@ -108,7 +108,7 @@ describe('lettere IA di iniziativa: inneschi del motore', () => {
 
   it('in mock: almeno 1 iniziativa dagli inneschi in media dal turno 2, tetto lettersPerTurn rispettato, replay identico', async () => {
     const e = makeEngine();
-    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'ini', seed: 'iniziative', config: { agentCadence: { lettersPerTurn: 2 } } });
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'ini', seed: 'iniziative', config: { factionMode: 'llm', agentCadence: { lettersPerTurn: 2 } } });
     const r = await runSim(e, c, 5);
     const factions = Object.keys((await e.store.getState(r.campaign.id)).factions);
     let triggered = 0;

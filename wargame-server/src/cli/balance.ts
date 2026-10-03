@@ -1,14 +1,17 @@
-// Statistica di bilanciamento delle crisi su più seed, senza rete: IA mock e un giocatore «moderato» come quello del playtest
-// (due pattuglie, una mossa diplomatica a rotazione DEMARCHE/REASSURANCE/BACKCHANNEL, una lettera ogni 2 turni, niente strike).
-// Uso: npm --prefix wargame-server run balance -- --seeds 10 --turns 20 [--json out.json]
-// Riporta: escalation finale per crisi (distribuzione), quante crisi a 10/10, turno medio del primo 10/10, pressione migratoria media.
+// Statistica di bilanciamento su più seed, senza rete: fazioni a regole (predefinito) o IA mock, e un giocatore «moderato» come
+// quello del playtest (due pattuglie, una mossa diplomatica a rotazione DEMARCHE/REASSURANCE/BACKCHANNEL, una lettera ogni 2 turni).
+// Uso: npm --prefix wargame-server run balance -- --seeds 10 --turns 20 [--mode rules|llm] [--json out.json]
+// Riporta: escalation finale per crisi, quante crisi a 10/10, turno medio del primo 10/10, pressione migratoria media; ordini con
+// unità per fazione IA per turno, ingaggi, lettere IA di iniziativa per turno, chiamate LLM per turno e tempo per turno.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { MockLLMProvider } from '../agents/mock-provider.js';
 import { LlmAgents } from '../agents/orchestrator.js';
-import { Engine } from '../engine/turn-machine.js';
+import type { LlmRequest } from '../agents/llm-client.js';
+import { Engine, agentFactions } from '../engine/turn-machine.js';
+import type { FactionMode } from '../config.js';
 import type { OrdersBody } from '../schemas/index.js';
 import { JsonStore } from '../store/json-store.js';
 import { runSim } from './sim.js';
@@ -38,21 +41,47 @@ export async function moderatePlayer(engine: Engine, id: string, t: number) {
   await engine.submitOrders(id, o);
 }
 
-export interface BalanceRun { seed: string; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[] }
+/** Per turno: ordini IA con unità per fazione, ingaggi, lettere IA di iniziativa, chiamate LLM (mock) e tempo. */
+export interface TurnStats { unitOrdersPerFaction: number; engagements: number; initiatives: number; llmCalls: number; ms: number }
+export interface BalanceRun { seed: string; mode: FactionMode; final: Record<string, number>; firstMax: Record<string, number | null>; migration: number[]; turns: TurnStats[]; llmByRole: Record<string, number> }
 
-export async function balanceRun(seed: string, turns: number, dir: string): Promise<BalanceRun> {
-  const engine = new Engine(new JsonStore(dir), new LlmAgents(new MockLLMProvider()));
-  const c = await engine.createCampaign({ scenarioId: 'med-2026', name: `balance ${seed}`, seed });
-  const r = await runSim(engine, c, turns, (t) => moderatePlayer(engine, c.id, t));
+/** Mock che conta le chiamate per ruolo (quelle delle fazioni spariscono in modalità rules). */
+class CountingMock extends MockLLMProvider {
+  byRole: Record<string, number> = {};
+  total = 0;
+  override async complete(req: LlmRequest) { this.byRole[req.role] = (this.byRole[req.role] ?? 0) + 1; this.total++; return super.complete(req); }
+}
+
+export async function balanceRun(seed: string, turns: number, dir: string, mode: FactionMode = 'rules'): Promise<BalanceRun> {
+  const mock = new CountingMock();
+  const engine = new Engine(new JsonStore(dir), new LlmAgents(mock));
+  const c = await engine.createCampaign({ scenarioId: 'med-2026', name: `balance ${seed}`, seed, config: { factionMode: mode } });
+  const perTurn: TurnStats[] = [];
+  let calls = mock.total; let t0 = Date.now();
+  const r = await runSim(engine, c, turns, async (t) => {
+    // il turno precedente è chiuso: le sue chiamate e il suo tempo (la creazione conta nel primo)
+    if (t > 1) { perTurn.push({ unitOrdersPerFaction: 0, engagements: 0, initiatives: 0, llmCalls: mock.total - calls, ms: Date.now() - t0 }); calls = mock.total; t0 = Date.now(); }
+    await moderatePlayer(engine, c.id, t);
+  });
+  perTurn.push({ unitOrdersPerFaction: 0, engagements: 0, initiatives: 0, llmCalls: mock.total - calls, ms: Date.now() - t0 });
   const firstMax: Record<string, number | null> = {}; const migration: number[] = [];
   let final: Record<string, number> = {};
+  const agents = agentFactions(await engine.store.getState(r.campaign.id, 0));
   for (let t = 1; t <= turns; t++) {
     const s = await engine.store.getState(r.campaign.id, t);
     migration.push(s.globalIndicators.migrationPressure);
     for (const cr of Object.values(s.crises)) { if (!(cr.id in firstMax)) firstMax[cr.id] = null; if (cr.escalation >= 10 && firstMax[cr.id] === null) firstMax[cr.id] = t; }
     final = Object.fromEntries(Object.values(s.crises).map((cr) => [cr.id, cr.escalation]));
+    const ds = (await Promise.all(agents.map((f) => engine.store.getDecision(r.campaign.id, t, f)))).filter((d) => !!d);
+    const units = ds.reduce((n, d) => n + d.orders.military.filter((o) => 'unitIds' in o && o.unitIds.length).length, 0);
+    const events = await engine.store.getEvents(r.campaign.id, t);
+    Object.assign(perTurn[t - 1]!, {
+      unitOrdersPerFaction: +(units / Math.max(1, agents.length)).toFixed(2),
+      engagements: events.filter((e) => e.type === 'ENGAGEMENT_OPENED').length,
+      initiatives: ds.reduce((n, d) => n + d.letters.filter((l) => l.kind === 'initiative').length, 0),
+    });
   }
-  return { seed, final, firstMax, migration };
+  return { seed, mode, final, firstMax, migration, turns: perTurn, llmByRole: mock.byRole };
 }
 
 export function summarize(runs: BalanceRun[]) {
@@ -66,30 +95,42 @@ export function summarize(runs: BalanceRun[]) {
   const at10 = runs.map((r) => Object.values(r.firstMax).filter((x) => x !== null).length);
   const finalAt10 = runs.map((r) => Object.values(r.final).filter((x) => x >= 10).length);
   const allFirst = runs.flatMap((r) => Object.values(r.firstMax).filter((x): x is number => x !== null));
+  const turns = runs.flatMap((r) => r.turns);
+  const roles = [...new Set(runs.flatMap((r) => Object.keys(r.llmByRole)))].sort();
   return {
     perCrisis, crisesEverAt10PerRun: avg(at10), crisesAt10AtEndPerRun: avg(finalAt10), runsWithMoreThan2AtEnd: finalAt10.filter((n) => n > 2).length,
     firstTenMeanTurn: avg(allFirst), migrationMean: avg(runs.flatMap((r) => r.migration)), migrationFinalMean: avg(runs.map((r) => r.migration.at(-1)!)),
     turnsAtMigration100: runs.reduce((a, r) => a + r.migration.filter((m) => m >= 100).length, 0),
+    // obiettivi della modalità rules: ≥ 1 ordine con unità per fazione IA per turno, ingaggi > 0, ≥ 1 lettera di iniziativa per turno
+    unitOrdersPerFactionPerTurn: avg(turns.map((t) => t.unitOrdersPerFaction)), turnsBelowOneUnitOrder: turns.filter((t) => t.unitOrdersPerFaction < 1).length,
+    engagementsPerRun: avg(runs.map((r) => r.turns.reduce((a, t) => a + t.engagements, 0))), runsWithoutEngagements: runs.filter((r) => !r.turns.some((t) => t.engagements)).length,
+    initiativesPerTurn: avg(turns.map((t) => t.initiatives)), turnsWithoutInitiative: turns.filter((t) => !t.initiatives).length,
+    llmCallsPerTurn: avg(turns.map((t) => t.llmCalls)), msPerTurn: avg(turns.map((t) => t.ms)),
+    llmCallsPerTurnByRole: Object.fromEntries(roles.map((x) => [x, +(runs.reduce((a, r) => a + (r.llmByRole[x] ?? 0), 0) / Math.max(1, turns.length)).toFixed(1)])),
+    turnsTotal: turns.length,
   };
 }
 
 async function main() {
-  const { values: a } = parseArgs({ options: { seeds: { type: 'string', default: '10' }, turns: { type: 'string', default: '20' }, json: { type: 'string' }, prefix: { type: 'string', default: 'bal' } } });
+  const { values: a } = parseArgs({ options: { seeds: { type: 'string', default: '10' }, turns: { type: 'string', default: '20' }, json: { type: 'string' }, prefix: { type: 'string', default: 'bal' }, mode: { type: 'string', default: 'rules' } } });
+  const mode: FactionMode = a.mode === 'llm' ? 'llm' : 'rules';
   const dir = mkdtempSync(path.join(tmpdir(), 'wg-balance-'));
   const runs: BalanceRun[] = [];
   try {
     for (let i = 1; i <= Number(a.seeds); i++) {
-      const r = await balanceRun(`${a.prefix}-${i}`, Number(a.turns), dir);
+      const r = await balanceRun(`${a.prefix}-${i}`, Number(a.turns), dir, mode);
       runs.push(r);
       console.log(`seed ${r.seed}: finale ${Object.entries(r.final).map(([k, v]) => `${k} ${v}`).join(', ')} · primo 10/10 ${JSON.stringify(Object.fromEntries(Object.entries(r.firstMax).filter(([, v]) => v !== null)))} · migrazione finale ${r.migration.at(-1)}`);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
   const s = summarize(runs);
-  console.log(`\n${runs.length} seed × ${a.turns} turni (IA mock, giocatore moderato)`);
+  console.log(`\n${runs.length} seed × ${a.turns} turni (fazioni: ${mode === 'rules' ? 'regole del motore' : 'IA mock'}, giocatore moderato)`);
   console.log('crisi           media  min  max  seed con 10/10  turno medio 1° 10/10');
   for (const [id, x] of Object.entries(s.perCrisis)) console.log(`${id.padEnd(14)} ${String(x.mean).padStart(5)} ${String(x.min).padStart(4)} ${String(x.max).padStart(4)} ${String(x.at10).padStart(15)} ${String(x.firstTen ?? '—').padStart(21)}`);
   console.log(`crisi arrivate a 10/10 per partita: ${s.crisesEverAt10PerRun} · a 10/10 alla fine: ${s.crisesAt10AtEndPerRun} (partite con più di 2: ${s.runsWithMoreThan2AtEnd})`);
   console.log(`turno medio del primo 10/10: ${s.firstTenMeanTurn ?? '—'} · pressione migratoria media ${s.migrationMean} (finale ${s.migrationFinalMean}, turni a 100: ${s.turnsAtMigration100})`);
+  console.log(`ordini IA con unità per fazione per turno: ${s.unitOrdersPerFactionPerTurn} (turni sotto 1: ${s.turnsBelowOneUnitOrder}/${s.turnsTotal}) · ingaggi per partita: ${s.engagementsPerRun} (partite senza: ${s.runsWithoutEngagements})`);
+  console.log(`lettere IA di iniziativa per turno: ${s.initiativesPerTurn} (turni senza: ${s.turnsWithoutInitiative}/${s.turnsTotal}) · chiamate LLM per turno: ${s.llmCallsPerTurn} ${JSON.stringify(s.llmCallsPerTurnByRole)} · ${s.msPerTurn} ms per turno (mock)`);
   if (a.json) writeFileSync(a.json, JSON.stringify({ runs, summary: s }, null, 1));
 }
 

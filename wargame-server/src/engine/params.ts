@@ -48,4 +48,47 @@ export const PARAMS = {
   letterTriggers: { tensionJump: 10 },
   /** Console Ordini (engine/parse-review.ts): fiducia da cui una fazione conta come alleata negli avvisi sulle azioni ostili */
   parser: { allyTrust: 40 },
+  /** Decisore a regole delle fazioni non giocate dall'umano (engine/policy.ts). */
+  policy: {
+    /** Punteggio di base per regola, nell'ordine di priorità della spec: se due regole chiedono la stessa zona o lo stesso
+     *  destinatario vince la più importante (la linea rossa prima della minaccia, la minaccia prima della crisi…). */
+    score: { red_line: 100, threat: 80, crisis: 50, detente: 50, objective: 35, ally: 30, routine: 10 },
+    /** Aggressività da cui si risponde alle minacce con la forza (SHOW_OF_FORCE nella zona dell'atto, altrimenti SANCTION):
+     *  sotto, DEMARCHE o BACKCHANNEL. La risposta di forza esce con probabilità = aggressività (tiro registrato): senza, due
+     *  profili aggressivi si rispondono a vicenda per sempre (sanzione → sanzione → …). */
+    forceAt: 0.5,
+    /** Risposte agli atti subiti per turno: una per aggressore, prima le più gravi. */
+    maxThreatResponses: 2,
+    /** Gravità degli atti subiti: livello di minaccia (1–5) nel registro e ordine delle risposte. */
+    severity: { strike: 5, engagement: 4, blockade: 3, threat: 3, sanction: 2, cyber: 2, sof: 2 },
+    /** Una crisi chiede una postura da questa escalation in su, nelle zone con almeno questo interesse (le altre non contano). */
+    crisisMin: 3, minInterest: 0.3,
+    /** Distensione: i profili con aggressività < detenteBelow, in una crisi che li coinvolge con escalation ≥ detenteFrom +
+     *  riskTolerance × detenteSpan (rischio 0 → 5, rischio 1 → 8), non aggiungono forze (solo un pattugliamento leggero) e
+     *  cercano la parte con cui sono più in tensione: REASSURANCE (fiducia ≥ 0) o BACKCHANNEL, da ceasefireAt una tregua. */
+    detenteBelow: 0.5, detenteFrom: 5, detenteSpan: 3, ceasefireAt: 8,
+    /** Coercizione, il rovescio della distensione: da questa escalation i profili aggressivi (≥ forceAt) coinvolti nella crisi fanno
+     *  una dimostrazione di forza invece della sola presenza. Senza, nessuna fazione a regole esercita pressione e gli ingaggi
+     *  nascono solo dal giocatore (0 in 5 turni nel primo playtest); a 5 (il Mar Rosso parte da lì) gli scontri erano ~30 per
+     *  partita di 20 turni, con flotte intere distrutte. */
+    coerceFrom: 6,
+    /** Ritiro: al massimo tanti ritiri per turno dalle zone dove la fazione ha forze ma nessuna regola le chiede più (le unità
+     *  impegnate in una zona non si spostano da sole: senza ritiro restano lì finché non si logorano). */
+    maxWithdrawals: 2,
+    /** Alleato: accordo di difesa in comune (NATO, UE, bilaterali) o fiducia ≥ allyTrust. Avversario (unico bersaglio cyber):
+     *  fiducia ≤ adversaryTrust e tensione ≥ adversaryTension. */
+    allyTrust: 40, adversaryTrust: -20, adversaryTension: 50,
+    /** Alleato stretto: accordo di difesa con al massimo 3 parti o fiducia ≥ closeAllyTrust. Solo loro sostengono un alleato dopo
+     *  un atto senza zona (sanzioni, minacce, cyber): con tutta la NATO e l'UE una sanzione alla Francia portava 10 rassicurazioni
+     *  a turno (56 in 10 turni nel playtest). Per un atto in una zona sostiene chi ha interesse in quella zona. */
+    closeAllyTrust: 60,
+    /** Cyber: al massimo un'operazione per turno dalle regole; disruption invece di espionage solo con aggressività e tensione
+     *  verso il bersaglio almeno così (il resto è spionaggio, il meno ostile). */
+    cyberDisruption: { aggressiveness: 0.6, tension: 80 },
+    /** Azioni diplomatiche per turno (le risposte agli accordi proposti non contano): più di così è rumore, non politica. */
+    maxDiplomacy: 3,
+    /** Un accordo proposto alla fazione si accetta con fiducia verso chi lo propone ≥ acceptTrust; tregue e accordi migratori
+     *  anche sotto, se lo stile non è assertive. */
+    acceptTrust: 10,
+  },
 } as const;

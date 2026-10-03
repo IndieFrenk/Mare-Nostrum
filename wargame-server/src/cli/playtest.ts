@@ -3,9 +3,11 @@
 // e statistiche degli agenti (anche lettere: inviate, ricevute, risposte arrivate, iniziative IA e quante dagli inneschi del motore,
 // lettere-modello; ordini IA
 // alle unità, quanti dalle posture per zona, ingaggi del turno; unità IA impegnate in un compito; posture emesse/tradotte/senza unità).
+// Per turno anche: tempo, chiamate LLM per ruolo (dal registro llm-log della campagna, se il server scrive nello stesso
+// WARGAME_DATA_DIR), decisioni a regole e loro motivazioni più frequenti.
 // Uso: npm run playtest -- --turns 10 [--base http://127.0.0.1:8787] [--name playtest] [--minor-every 2 --reflect-every 3]
 // Report: stampa a video e JSON in <WARGAME_DATA_DIR>/../playtest/<id>.json
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { config } from '../config.js';
@@ -45,7 +47,20 @@ else {
 if (a['minor-every'] || a['reflect-every']) {
   c = await call('POST', `/campaigns/${c.id}/config`, { agentCadence: { minorEvery: Number(a['minor-every'] ?? c.config.agentCadence?.minorEvery ?? 1), reflectEvery: Number(a['reflect-every'] ?? c.config.agentCadence?.reflectEvery ?? 1) } });
 }
-console.log(`cadenza: ${JSON.stringify(c.config.agentCadence)} · modelli: ${JSON.stringify(Object.fromEntries(Object.entries(c.config.llm).map(([k, v]) => [k, (v as J).model])))}`);
+console.log(`fazioni: ${c.config.factionMode ?? 'modalità del server'} · cadenza: ${JSON.stringify(c.config.agentCadence)} · modelli: ${JSON.stringify(Object.fromEntries(Object.entries(c.config.llm).map(([k, v]) => [k, (v as J).model])))}`);
+
+/** Chiamate LLM del turno per ruolo, dal registro della campagna (null se il server scrive altrove). */
+function llmCalls(id: string, t: number): Record<string, number> | null {
+  const f = path.join(config.dataDir, id, 'llm-log', `turn-${String(t).padStart(4, '0')}.jsonl`);
+  if (!existsSync(path.join(config.dataDir, id))) return null;
+  const out: Record<string, number> = {};
+  if (existsSync(f)) for (const l of readFileSync(f, 'utf8').split('\n').filter(Boolean)) { const r = (JSON.parse(l) as J).role as string; out[r] = (out[r] ?? 0) + 1; }
+  return out;
+}
+const add = (into: Record<string, number>, from: Record<string, number>) => { for (const [k, v] of Object.entries(from)) into[k] = (into[k] ?? 0) + v; return into; };
+const top = (m: Record<string, number>, n: number) => Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
+const llmTotal: Record<string, number> = {}; const ruleTotal: Record<string, number> = {}; const textTotal: Record<string, number> = {};
+let llmSeen = false;
 
 const turns: J[] = [];
 const target = c.currentTurn + Number(a.turns) - 1;
@@ -113,7 +128,18 @@ while (c.currentTurn <= target && c.status === 'active') {
   for (const d of decisions) byModel[d.model] = (byModel[d.model] ?? 0) + 1;
   const fallback = decisions.filter((d) => d.validation.fallbackUsed).map((d) => `${d.factionId}(${d.validation.errors.join('; ').slice(0, 120)})`);
   const doctrine = decisions.filter((d) => d.model === 'dottrina').length;
-  const firstTry = decisions.filter((d) => d.model !== 'dottrina' && !d.validation.fallbackUsed && d.validation.repairAttempts === 0).length;
+  const rules = decisions.filter((d) => d.model === 'regole');
+  const firstTry = decisions.filter((d) => d.model !== 'dottrina' && d.model !== 'regole' && !d.validation.fallbackUsed && d.validation.repairAttempts === 0).length;
+  // motivazioni delle decisioni a regole: per regola e per frase (senza i numeri, così si sommano le frasi uguali)
+  const byRule: Record<string, number> = {}; const byText: Record<string, number> = {};
+  for (const d of rules) for (const r of (d.rationale ?? []) as J[]) {
+    byRule[r.rule] = (byRule[r.rule] ?? 0) + 1;
+    const key = String(r.text).replace(/\d+(?:[.,]\d+)?/g, 'N');
+    byText[key] = (byText[key] ?? 0) + 1;
+  }
+  add(ruleTotal, byRule); add(textTotal, byText);
+  const calls = llmCalls(c.id, t);
+  if (calls) { llmSeen = true; add(llmTotal, calls); }
   const repaired = decisions.filter((d) => d.validation.repairAttempts > 0 && !d.validation.fallbackUsed).length;
   const orderCount = decisions.reduce((n, d) => n + d.orders.military.length + d.orders.diplomacy.length + d.orders.procurement.length + d.orders.statements.length, 0);
   // ordini militari IA che muovono unità vere, e quanti vengono dalle posture per zona (stanceOrders; 'worn' = rientro dei logorati)
@@ -136,7 +162,7 @@ while (c.currentTurn <= target && c.status === 'active') {
   const s = pm.state as J;
   const ita = s.factions.ITA;
   // unità IA fuori base con un compito in corso (continuano il compito del turno prima finché non rientrano o sono logorate)
-  const aiIds = new Set(Object.values(s.factions as Record<string, J>).filter((f) => f.controller === 'ai').map((f) => f.id));
+  const aiIds = new Set(Object.values(s.factions as Record<string, J>).filter((f) => f.controller !== 'human' && f.kind !== 'bloc').map((f) => f.id));
   const busyUnits = Object.values(s.units as Record<string, J>).filter((u) => aiIds.has(u.factionId) && ['deployed', 'transit'].includes(u.status) && u.currentTask).length;
   if (ita.budget.discretionary < 0) problem(t, `FOED negativo: ${ita.budget.discretionary}`);
   for (const [id, cr] of Object.entries(s.crises as Record<string, J>)) if (cr.escalation < 0 || cr.escalation > 10) problem(t, `crisi ${id} fuori scala: ${cr.escalation}`);
@@ -154,7 +180,8 @@ while (c.currentTurn <= target && c.status === 'active') {
     template: aiLetters.filter((l) => l.source === 'template').map((l) => `${l.actionId}: ${(l.errors as string[]).join('; ').slice(0, 120)}`),
   };
   const row = {
-    turn: t, minutes: +((Date.now() - tt) / 60_000).toFixed(1), decisions: decisions.length, firstTry, repaired, fallback: fallback.length, doctrine, byModel, fallbackDetail: fallback,
+    turn: t, minutes: +((Date.now() - tt) / 60_000).toFixed(1), seconds: +((Date.now() - tt) / 1000).toFixed(1), decisions: decisions.length, rulesDecisions: rules.length,
+    llmCalls: calls, rationaleByRule: byRule, topRationale: top(byText, 5), firstTry, repaired, fallback: fallback.length, doctrine, byModel, fallbackDetail: fallback,
     aiOrders: orderCount, rejectedOrders: rejected, cmo,
     unitOrders: { total: unitOrders.length, perFaction: +(unitOrders.length / Math.max(1, decisions.length)).toFixed(2), fromStances: stanceOrders.filter((x) => x.stance !== 'worn').length, worn: stanceOrders.filter((x) => x.stance === 'worn').length, byKind },
     engagements, busyUnits, stances, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
@@ -162,7 +189,9 @@ while (c.currentTurn <= target && c.status === 'active') {
     foed: ita.budget.discretionary, stability: ita.stability, crises: Object.fromEntries(Object.entries(s.crises as Record<string, J>).map(([id, cr]) => [id, cr.escalation])),
   };
   turns.push(row);
-  console.log(`  ${row.minutes} min · decisioni IA ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
+  console.log(`  ${row.seconds} s · decisioni a regole ${rules.length}, LLM ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
+  console.log(`  chiamate LLM ${calls ? `${Object.values(calls).reduce((a, b) => a + b, 0)} ${JSON.stringify(calls)}` : 'n/d (registro del server non leggibile da qui)'} · motivazioni ${JSON.stringify(byRule)}`);
+  for (const [x, n] of row.topRationale) console.log(`    ${n}× ${x}`);
   console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
   console.log(`  unità IA impegnate ${busyUnits} · posture emesse ${stances.emitted} / tradotte ${stances.translated} / senza unità ${stances.noUnits}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
@@ -173,9 +202,15 @@ while (c.currentTurn <= target && c.status === 'active') {
 const unitAvg = turns.reduce((a, r) => a + r.unitOrders.perFaction, 0) / Math.max(1, turns.length);
 const fromT2 = turns.filter((r) => r.turn >= 2);
 const initiativeAvg = fromT2.reduce((a, r) => a + r.letters.aiInitiative, 0) / Math.max(1, fromT2.length);
-const report = { campaign: c.id, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), cadence: c.config.agentCadence, turns, problems,
+const report = { campaign: c.id, factionMode: c.config.factionMode ?? null, totalMinutes: +((Date.now() - t0) / 60_000).toFixed(1), secondsPerTurn: +(turns.reduce((a, r) => a + r.seconds, 0) / Math.max(1, turns.length)).toFixed(1),
+  cadence: c.config.agentCadence, turns, problems,
+  llmCallsByRole: llmSeen ? llmTotal : null, llmCallsPerTurn: llmSeen ? +(Object.values(llmTotal).reduce((a, b) => a + b, 0) / Math.max(1, turns.length)).toFixed(1) : null,
+  rulesDecisions: turns.reduce((a, r) => a + r.rulesDecisions, 0), rationaleByRule: ruleTotal, topRationale: top(textTotal, 10),
   unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0), aiInitiativesPerTurnFromT2: +initiativeAvg.toFixed(2) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
 writeFileSync(out, JSON.stringify(report, null, 1));
-console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}\nreport ${out}`);
+console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min (${report.secondsPerTurn} s per turno) · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}`);
+console.log(`chiamate LLM per turno: ${report.llmCallsPerTurn ?? 'n/d'} ${report.llmCallsByRole ? JSON.stringify(report.llmCallsByRole) : ''} · decisioni a regole ${report.rulesDecisions} · motivazioni per regola ${JSON.stringify(ruleTotal)}`);
+for (const [x, n] of report.topRationale) console.log(`  ${n}× ${x}`);
+console.log(`report ${out}`);

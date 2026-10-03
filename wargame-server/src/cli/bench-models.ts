@@ -48,11 +48,14 @@ const needLog = ['fazioni', 'narratore', 'riflessione', 'lettera'].some(wants);
 const calls = needLog ? readFileSync(path.join(campaignDir, 'llm-log/turn-0001.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as LlmCall) : [];
 const pick = (role: string, withFaction = true) => {
   const c = calls.find((x) => x.role === role && (!withFaction || x.factionId));
-  if (!c) throw new Error(`nessuna chiamata ${role} nel log`);
+  // campagne a regole: nessuna decisione né riflessione LLM da rifare
+  if (!c) throw new Error(`nessuna chiamata ${role} nel log${campaign.config.factionMode === 'rules' ? ' (campagna in modalità rules: per «fazioni» e «riflessione» serve una campagna creata con WARGAME_FACTION_MODE=llm)' : ''}`);
   return { factionId: c.factionId ?? '', ...(c.request as { system: string; user: string }) };
 };
 const none = { factionId: '', system: '', user: '' };
-const major = needLog ? pick('faction_major') : none;
+// per la lettera basta una potenza maggiore: dal log se c'è, altrimenti dallo scenario (campagne a regole)
+const major = wants('fazioni') ? pick('faction_major')
+  : { ...none, factionId: calls.find((x) => x.role === 'faction_major' && x.factionId)?.factionId ?? Object.values(state.factions).filter((f) => f.agentRole === 'faction_major').map((f) => f.id).sort()[0] ?? '' };
 const refl = wants('riflessione') ? pick('reflection') : none;
 const narr = wants('narratore') ? pick('gm_narrator', false) : none;
 const refsOf = async (f: string) => new Set(((await store.getKnowledge(campaignId, f, 1))?.contacts ?? []).map((c) => c.id));
