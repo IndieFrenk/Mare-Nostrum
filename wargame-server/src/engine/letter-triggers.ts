@@ -1,5 +1,6 @@
 import type { Engagement, FactionOrders, GameEvent, LetterTone, WorldState } from '../schemas/index.js';
 import { LETTER_LIMITS } from '../schemas/index.js';
+import { diploActs } from './opinion.js';
 import { PARAMS } from './params.js';
 
 /**
@@ -42,13 +43,14 @@ export function letterTriggers(i: TriggerInput): LetterTrigger[] {
     if (d.kind === 'THREAT') add(d.target, o.factionId, 'threat', 'firm', `Rispondere con fermezza alla minaccia ricevuta da ${name(o.factionId)}: le minacce non cambiano la posizione del nostro Governo, che resta aperto al dialogo.`);
     if (d.kind === 'SANCTION') add(d.target, o.factionId, 'sanction', 'firm', `Protestare contro le sanzioni decise da ${name(o.factionId)} e chiederne la revoca: danneggiano i rapporti tra i due Paesi.`);
   }
+  // blocco navale: l'atto colpisce chi aveva unità nella zona (nota scritta da adjudication.ts, mai propagata)
+  for (const act of diploActs(i.prevEvents)) {
+    if (!act.note.startsWith('BLOCKADE in ')) continue;
+    const z = act.note.slice('BLOCKADE in '.length);
+    add(act.b, act.a, 'blockade', 'firm', `Protestare contro il blocco navale di ${name(act.a)} in ${zone(z)} e chiedere la libertà di navigazione.`);
+  }
   for (const e of i.prevEvents) {
     const p = e.payload as Record<string, unknown>;
-    // blocco navale: la relazione colpita è quella con chi aveva unità nella zona (nota scritta da adjudication.ts, mai propagata)
-    if (e.type === 'RELATION_CHANGED' && typeof p.note === 'string' && p.note.startsWith('BLOCKADE in ')) {
-      const z = p.note.slice('BLOCKADE in '.length);
-      add(String(p.b), String(p.a), 'blockade', 'firm', `Protestare contro il blocco navale di ${name(String(p.a))} in ${zone(z)} e chiedere la libertà di navigazione.`);
-    }
     // ingaggio: ogni parte scrive alle altre
     if (e.type === 'ENGAGEMENT_OPENED') {
       const eng = p.engagement as Engagement;

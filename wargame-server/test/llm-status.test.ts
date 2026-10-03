@@ -40,7 +40,7 @@ describe('stato dei modelli', () => {
     expect(st).toMatchObject({ reachable: true, mode: 'llm', baseUrl: fakeUrl, missing: ['gemma3:27b'], listed: ['qwen3.5:4b', 'qwen3.5:9b'], cached: false, enforced: true });
     // modalità predefinita «rules»: solo i ruoli che usano ancora l'LLM (le fazioni decidono con le regole del motore)
     expect(st.factionMode).toBe('rules');
-    expect(st.models).toEqual({ gm_narrator: 'qwen3.5:9b', intel_analyst: 'qwen3.5:4b', order_parser: 'qwen3.5:9b', repair: 'qwen3.5:4b', diplomat: 'gemma3:27b' });
+    expect(st.models).toEqual({ gm_narrator: 'qwen3.5:9b', intel_analyst: 'qwen3.5:4b', order_parser: 'qwen3.5:9b', repair: 'qwen3.5:4b', diplomat: 'gemma3:27b', strategist: 'qwen3.5:4b', chancery: 'qwen3.5:4b' });
     expect(typeof st.latencyMs).toBe('number');
     const again = (await app.inject({ method: 'GET', url: '/api/wg/llm/status' })).json();
     expect(again.cached).toBe(true);

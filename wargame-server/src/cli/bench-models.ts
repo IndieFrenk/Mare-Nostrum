@@ -8,8 +8,14 @@
 // - lettera: risposta di una fazione a una lettera di esempio del giocatore (stesso prompt del gioco): schema, lunghezze e numeri
 // - parser: frasi italiane del giocatore per la Console Ordini (cli/parser-cases.ts), stesso prompt e stessi controlli del
 //   gioco (nomi → id, posture, parse-review); per modello: corretti / sbagliati / pericolosi (ostili verso alleati, cyber non chiesta)
-// Uso: npm run bench:models -- <cartella-campagna> <modello|combo>... [--runs N] [--solo parser,fazioni,narratore,riflessione,lettera] [--mock]
-// (config da wargame-server/.env; --mock usa il provider finto al posto dei modelli, per provare il banco)
+// - strategist (settore 11): 5 situazioni (la Knowledge del turno 1 di USA, CHN, RUS, FRA, TUR), stesso prompt e stessi controlli del gioco:
+//   JSON valido, bersagli e zone esistenti (il motore scarta gli id inventati e lo conta), coerenza (niente priorità contrastanti, niente corteggiare
+//   un ostile con tensione alta né contenere un amico stretto); per modello: ok / schema / allucinazioni / incoerenze, tempo, token, limiti del motore
+// - chancery (settore 11): 3 atti gravi, gli Stati e le posizioni scelti dal motore, stesso prompt e stessi controlli del gioco: posizioni rispettate,
+//   nessun numero inventato, nessun nome di persona, ≤ 30 parole, tutti gli Stati coperti
+// Uso: npm run bench:models -- <cartella-campagna> [<modello|combo>...] [--profile locale,gemini|all] [--runs N] [--solo parser,fazioni,narratore,riflessione,lettera,strategist,chancery] [--mock]
+// (config da wargame-server/.env; --mock usa il provider finto al posto dei modelli, per provare il banco). --profile prova strategist e chancery su
+// ogni profilo di llm-profiles/ (con i ripieghi su 429 e i limiti di richieste del profilo): tempo medio, token, ripieghi, 429 e chiamate saltate.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -32,11 +38,24 @@ import { numbersNotInFacts } from '../agents/repair.js';
 import { loadScenario } from '../engine/scenario.js';
 import { validateOrders } from '../engine/validators.js';
 import { JsonStore } from '../store/json-store.js';
+import { LlmBudget } from '../agents/budget.js';
+import { listProfiles, loadProfile, profileRouting, roleChain } from '../agents/profiles.js';
+import { writeDirective } from '../agents/strategist.js';
+import { writeStatements } from '../agents/chancery.js';
+import { limitDirective, strategistContext } from '../engine/directive.js';
+import { chanceryVocabulary, pickStates } from '../engine/chancery.js';
+import { opinionBand, opinionLookup } from '../engine/opinion.js';
+import { reactTo } from '../engine/world-ai.js';
+import { roleConfig, type ChanceryJob, type StrategistJob } from '../engine/turn-machine.js';
+import type { GraveEvent } from '../schemas/index.js';
+import type { LlmProvider } from '../agents/llm-client.js';
 
-const { values: opt, positionals } = parseArgs({ allowPositionals: true, options: { runs: { type: 'string', default: '1' }, 'all-factions': { type: 'boolean', default: false }, solo: { type: 'string', default: '' }, mock: { type: 'boolean', default: false } } });
+const { values: opt, positionals } = parseArgs({ allowPositionals: true, options: { runs: { type: 'string', default: '1' }, 'all-factions': { type: 'boolean', default: false }, solo: { type: 'string', default: '' }, mock: { type: 'boolean', default: false }, profile: { type: 'string', default: '' } } });
 const [dir, ...models] = positionals;
-if (!dir || !models.length) { console.error('uso: bench:models -- <cartella-campagna> <modello>... [--runs N] [--solo parser,...] [--mock]'); process.exit(2); }
+if (!dir || (!models.length && !opt.profile)) { console.error('uso: bench:models -- <cartella-campagna> [<modello>...] [--profile locale,gemini|all] [--runs N] [--solo parser,...,strategist,chancery] [--mock]'); process.exit(2); }
 const only = new Set(opt.solo.split(',').map((x) => x.trim()).filter(Boolean));
+// solo profili: i due casi che dipendono dai profili
+if (!models.length && !only.size) for (const x of ['strategist', 'chancery']) only.add(x);
 const wants = (n: string) => !only.size || only.has(n);
 const campaignDir = path.resolve(dir);
 const store = new JsonStore(path.dirname(campaignDir));
@@ -188,6 +207,94 @@ if (wants('parser')) {
   }
 }
 
+// ——— strategist e chancery: ogni modello e ogni profilo ———
+interface Target { label: string; provider: LlmProvider; model: { strategist: string; chancery: string }; budget?: LlmBudget }
+const targets: Target[] = models.map((m) => ({ label: m, provider: p, model: { strategist: m, chancery: m } }));
+const profileNames = opt.profile === 'all' ? listProfiles() : opt.profile.split(',').map((x) => x.trim()).filter(Boolean);
+for (const name of profileNames) {
+  if (opt.mock) { targets.push({ label: `profilo ${name} (mock)`, provider: p, model: { strategist: 'mock', chancery: 'mock' } }); continue; }
+  const prof = loadProfile({ ...process.env, LLM_PROFILE: name });
+  const routing = profileRouting(prof!);
+  const budget = new LlmBudget(routing, { callsPerTurn: Infinity, cache: false });
+  targets.push({ label: `profilo ${name}`, provider: budget.view(campaign, 1, 3), model: { strategist: roleChain(prof!, 'strategist')[0]!.model, chancery: roleChain(prof!, 'chancery')[0]!.model }, budget });
+}
+type Tally = { n: number; ok: number; schema: number; alluc: number; incoerente: number; err: number; secs: number; tokIn: number; tokOut: number; limits: number };
+const newTally = (): Tally => ({ n: 0, ok: 0, schema: 0, alluc: 0, incoerente: 0, err: 0, secs: 0, tokIn: 0, tokOut: 0, limits: 0 });
+const stratStats: Record<string, Tally> = {}; const chanStats: Record<string, Tally & { statements: number; fromModel: number; numeri: number; nomi: number; lunghe: number; mancanti: number; posizioni: number; coerenza: number }> = {};
+const runs = Number(opt.runs);
+if (targets.length && (wants('strategist') || wants('chancery'))) {
+  const names = Object.fromEntries(Object.values(state.factions).map((f) => [f.id, f.name]));
+  const withModel = (role: 'strategist' | 'chancery', model: string) => { const c = structuredClone(campaign); c.config.llm[role] = { ...roleConfig(campaign, role), model }; return c; };
+  // 5 situazioni per il strategist: la Knowledge del turno 1 di cinque potenze
+  const situations: StrategistJob[] = [];
+  if (wants('strategist')) for (const f of ['USA', 'CHN', 'RUS', 'FRA', 'TUR'].filter((x) => state.factions[x])) {
+    const k = await store.getKnowledge(campaignId, f, 1);
+    if (!k) continue;
+    situations.push({ campaign, factionId: f, turn: 1, knowledge: k, profile: scenario.profiles[f] ?? '', context: strategistContext(k, null, names), limit: { state, factionId: f, zones: new Set(Object.keys(scenario.world.zones)) } });
+  }
+  // 3 atti gravi per la chancery, con gli Stati e le posizioni scelti dal motore
+  const events: GraveEvent[] = [
+    { id: 'B1-1', kind: 'strike', a: 'RUS', b: 'GRC', severity: 5, turn: 1, text: 'strike su MELLITAH' },
+    { id: 'B1-2', kind: 'sanction', a: 'USA', b: 'IRN', severity: 3, turn: 1, text: 'sanzioni: misure mirate' },
+    { id: 'B1-3', kind: 'blockade', a: 'TUR', b: 'CYP', severity: 3, turn: 1, text: 'blocco navale a est di Cipro' },
+  ].filter((e) => state.factions[e.a] && state.factions[e.b]) as GraveEvent[];
+  const op = opinionLookup(state);
+  const chanJobs: ChanceryJob[] = wants('chancery') ? events.map((ev) => ({
+    campaign, turn: 1, event: { id: ev.id, kind: ev.kind, actor: ev.a, victim: ev.b, severity: ev.severity, text: ev.text },
+    actorName: names[ev.a] ?? ev.a, victimName: names[ev.b] ?? ev.b, states: pickStates(state, reactTo(state, op, ev, campaign.playerFaction)), vocabulary: chanceryVocabulary(state),
+  })) : [];
+  const COND = /condann|deplor|denunci|riprov|inaccettabil|critic|violazione/i; const SUPP = /sostien|comprend|appogg|legittim|ragioni/i;
+  const lexicalOk = (text: string, pos: string) => (pos === 'condemn' ? COND.test(text) && !SUPP.test(text) : pos === 'support' ? SUPP.test(text) && !COND.test(text) : !COND.test(text) && !SUPP.test(text));
+  for (const t of targets) {
+    for (let run = 0; run < runs; run++) {
+      for (const job of situations) {
+        const s = (stratStats[t.label] ??= newTally()); s.n++;
+        const t0 = Date.now(); const log: LlmCall[] = [];
+        try {
+          const r = await writeDirective(t.provider, log, { ...job, campaign: withModel('strategist', t.model.strategist) });
+          s.secs += (Date.now() - t0) / 1000; s.tokIn += r.usage.promptTokens; s.tokOut += r.usage.completionTokens;
+          let verdict: 'ok' | 'schema' | 'alluc' | 'incoerente' = 'ok'; let why = '';
+          if (r.source === 'none') { verdict = /nessuna voce valida/.test(r.errors.join(' ')) ? 'alluc' : 'schema'; why = r.errors.join(' | ').slice(0, 140); }
+          else {
+            const l = limitDirective(r.proposed, job.limit); s.limits += l.notes.length;
+            const rows = new Map(job.knowledge.ownRelations ? Object.entries(job.knowledge.ownRelations) : []);
+            const bad = l.notes.filter((x) => /inesistente|sconosciuta/.test(x));
+            const incoherent = l.notes.filter((x) => /contrastanti/.test(x)).concat(l.directive.priorities.flatMap((x) => {
+              const rel = rows.get(x.target); if (!rel) return [];
+              return (x.kind === 'court' || x.kind === 'improve') && opinionBand(rel.trust) === 'ostile' && rel.tension >= 60 ? [`${x.kind} verso ${x.target} ostile`]
+                : (x.kind === 'deter' || x.kind === 'isolate' || x.kind === 'contain') && opinionBand(rel.trust) === 'stretta' ? [`${x.kind} verso ${x.target} stretto`] : [];
+            }));
+            if (bad.length) { verdict = 'alluc'; why = bad.slice(0, 2).join(' | '); } else if (incoherent.length) { verdict = 'incoerente'; why = incoherent.slice(0, 2).join(' | '); }
+          }
+          s[verdict]++;
+          console.log(`${t.label.padEnd(28)} strategist ${job.factionId.padEnd(3)} ${verdict.toUpperCase().padEnd(10)} ${((Date.now() - t0) / 1000).toFixed(0).padStart(3)}s in ${r.usage.promptTokens} out ${r.usage.completionTokens} ${why}`);
+        } catch (e) { s.err++; s.secs += (Date.now() - t0) / 1000; console.log(`${t.label.padEnd(28)} strategist ${job.factionId.padEnd(3)} ERRORE ${String((e as Error).message).slice(0, 140)}`); }
+      }
+      for (const job of chanJobs) {
+        const s = (chanStats[t.label] ??= { ...newTally(), statements: 0, fromModel: 0, numeri: 0, nomi: 0, lunghe: 0, mancanti: 0, posizioni: 0, coerenza: 0 }); s.n++;
+        const t0 = Date.now(); const log: LlmCall[] = [];
+        try {
+          const r = await writeStatements(t.provider, log, { ...job, campaign: withModel('chancery', t.model.chancery) });
+          s.secs += (Date.now() - t0) / 1000; for (const c of log) { s.tokIn += c.tokens.in; s.tokOut += c.tokens.out; }
+          s.statements += r.statements.length; s.fromModel += r.statements.filter((x) => x.source === 'ai').length;
+          for (const e of r.errors) { if (/numeri/.test(e)) s.numeri++; if (/nomi di persona/.test(e)) s.nomi++; if (/parole/.test(e)) s.lunghe++; if (/mancante/.test(e)) s.mancanti++; }
+          // posizioni: quelle scritte dal modello, se le ha ripetute, contro quelle del motore; e il lessico del testo contro la posizione
+          let raw: { statements?: { iso: string; position?: string; text: string }[] } = {};
+          try { raw = extractJson(String(log.filter((c) => c.ok).at(-1)?.response ?? '{}')) as typeof raw; } catch { /* nessuna risposta valida */ }
+          for (const st of job.states) {
+            const x = raw.statements?.find((y) => y.iso?.toUpperCase() === st.iso);
+            if (x?.position && x.position !== st.position) s.posizioni++;
+            if (x && !lexicalOk(x.text, st.position)) s.coerenza++;
+          }
+          const verdict = r.source === 'ai' && !r.errors.length ? 'ok' : r.source === 'template' ? 'schema' : 'alluc';
+          s[verdict]++;
+          console.log(`${t.label.padEnd(28)} chancery   ${job.event.id} ${(r.source === 'ai' ? 'OK' : r.source === 'mixed' ? 'PARZIALE' : 'MODELLI').padEnd(10)} ${((Date.now() - t0) / 1000).toFixed(0).padStart(3)}s ${r.statements.filter((x) => x.source === 'ai').length}/${r.statements.length} frasi dal modello ${r.errors.slice(0, 2).join(' | ').slice(0, 140)}`);
+        } catch (e) { s.err++; s.secs += (Date.now() - t0) / 1000; console.log(`${t.label.padEnd(28)} chancery   ${job.event.id} ERRORE ${String((e as Error).message).slice(0, 140)}`); }
+      }
+    }
+  }
+}
+
 console.log('\nRIEPILOGO (ok / schema sbagliato / allucinazioni / errori · secondi medi)');
 for (const [k, s] of Object.entries(summary)) console.log(`${k.padEnd(42)} ${s.ok}/${s.n} ok · ${s.schema} schema · ${s.halluc} alluc. · ${s.err} err · ${(s.secs / s.n).toFixed(0)} s`);
 console.log('\nORDINI MILITARI DELLE FAZIONI (espliciti + tradotti dalle posture, per tipo)');
@@ -202,4 +309,17 @@ if (Object.keys(parserStats).length) {
     const n = st.corretto + st.sbagliato + st.pericoloso;
     console.log(`${m.padEnd(28)} ${st.corretto} corretti · ${st.sbagliato} sbagliati · ${st.pericoloso} pericolosi su ${n} · ${(st.secs / Math.max(1, n)).toFixed(1)} s`);
   }
+}
+
+if (Object.keys(stratStats).length) {
+  console.log(`\nSTRATEGIST — direttive (${stratStats[Object.keys(stratStats)[0]!]!.n / runs} situazioni × ${runs}: ok / schema / allucinazioni / incoerenze · secondi e token medi · limiti del motore per direttiva)`);
+  for (const [m, s] of Object.entries(stratStats)) console.log(`${m.padEnd(28)} ${s.ok}/${s.n} ok · ${s.schema} schema · ${s.alluc} alluc. · ${s.incoerente} incoer. · ${s.err} err · ${(s.secs / s.n).toFixed(1)} s · token ${Math.round(s.tokIn / s.n)}+${Math.round(s.tokOut / s.n)} · ${(s.limits / s.n).toFixed(1)} limiti`);
+}
+if (Object.keys(chanStats).length) {
+  console.log(`\nCHANCERY — frasi delle cancellerie (${chanStats[Object.keys(chanStats)[0]!]!.n / runs} atti × ${runs}: atti ok / frasi-modello / parziali · frasi dal modello · violazioni)`);
+  for (const [m, s] of Object.entries(chanStats)) console.log(`${m.padEnd(28)} ${s.ok}/${s.n} atti ok · ${s.schema} tutti frasi-modello · ${s.alluc} parziali · ${s.err} err · frasi dal modello ${s.fromModel}/${s.statements} · numeri inventati ${s.numeri} · nomi di persona ${s.nomi} · troppo lunghe ${s.lunghe} · mancanti ${s.mancanti} · posizioni contraddette ${s.posizioni} · lessico incoerente ${s.coerenza} · ${(s.secs / s.n).toFixed(1)} s · token ${Math.round(s.tokIn / s.n)}+${Math.round(s.tokOut / s.n)}`);
+}
+for (const t of targets) if (t.budget) {
+  const u = (await t.budget.status(campaign, 1)).campaign!.turn;
+  if (u) console.log(`\n${t.label}: chiamate ${u.calls} · ripieghi sul modello successivo ${u.fallbacks} · 429 ${u.rate429} · saltate ${u.skipped} · errori ${u.errors} · token ${u.tokensIn}+${u.tokensOut}`);
 }

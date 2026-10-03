@@ -1,6 +1,12 @@
 import type { AgentMemory, FactionKnowledge } from '../schemas/index.js';
 import type { Scenario } from '../engine/scenario.js';
+import { DIPLO_CATALOG } from '../engine/diplo-actions.js';
 import { stanceForces } from '../engine/stances.js';
+
+/** Azioni diplomatiche che un agente può ordinare (gli alias NATO_ART4, EU_COUNCIL e UNSC_DRAFT restano solo in lettura). */
+const DIPLO_KINDS = ['DEMARCHE', 'THREAT', 'REASSURANCE', 'BACKCHANNEL', 'PROPOSE_AGREEMENT', 'RESPOND_AGREEMENT', 'SANCTION', 'LIFT_SANCTION', 'ENERGY_DEAL', 'AID', 'IMPROVE_RELATIONS', 'STOP_IMPROVE', 'RECALL_AMBASSADOR', 'EXPEL_DIPLOMATS', 'BREAK_RELATIONS', 'RESTORE_RELATIONS', 'ARMS_EMBARGO', 'LIFT_ARMS_EMBARGO', 'ULTIMATUM', 'MEDIATE', 'RESOLUTION'] as const;
+/** costo indicativo delle azioni il cui costo dipende dal tipo (trattato, sede): media del catalogo */
+const DIPLO_FIXED: Partial<Record<(typeof DIPLO_KINDS)[number], number>> = { PROPOSE_AGREEMENT: 4, RESOLUTION: 5 };
 
 /** Azioni lecite per una fazione, derivate SOLO dalla sua Knowledge e dal catalogo pubblico. */
 export function legalActions(k: FactionKnowledge, sc: Scenario) {
@@ -21,7 +27,15 @@ export function legalActions(k: FactionKnowledge, sc: Scenario) {
     // solo i tipi di ordine che la fazione può davvero eseguire: i modelli piccoli altrimenti inventano asset ISR o squadre SOF
     orderKinds: ['MOVE', 'PATROL', 'PRESENCE', 'SHOW_OF_FORCE', 'ESCORT', 'BLOCKADE', 'EXCLUSION_ZONE', 'STRIKE', 'ISR', 'SOF_OP', 'CYBER_OP', 'AIR_DEFENSE', 'REPAIR', 'RETURN_TO_BASE', 'STAND_DOWN', 'EVACUATION']
       .filter((kind) => (kind !== 'ISR' || f.isrAssets.length > 0) && (kind !== 'SOF_OP' || k.ownUnits.some((u) => u.type === 'sof_team' && u.status !== 'destroyed'))),
-    diploKinds: ['DEMARCHE', 'THREAT', 'REASSURANCE', 'PROPOSE_AGREEMENT', 'RESPOND_AGREEMENT', 'SANCTION', 'LIFT_SANCTION', 'BACKCHANNEL', 'NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT', 'ENERGY_DEAL', 'AID'],
+    diploKinds: DIPLO_KINDS,
+    // capitale diplomatico (CD): ogni azione ha un costo, molte una ricarica; il motore scarta ciò che non si può pagare
+    capitaleDiplomatico: k.diplomacy?.capital ?? null,
+    costiDiplomatici: Object.fromEntries(DIPLO_KINDS.map((kind) => {
+      const c = DIPLO_CATALOG[kind].cost;
+      return [kind, (typeof c === 'number' ? c : DIPLO_FIXED[kind] ?? 3) * (DIPLO_CATALOG[kind].coercive ? k.diplomacy?.coerciveCost ?? 1 : 1)];
+    })),
+    ricariche: k.diplomacy?.cooldowns ?? {},
+    slotMiglioramento: k.diplomacy ? k.diplomacy.improvingSlots - k.diplomacy.improving.length : 0,
   };
 }
 

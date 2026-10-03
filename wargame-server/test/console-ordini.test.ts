@@ -92,7 +92,7 @@ describe('console ordini: nomi riconosciuti prima dell\'LLM', () => {
     expect(sys).toContain('dai un ordine in orders.military con quell\'id in "unitIds". Usa zoneStances SOLO se la direttiva non nomina unità');
     expect(sys).toContain('"military":[{"id":"m1","kind":"PRESENCE","unitIds":["ITA-F590"],"zoneId":"IONIO","roe":"WEAPONS_HOLD"}],"zoneStances":[]');
     // prompt corto per i modelli da 4B
-    expect(sys.length).toBeLessThan(6000);
+    expect(sys.length).toBeLessThan(7000);
   });
 });
 
@@ -453,5 +453,58 @@ describe('banco «parser»: casi e punteggio', () => {
     const ok = await run({ orders: { ...empty, military: [{ id: 'm1', kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],
       diplomacy: [{ id: 'd1', kind: 'REASSURANCE', target: 'GRC', message: 'x', visibility: 'public' }] } }, FRASE_2, 'sok');
     expect(ok).toEqual({ verdict: 'corretto', reasons: [] });
+  });
+});
+
+describe('Console ordini: azioni diplomatiche del catalogo (capitale, ricariche, completamento)', () => {
+  const nuove = PARSER_CASES.slice(14);
+  it('il banco ha le 14 frasi di prima e 4 con le azioni nuove', () => {
+    expect(PARSER_CASES).toHaveLength(18);
+    expect(nuove.flatMap((c) => c.expect.map((x) => x.kinds[0]))).toEqual(['RECALL_AMBASSADOR', 'ULTIMATUM', 'IMPROVE_RELATIONS', 'RESOLUTION']);
+  });
+
+  it('con il mock le 4 frasi nuove sono corrette (alcune dal modello, le altre le completa il motore); nessuna regressione sulle 14 di prima', async () => {
+    const e = makeEngine();
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'banco-nuove', seed: 'banco-nuove' });
+    for (const pc of nuove) {
+      const r = await e.parseOrders(c.id, pc.text);
+      expect(scoreParsed(pc, r), pc.text).toEqual({ verdict: 'corretto', reasons: [] });
+    }
+    // la risoluzione la completa il motore con la sede della frase e il bersaglio nominato
+    const res = await e.parseOrders(c.id, nuove[3]!.text);
+    expect(res.orders.diplomacy.find((d) => d.kind === 'RESOLUTION')).toMatchObject({ forum: 'UNGA', target: 'RUS' });
+    expect(res.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: RESOLUTION in UNGA contro RUS'))).toBe(true);
+    // l'ultimatum prende la scadenza dal testo (entro 2 turni)
+    const ult = await e.parseOrders(c.id, nuove[1]!.text);
+    expect(ult.orders.diplomacy.find((d) => d.kind === 'ULTIMATUM')).toMatchObject({ target: 'RUS', deadlineTurns: 2 });
+  });
+
+  it('il motore completa le azioni nuove che il modello dimentica: una sola fazione nominata, mai con una negazione, la frase più specifica vince', async () => {
+    const e = makeEngine(new ScriptedParser({ orders: empty, ambiguities: [] }));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'compl', seed: 'compl' });
+    const kinds = async (text: string) => (await e.parseOrders(c.id, text)).orders.diplomacy.map((d) => d.kind);
+    expect(await kinds('Richiama l\'ambasciatore dall\'Iran')).toEqual(['RECALL_AMBASSADOR']);
+    expect(await kinds('Espelli i diplomatici russi')).toEqual(['EXPEL_DIPLOMATS']);
+    expect(await kinds('Imponi un embargo sulle armi alla Russia')).toEqual(['ARMS_EMBARGO']);
+    expect(await kinds('Revoca l\'embargo sulle armi alla Russia')).toEqual(['LIFT_ARMS_EMBARGO']);
+    expect(await kinds('Migliora le relazioni con l\'Egitto')).toEqual(['IMPROVE_RELATIONS']);
+    expect(await kinds('Porta al Consiglio di sicurezza la questione del Mar Rosso')).toEqual(['RESOLUTION']);
+    expect(await kinds('Non richiamare l\'ambasciatore dall\'Iran')).toEqual([]);
+    expect(await kinds('Richiama l\'ambasciatore dall\'Iran e dalla Russia')).toEqual([]); // due fazioni: ambiguo, non si indovina
+  });
+
+  it('avvisi dopo l\'LLM: capitale insufficiente e ricarica (la bozza resta modificabile, il validatore dà l\'errore vero)', async () => {
+    const e = makeEngine(new ScriptedParser({ orders: { ...empty, diplomacy: [{ id: 'd1', kind: 'THREAT', target: 'RUS', message: 'x', visibility: 'public' }] }, ambiguities: [] }));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'avvisi', seed: 'avvisi' });
+    const s = await e.store.getState(c.id);
+    s.diplomacy!.capital.ITA = 2;
+    await e.store.saveState(c.id, s);
+    const r = await e.parseOrders(c.id, 'Minaccia la Russia');
+    expect(r.validation.risks.some((x) => x.startsWith('⚠ Capitale diplomatico: la bozza costa 3 CD ma ne hai 2'))).toBe(true);
+    expect(r.validation.errors.some((x) => x.includes('capitale diplomatico insufficiente'))).toBe(true);
+    s.diplomacy!.capital.ITA = 20; s.diplomacy!.cooldowns['ITA|THREAT|RUS'] = s.turn + 2;
+    await e.store.saveState(c.id, s);
+    const r2 = await e.parseOrders(c.id, 'Minaccia la Russia');
+    expect(r2.validation.risks.some((x) => /Minaccia \(.*\) è in ricarica fino al turno/.test(x))).toBe(true);
   });
 });

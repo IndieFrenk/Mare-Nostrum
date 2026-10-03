@@ -16,10 +16,10 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 #wg-top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 10px;
   background: linear-gradient(#262a24, #121511); border-bottom: 2px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,.7); }
 .wg-flag { width: 58px; height: 38px; font-weight: 800; letter-spacing: .08em; background: linear-gradient(90deg, #1f7a3f 0 33%, #eee 33% 66%, #c33 66%); color: #111; text-shadow: 0 0 3px #fff; border: 2px solid var(--gold); }
-.wg-res { display: flex; flex-direction: column; padding: 2px 10px; border-left: 1px solid #3b3526; min-width: 76px; }
+.wg-res { display: flex; flex-direction: column; padding: 2px 8px; border-left: 1px solid #3b3526; min-width: 0; white-space: nowrap; }
 .wg-res small { color: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; } .wg-res b { color: var(--gold); font-size: 14px; }
 .wg-spacer { flex: 1; }
-.wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
+.wg-date { display: flex; flex-direction: column; align-items: flex-end; padding: 0 10px; white-space: nowrap; } .wg-date b { font-size: 17px; letter-spacing: .04em; } .wg-date small { color: var(--dim); }
 .wg-len { font-size: 11px; margin-right: 6px; }
 /* stato dei modelli: verde = rispondono, giallo = rispondono ma manca un modello o sono lenti, rosso = irraggiungibili */
 .wg-llm { display: flex; align-items: center; gap: 5px; margin-right: 6px; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 12px; padding: 3px 8px; color: var(--dim); cursor: help; }
@@ -63,7 +63,7 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-drawer:not(:empty) ~ .wg-selection { left: 508px; }
 
 /* modalità mappa e log */
-#wg-modes { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 3px; }
+#wg-modes { position: absolute; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: calc(100vw - 20px); }
 #wg-modes button { text-transform: capitalize; background: rgba(20,22,18,.9); } #wg-modes .on { border-color: var(--gold); color: var(--gold); }
 #wg-log { position: absolute; left: 58px; bottom: 12px; color: var(--dim); max-width: 50vw; pointer-events: none; text-shadow: 0 1px 2px #000; }
 
@@ -112,3 +112,41 @@ textarea { width: 100%; }
 .wg-letter-to { color: var(--ink-dim); } .wg-letter-subject { margin: 8px 0 10px !important; }
 .wg-letter-body p { text-indent: 1.2em; } .wg-letter-body p:first-child { text-indent: 0; }
 .wg-letter-sign { text-align: right; font-style: italic; margin-top: 14px !important; }
+
+/* diplomazia: palette in variabili (la mappa le legge). Scala divergente blu–arancio per l'opinione, leggibile anche da chi non distingue rosso e verde;
+   ogni voce di legenda ha comunque il nome scritto, il colore non è l'unico segnale. */
+:root {
+  --wg-op-0: #c4501b; --wg-op-1: #f0a04b; --wg-op-2: #8c8c80; --wg-op-3: #6fb1e8; --wg-op-4: #2b6cc4; /* ostile · fredda · neutra · cordiale · stretta */
+  --wg-self: #f2e9c4; --wg-none: #3c3c36;
+  --wg-tr-defense: #6ec1ff; --wg-tr-guarantee: #ffd166; --wg-tr-access: #ff9f5a; --wg-tr-trade: #7fe0a8; --wg-tr-energy: #f08ad0; --wg-tr-migration: #c3b1ff; --wg-tr-other: #b8b8b0;
+  --wg-vote-yes: #4a8fe0; --wg-vote-no: #e8832e; --wg-vote-abstain: #cfcab0; --wg-vote-absent: #33332f;
+  --wg-tension-0: #6fb1e8; --wg-tension-1: #cfcab0; --wg-tension-2: #f0a04b; --wg-tension-3: #c4501b; /* distensione · normale · alta · critica */
+}
+#wg-legend { right: 10px; bottom: 52px; width: 300px; padding: 6px 10px 8px; display: grid; gap: 5px; }
+#wg-legend > b { color: var(--gold); text-transform: uppercase; letter-spacing: .08em; font-size: 12px; }
+#wg-legend select { width: 100%; }
+.wg-seg { display: flex; } .wg-seg button { flex: 1; border-radius: 0; } .wg-seg button.on { border-color: var(--gold); color: var(--gold); }
+.wg-sw { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; }
+.wg-sw li { display: flex; align-items: center; gap: 5px; } .wg-sw i { width: 14px; height: 10px; display: inline-block; border: 1px solid #000; } .wg-sw i.wg-ln { height: 0; border: 0; width: 22px; }
+.wg-vote-title { margin: 0; font-size: 12px; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+/* scheda paese unificata (tutti gli Stati) */
+.wg-cc { width: 372px; max-height: calc(100vh - 270px); min-height: 200px; overflow: auto; } .wg-cc header span { font-size: 18px; line-height: 1; }
+body:has(#wg-legend) .wg-cc { max-height: max(200px, calc(100vh - 470px)); } /* la legenda della modalità mappa sta sotto la scheda */
+.wg-cc h4 { margin: 10px 10px 2px; color: #cfc6a8; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.wg-cc summary { cursor: pointer; font-weight: 600; color: #cfc6a8; margin: 6px 0 2px; }
+.wg-cc .pos { color: var(--wg-op-3); } .wg-cc .neg { color: var(--wg-op-1); } /* più/meno: blu/arancio, e comunque col segno scritto */
+.wg-opline { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; } .wg-opline b { text-transform: capitalize; }
+.wg-cbar { position: relative; height: 10px; background: #26271f; margin: 3px 0; } .wg-cbar i { position: absolute; top: 0; bottom: 0; } .wg-cbar u { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--dim); }
+.wg-bseg { display: flex; gap: 2px; margin: 3px 0; } .wg-bseg i { flex: 1; height: 10px; opacity: .3; } .wg-bseg i.on { opacity: 1; outline: 1px solid var(--text); }
+.wg-reasons { list-style: none; margin: 4px 0; padding: 0; font-size: 12px; } .wg-reasons b { display: inline-block; min-width: 40px; font-variant-numeric: tabular-nums; }
+.wg-reasons li.shared { color: var(--gold); } .wg-chip.shared { border-color: var(--gold); color: var(--gold); }
+.wg-act { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 3px 0; padding: 3px 0; border-bottom: 1px solid var(--line); } .wg-act > button { text-align: left; } .wg-act button b { color: var(--gold); }
+.wg-why { flex-basis: 100%; color: var(--warn); } .wg-accept { flex-basis: 100%; font-size: 12px; } .wg-accept summary { display: inline; font-weight: 400; margin: 0 0 0 6px; }
+/* elenco degli Stati */
+.wg-states { list-style: none; margin: 6px 0 0; padding: 0; } .wg-states button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; border-color: transparent; background: none; }
+.wg-states button.on { border-color: var(--gold); } .wg-states small { color: var(--dim); display: flex; align-items: center; gap: 4px; } .wg-states small i { width: 10px; height: 10px; display: inline-block; border: 1px solid #000; }
+/* barra in alto: tensione mondiale (quattro fasce, indicatore sul valore) */
+.wg-tension { min-width: 128px; } .wg-tbar { position: relative; display: flex; height: 5px; margin-top: 2px; } .wg-tbar i { display: block; height: 100%; opacity: .85; } .wg-tbar u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; box-shadow: 0 0 2px #000; }
+

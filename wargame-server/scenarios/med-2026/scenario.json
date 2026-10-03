@@ -4,5 +4,11 @@
   "startDate": "2026-03-02",
   "turnLength": "week",
   "playerFaction": "ITA",
-  "globalIndicators": { "brentUsd": 78, "ttfEurMwh": 38, "medShippingRisk": 45, "migrationPressure": 55 }
+  "globalIndicators": {
+    "brentUsd": 78,
+    "ttfEurMwh": 38,
+    "medShippingRisk": 45,
+    "migrationPressure": 55,
+    "worldTension": 30
+  }
 }

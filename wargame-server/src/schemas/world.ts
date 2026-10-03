@@ -12,7 +12,7 @@ export const Roe = z.enum(['WEAPONS_HOLD', 'WEAPONS_TIGHT', 'WEAPONS_FREE']);
 export const UnitType = z.enum(['carrier', 'lhd', 'destroyer', 'frigate', 'opv', 'submarine', 'fighter_sqn', 'strike_sqn', 'aew', 'mpa', 'drone_flight', 'sam_battery', 'ground_bn', 'sof_team', 'tanker', 'transport']);
 export const Domain = z.enum(['sea', 'subsurface', 'air', 'land', 'space', 'cyber']);
 export const UnitStatus = z.enum(['ready', 'deployed', 'transit', 'maintenance', 'damaged', 'destroyed']);
-export const AgentRole = z.enum(['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat']);
+export const AgentRole = z.enum(['faction_major', 'faction_minor', 'gm_narrator', 'intel_analyst', 'order_parser', 'reflection', 'repair', 'diplomat', 'strategist', 'chancery']);
 
 export const Objective = z.object({ id: z.string(), text: z.string(), priority: z.union([z.literal(1), z.literal(2), z.literal(3)]), metric: z.string(), progress: z.number() });
 export const RedLine = z.object({ id: z.string(), text: z.string(), trigger: z.string(), response: z.string() });
@@ -44,6 +44,8 @@ export const FactionPolicy = z.object({
 export const Faction = z.object({
   id: FactionId, name: z.string(), kind: z.enum(['state', 'bloc', 'nonstate']),
   controller: z.enum(['human', 'ai', 'scripted']), agentRole: AgentRole.nullable(), profileRef: z.string(),
+  /** `A` = grande potenza con una direttiva strategica proposta dall'LLM ogni 3–6 turni (oltre a USA, CHN, RUS; docs/wargame/DIPLOMAZIA.md §11) */
+  tier: z.enum(['A']).optional(),
   posture: z.number().int().min(1).max(5),
   budget: z.object({ discretionary: MEur, perTurnIncome: MEur }),
   stocks: z.record(z.string(), z.number()),
@@ -87,8 +89,73 @@ export const Zone = z.object({ id: ZoneId, name: z.string(), terrain: z.enum(['s
 export const Relation = z.object({ trust: z.number(), tension: z.number(), tradeDependency: z.number(), lastIncidentTurn: Turn.nullable(), notes: z.array(z.string()) });
 export const RelationMatrix = z.record(FactionId, z.record(FactionId, Relation));
 
+/**
+ * Modificatore dell'opinione (docs/wargame/DIPLOMAZIA.md §5.2): `opinion(from→to)` = base + Σ modificatori(from→to). Un'azione di A
+ * verso B crea un modificatore su `opinion(B→A)`, cioè su come B vede A. `value` è il valore corrente (si riduce verso 0 con il
+ * decadimento, un evento OPINION_DECAYED per turno); `decayPerWeek` 0 = finché dura la causa.
+ */
+export const OpinionModifier = z.object({
+  id: z.string(), from: FactionId, to: FactionId,
+  /** chiave della tabella PARAMS.opinion.modifiers («threat», «sanction», «history»…) */
+  kind: z.string(), label: z.string(),
+  value: z.number(), decayPerWeek: z.number().min(0).default(0),
+  /** valore assoluto sotto cui non scende finché la causa è attiva (senza `expiresTurn`) */
+  floor: z.number().optional(),
+  expiresTurn: Turn.optional(),
+  /** ordine, accordo o evento che l'ha causato */
+  causeRef: z.string(),
+  visibility: Visibility.default('public'),
+  /** turno in cui è nato (per «i turni che mancano» nella scheda paese) */
+  turn: Turn.default(0),
+});
+/**
+ * Stato sparso della diplomazia: mai la matrice completa (con 197 Stati sarebbero ~39.000 coppie per snapshot).
+ * - `modifiers`: tutti i modificatori d'opinione vivi;
+ * - `tension`: tensione di coppia (simmetrica) solo per le coppie diverse dal fondo, chiave «A|B» con A < B;
+ * - `tensionBase`: tensione strutturale delle coppie diverse dal predefinito (dallo scenario): il fondo verso cui la tensione torna.
+ * La tensione mondiale sta in `globalIndicators.worldTension`. Gli altri campi del §5.5 (capitale, ricariche, ultimatum) arrivano col settore 09.
+ */
+/** Ultimatum con scadenza: alla scadenza `met` (il destinatario ha cercato la distensione) o `expired` (dà legittimità alla forza, tensione mondiale +5). */
+export const Ultimatum = z.object({
+  id: z.string(), from: FactionId, to: FactionId, demand: z.string(), issuedTurn: Turn, deadlineTurn: Turn,
+  status: z.enum(['pending', 'met', 'expired']),
+  /** il destinatario ha cercato la distensione (rassicurazione, canale riservato, lettera conciliante, accordo accettato) prima della scadenza */
+  answered: z.boolean().optional(),
+  /** per `expired`: fino a questo turno le azioni di forza di `from` contro `to` non pagano il costo di legittimità */
+  legitimateUntil: Turn.optional(),
+});
+/** Risoluzione approvata da un'istituzione (dà legittimità a blocchi e zone di esclusione contro `target` finché non scade). */
+export const Resolution = z.object({
+  id: z.string(), forum: z.string(), institutionId: z.string(), subject: z.string(), topic: z.string(),
+  proposer: FactionId, target: FactionId.optional(), turn: Turn, expiresTurn: Turn,
+});
+export const TieStatus = z.enum(['recalled', 'expelled', 'broken']);
+export const Diplomacy = z.object({
+  modifiers: z.array(OpinionModifier).default([]),
+  tension: z.record(z.string(), z.number()).default({}),
+  tensionBase: z.record(z.string(), z.number()).default({}),
+  /** capitale diplomatico (CD) delle fazioni, tra 0 e il tetto (PARAMS.diplo.capital.cap): una rendita per turno, si spende nelle azioni */
+  capital: z.record(FactionId, z.number()).default({}),
+  /** ricariche per destinatario: chiave «attore|azione|destinatario» (o «rej|proponente|destinatario|tipo» per le proposte respinte) → primo turno in cui si può ripetere */
+  cooldowns: z.record(z.string(), z.number()).default({}),
+  /** «Migliorare le relazioni» in corso: ogni turno costa 1 CD e alza di 2 l'opinione di `target` verso `actor`, fino a +30 */
+  improving: z.array(z.object({ actor: FactionId, target: FactionId, since: Turn })).default([]),
+  ultimatums: z.array(Ultimatum).default([]),
+  /** stato dei rapporti diplomatici di una coppia (chiave «A|B»): ambasciatore richiamato, diplomatici espulsi, relazioni rotte */
+  ties: z.record(z.string(), TieStatus).default({}),
+  /** embarghi sulle armi, «da>a» */
+  embargoes: z.array(z.string()).default([]),
+  resolutions: z.array(Resolution).default([]),
+});
+
 export const Agreement = z.object({
-  id: z.string(), type: z.enum(['defense', 'energy', 'basing', 'migration', 'ceasefire', 'arms_sale', 'intel_sharing', 'secret']),
+  id: z.string(),
+  /**
+   * Tipi nuovi (docs/wargame/DIPLOMAZIA.md §7): `non_aggression` (violato da un atto di forza tra le parti), `guarantee` (parties[0] è il garante,
+   * le altre sono garantite: il garante risponde alle linee rosse del garantito), `military_access` (parties[0] concede l'accesso alle proprie zone),
+   * `defense_cooperation` (cooperazione di difesa: conta come alleanza stretta se a ≤ 3 parti) e `trade`.
+   */
+  type: z.enum(['defense', 'energy', 'basing', 'migration', 'ceasefire', 'arms_sale', 'intel_sharing', 'secret', 'non_aggression', 'guarantee', 'military_access', 'defense_cooperation', 'trade']),
   parties: z.array(FactionId), terms: z.string(), startTurn: Turn, endTurn: Turn.nullable(),
   visibility: Visibility, status: z.enum(['proposed', 'active', 'violated', 'expired']),
 });
@@ -132,7 +199,13 @@ export const WorldState = z.object({
   infrastructure: z.record(z.string(), Infrastructure), zones: z.record(ZoneId, Zone), relations: RelationMatrix,
   crises: z.record(z.string(), Crisis), agreements: z.record(z.string(), Agreement),
   pendingDeliveries: z.array(PendingDelivery), engagements: z.record(z.string(), Engagement),
-  globalIndicators: z.object({ brentUsd: z.number(), ttfEurMwh: z.number(), medShippingRisk: z.number(), migrationPressure: z.number() }),
+  globalIndicators: z.object({
+    brentUsd: z.number(), ttfEurMwh: z.number(), medShippingRisk: z.number(), migrationPressure: z.number(),
+    /** tensione mondiale 0–100 (engine/world-tension.ts): rende più facili o più costose le azioni gravi (docs/wargame/DIPLOMAZIA.md §6) */
+    worldTension: z.number().default(30),
+  }),
+  /** opinione asimmetrica e tensione di coppia; assente nelle campagne precedenti (si riempie in lettura, store/migrations) */
+  diplomacy: Diplomacy.optional(),
 });
 
 export const LedgerEntry = z.object({
@@ -161,6 +234,11 @@ export type Base = z.infer<typeof Base>;
 export type Infrastructure = z.infer<typeof Infrastructure>;
 export type Zone = z.infer<typeof Zone>;
 export type Relation = z.infer<typeof Relation>;
+export type OpinionModifier = z.infer<typeof OpinionModifier>;
+export type Diplomacy = z.infer<typeof Diplomacy>;
+export type Ultimatum = z.infer<typeof Ultimatum>;
+export type Resolution = z.infer<typeof Resolution>;
+export type TieStatus = z.infer<typeof TieStatus>;
 export type Agreement = z.infer<typeof Agreement>;
 export type Crisis = z.infer<typeof Crisis>;
 export type PendingDelivery = z.infer<typeof PendingDelivery>;

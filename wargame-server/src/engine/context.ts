@@ -1,4 +1,6 @@
 import type { Campaign, Contact, EventType, GameEvent, LedgerEntry, TurnPhase, Visibility, WorldState } from '../schemas/index.js';
+import { isActor } from './diplo-actions.js';
+import { buildModifier, kindOfNote, type ActRef } from './opinion.js';
 import { PARAMS } from './params.js';
 import { applyEvent } from './reducer.js';
 import { Rng } from './rng.js';
@@ -49,13 +51,54 @@ export class TurnCtx {
     this.ledger.push({ turn: this.turn, factionId, category, amount: delta, balanceAfter: this.state.factions[factionId].budget.discretionary, ref, note });
   }
 
-  /** detente: azione distensiva (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato) che raffredda le crisi comuni */
+  /**
+   * Costruttore di modificatori (docs/wargame/DIPLOMAZIA.md §5.2): un'azione di `a` verso `b` cambia **come b vede a**, cioè
+   * `opinion(b→a)`, con tipo e decadimento dedotti dalla nota (tabella in engine/opinion.ts: minaccia, démarche, sanzioni…); `trust` è il
+   * valore del modificatore (già tarato da chi chiama) e `tension` cambia la tensione di coppia (simmetrica). Gli alleati stretti di b
+   * (`propagate` ≠ false) ne ricevono il 30%. Gli scontri e gli accordi accettati valgono per entrambe le parti. Emette OPINION_MODIFIER
+   * e TENSION_CHANGED; l'atto (`act`) viaggia sul primo dei due, per chi legge incidenti, minacce e distensioni.
+   * detente: azione distensiva (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato) che raffredda le crisi comuni.
+   */
   relate(a: string, b: string, trust: number, tension: number, note: string, opts: { incident?: boolean; propagate?: boolean; visibility?: Visibility; detente?: boolean } = {}) {
-    if (a === b || !this.state.relations[a]?.[b]) return;
-    this.emit('RELATION_CHANGED', a, { a, b, trust, tension, note, incident: opts.incident ?? false, ...(opts.detente ? { detente: true } : {}) }, { targets: [b], visibility: opts.visibility ?? 'public' });
-    if (opts.propagate === false) return;
-    const k = 0.3;
-    for (const ally of alliesOf(this.state, b)) if (ally !== a) this.emit('RELATION_CHANGED', a, { a, b: ally, trust: +(trust * k).toFixed(1), tension: +(tension * k).toFixed(1), note: `propagazione: ${note}` }, { targets: [ally], visibility: opts.visibility ?? 'public' });
+    // vale per ogni coppia di attori: fazioni dello scenario e Stati del registro (ISO3)
+    if (a === b || !isActor(this.state, a) || !isActor(this.state, b)) return;
+    const visibility = opts.visibility ?? 'public';
+    // chi ha ricevuto un ultimatum e cerca la distensione verso chi lo ha mandato lo «soddisfa» (si verifica alla scadenza)
+    if (opts.detente) for (const u of this.state.diplomacy?.ultimatums ?? []) if (u.status === 'pending' && !u.answered && u.from === b && u.to === a) this.emit('DIPLOMACY_CHANGED', a, { change: { op: 'ultimatum_answered', id: u.id } }, { visibility: [a, b] });
+    const { kind, label } = kindOfNote(note);
+    const act: ActRef = { id: `A${this.turn}-${this.seq}`, a, b, note, ...(opts.incident ? { incident: true } : {}), ...(opts.detente ? { detente: true } : {}) };
+    let carried = false;
+    /** OPINION_MODIFIER su opinion(from→to) */
+    const modify = (from: string, to: string, value: number, o: { propagated?: boolean; mirror?: boolean; of?: string; label?: string } = {}) => {
+      const m = buildModifier(this.state, { kind: o.of ?? kind, label: o.label ?? label, from, to, value, turn: this.turn, act: act.id, causeRef: `E${this.turn}-${this.seq}`, visibility });
+      const withAct = !carried && !o.propagated && !o.mirror;
+      if (withAct) carried = true;
+      this.emit('OPINION_MODIFIER', a, { modifier: m, ...(withAct ? { act } : {}), ...(o.propagated ? { propagated: true } : {}) }, { targets: [o.propagated ? from : b], visibility });
+    };
+    const tense = (x: string, y: string, delta: number, propagated = false) => {
+      const withAct = !carried && !propagated;
+      if (withAct) carried = true;
+      this.emit('TENSION_CHANGED', a, { a: x, b: y, delta, ...(withAct ? { act } : {}), ...(propagated ? { propagated: true } : {}) }, { targets: [y], visibility });
+    };
+    if (kind === 'sanction_lifted') {
+      // la revoca trasforma le sanzioni in vigore in un residuo che decade (−15 → −7,5, come prima il valore netto), non ne aggiunge altre
+      for (const m of (this.state.diplomacy?.modifiers ?? []).filter((x) => x.kind === 'sanction' && x.from === b && x.to === a)) {
+        carried = true;
+        this.emit('OPINION_MODIFIER', a, { modifier: { ...m, kind, label, value: +(m.value / 2).toFixed(1), decayPerWeek: PARAMS.opinion.modifiers.sanction_lifted!.decayPerWeek, causeRef: `E${this.turn}-${this.seq}`, turn: this.turn }, act }, { targets: [b], visibility });
+        break;
+      }
+    } else if (trust) {
+      modify(b, a, trust);
+      if (PARAMS.opinion.modifiers[kind]?.mutual) modify(a, b, trust, { mirror: true });
+    }
+    if (tension || !carried) tense(a, b, tension);
+    if (opts.propagate === false || kind === 'sanction_lifted') return;
+    const k = PARAMS.diplo.propagation;
+    for (const ally of alliesOf(this.state, b)) {
+      if (ally === a || !this.state.relations[a]?.[ally]) continue;
+      if (trust) modify(ally, a, +(trust * k).toFixed(1), { propagated: true });
+      if (tension) tense(a, ally, +(tension * k).toFixed(1), true);
+    }
   }
 
   /** escalation già dovuta agli ordini in questo turno, per crisi (tetto PARAMS.crisisOrderCapPerTurn) */
@@ -84,7 +127,7 @@ export class TurnCtx {
 
 export function alliesOf(s: WorldState, f: string): string[] {
   return Object.values(s.agreements)
-    .filter((a) => a.status === 'active' && a.type === 'defense' && a.parties.includes(f) && a.parties.length <= 3)
+    .filter((a) => a.status === 'active' && (a.type === 'defense' || a.type === 'defense_cooperation') && a.parties.includes(f) && a.parties.length <= 3)
     .flatMap((a) => a.parties).filter((x) => x !== f);
 }
 

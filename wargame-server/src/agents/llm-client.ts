@@ -8,8 +8,41 @@ export interface LlmRequest {
   /** tiene maxLength/maxProperties nello schema inviato (lettere, parser): i modelli locali si fermano prima; se il provider li rifiuta si tolgono */
   keepLengths?: boolean;
 }
-export interface LlmResponse { text: string; usage: { promptTokens: number; completionTokens: number }; latencyMs: number; model: string }
-export interface LlmProvider { name: string; complete(req: LlmRequest): Promise<LlmResponse> }
+export interface LlmResponse {
+  text: string; usage: { promptTokens: number; completionTokens: number }; latencyMs: number; model: string;
+  /** vera se la risposta viene dalla cache della campagna (agents/budget.ts): nessuna chiamata, nessun token */
+  cached?: boolean;
+}
+export interface LlmProvider {
+  name: string; complete(req: LlmRequest): Promise<LlmResponse>;
+  /** la risposta a questa richiesta non è stata accettata (schema o regole): la cache non la deve restituire di nuovo */
+  reject?(req: LlmRequest): void;
+}
+
+/**
+ * La chiamata non è stata fatta: budget del turno finito, limite di richieste al minuto o al giorno, tutti i modelli del profilo in 429.
+ * Non è un guasto del modello: chi chiama non chiede il repair e passa al testo deterministico del suo ruolo.
+ */
+export class LlmSkipped extends Error {
+  constructor(readonly reason: 'budget' | 'rate' | 'daily' | '429', message: string) { super(message); this.name = 'LlmSkipped'; }
+}
+
+/** HTTP 429: il provider chiede di rallentare. `retryAfterMs` viene dall'intestazione `Retry-After` (o dal `retryDelay` di Google). */
+export class RateLimitError extends Error {
+  constructor(message: string, readonly retryAfterMs: number | null) { super(message); this.name = 'RateLimitError'; }
+}
+
+/** `Retry-After`: secondi o data HTTP; in mancanza il `retryDelay` («34s») che Google mette nel corpo dell'errore. */
+export function retryAfterMs(header: string | null | undefined, body = ''): number | null {
+  if (header) {
+    const secs = Number(header);
+    if (Number.isFinite(secs) && secs >= 0) return Math.round(secs * 1000);
+    const at = Date.parse(header);
+    if (Number.isFinite(at)) return Math.max(0, at - Date.now());
+  }
+  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
+  return m ? Math.round(Number(m[1]) * 1000) : null;
+}
 
 /** Estrae il primo oggetto JSON bilanciato da un testo (gestisce fence e prosa attorno). */
 export function extractJson(text: string): unknown {
@@ -44,6 +77,8 @@ export function portableSchema(s: unknown, names = false, keep: readonly string[
 
 /** Errore HTTP che non ha senso ripetere (modello inesistente, richiesta rifiutata). */
 class FatalHttpError extends Error {}
+/** 429 dopo gli ultimi tentativi: non si ripete più, sale come RateLimitError. */
+class FatalRateLimit extends RateLimitError {}
 
 /**
  * Client OpenAI-compatible (OmniRoute): json_schema se il modello lo supporta, altrimenti json_object; 2 retry con backoff.
@@ -57,8 +92,14 @@ export class OpenAiCompatProvider implements LlmProvider {
   private lengthsUnsupported = new Set<string>();
   /** LLM_EXTRA_BODY: campi aggiunti a ogni richiesta, in JSON (es. {"reasoning_effort":"none"} per spegnere il ragionamento). */
   private extra: Record<string, unknown> = (() => { try { return JSON.parse(process.env.LLM_EXTRA_BODY || '{}'); } catch { return {}; } })();
-  /** LLM_RESPONSE_FORMAT=json_object salta del tutto json_schema (utile se i provider principali non lo accettano). */
-  constructor(readonly baseUrl = process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1', readonly apiKey = process.env.LLM_API_KEY, readonly responseFormat = process.env.LLM_RESPONSE_FORMAT ?? 'json_schema') {}
+  /**
+   * LLM_RESPONSE_FORMAT=json_object salta del tutto json_schema (utile se i provider principali non lo accettano).
+   * `opts.extraBody` sostituisce LLM_EXTRA_BODY (profili di provider); `opts.retry429` sono i tentativi in più dopo un 429 (predefinito 2, con
+   * attesa): con 0 il 429 sale subito come RateLimitError e il gestore del budget passa al modello successivo del profilo.
+   */
+  constructor(readonly baseUrl = process.env.LLM_BASE_URL ?? 'http://localhost:20128/v1', readonly apiKey = process.env.LLM_API_KEY, readonly responseFormat = process.env.LLM_RESPONSE_FORMAT ?? 'json_schema', readonly opts: { extraBody?: Record<string, unknown>; retry429?: number } = {}) {
+    if (opts.extraBody) this.extra = opts.extraBody;
+  }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     let lastErr: unknown;
@@ -88,7 +129,12 @@ export class OpenAiCompatProvider implements LlmProvider {
             attempt--; continue;
           }
           const msg = `LLM HTTP ${res.status}: ${body}`;
-          if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) throw new FatalHttpError(msg);
+          if (res.status === 429) {
+            const wait = retryAfterMs(res.headers.get('retry-after'), body);
+            if (attempt >= (this.opts.retry429 ?? 2)) throw new FatalRateLimit(msg, wait);
+            throw new RateLimitError(msg, wait);
+          }
+          if (res.status >= 400 && res.status < 500 && res.status !== 408) throw new FatalHttpError(msg);
           throw new Error(msg);
         }
         const j = (await res.json()) as { model?: string; choices: { message: { content: unknown } }[]; usage?: { prompt_tokens: number; completion_tokens: number } };
@@ -99,7 +145,7 @@ export class OpenAiCompatProvider implements LlmProvider {
           : content == null ? '' : JSON.stringify(content);
         return { text, usage: { promptTokens: j.usage?.prompt_tokens ?? 0, completionTokens: j.usage?.completion_tokens ?? 0 }, latencyMs: Date.now() - t0, model: j.model ?? req.model };
       } catch (e) {
-        if (e instanceof FatalHttpError) throw e;
+        if (e instanceof FatalHttpError || e instanceof FatalRateLimit) throw e;
         lastErr = e;
       } finally { clearTimeout(timer); }
     }

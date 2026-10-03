@@ -55,7 +55,11 @@ describe('notizie: un numero inventato non cancella tutto il turno', () => {
     const p = fixed({ news: [{ outlet: 'ANSA', headline: 'Sbarchi', body: 'Arrivati 438 migranti.', eventIds: [] }] });
     const log: LlmCall[] = [];
     const c = { config: { llm: { gm_narrator: { model: 'finto', temperature: 0, maxTokens: 100, timeoutMs: 1000 } } } } as never;
-    expect(await writeNews(p, log, c, 4, events)).toEqual([]);
+    // dopo il repair fallito le notizie vengono dai fatti (agenzia ANSA, stessi eventi): niente numeri inventati
+    const out = await writeNews(p, log, c, 4, events);
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((n) => n.outlet === 'ANSA' && n.factsRef.length === 1)).toBe(true);
+    expect(JSON.stringify(out)).not.toContain('438');
     expect(p.calls.length).toBe(3);
     expect(log.every((l) => !l.ok)).toBe(true);
   });

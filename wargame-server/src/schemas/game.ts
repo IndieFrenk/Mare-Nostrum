@@ -1,6 +1,10 @@
 import { z } from 'zod';
-import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, Turn, Unit, Visibility, ZoneId } from './world.js';
-import { FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
+import { AgentRole, Agreement, Crisis, Domain, Faction, FactionId, LatLon, Reliability, TieStatus, Turn, Ultimatum, Unit, Visibility, ZoneId } from './world.js';
+import { DiploAction, FactionOrders, OrdersBody, STANCES, ZoneStance } from './orders.js';
+
+/** Fasce con cui si vede l'opinione degli altri verso di sé (docs/wargame/DIPLOMAZIA.md §5.6); le soglie sono in PARAMS.opinion.bands. */
+export const OPINION_BANDS = ['ostile', 'fredda', 'neutra', 'cordiale', 'stretta'] as const;
+export type OpinionBand = (typeof OPINION_BANDS)[number];
 
 export const TurnPhase = z.enum(['OPEN', 'INTEL', 'BRIEFING', 'PLAYER_ORDERS', 'AI_DECISIONS', 'ADJUDICATION', 'CMO_PENDING', 'DEBRIEF', 'CLOSED']);
 export const LlmRoleConfig = z.object({ model: z.string(), temperature: z.number(), maxTokens: z.number(), timeoutMs: z.number() });
@@ -20,6 +24,8 @@ export const Campaign = z.object({
       order_parser: LlmRoleConfig, reflection: LlmRoleConfig, repair: LlmRoleConfig,
       /** facoltativo: le campagne create prima delle lettere usano il modello di faction_major */
       diplomat: LlmRoleConfig.optional(),
+      /** facoltativi (settore 11): direttive strategiche delle grandi potenze e frasi delle cancellerie; le campagne vecchie usano il modello di faction_major */
+      strategist: LlmRoleConfig.optional(), chancery: LlmRoleConfig.optional(),
     }), maxConcurrentAgents: z.number().int().min(1),
     /**
      * chi decide le mosse delle fazioni non umane: `rules` = decisore a regole del motore (engine/policy.ts), `llm` = agenti LLM
@@ -66,18 +72,22 @@ export const DiploLetter = z.object({
   /** human = scritta (o rivista) dal giocatore; ai = scritta da un LLM; template = lettera-modello di ripiego */
   source: z.enum(['human', 'ai', 'template']), model: z.string().optional(),
 });
-export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()) });
+export const NewsItem = z.object({ id: z.string(), turn: Turn, outlet: z.string(), outletFaction: FactionId, bias: z.number(), headline: z.string(), body: z.string(), zoneId: ZoneId.optional(), factsRef: z.array(z.string()),
+  /** `chancery`: le frasi delle cancellerie su un atto grave (le aggiunge il motore a fine turno, non il narratore) */
+  kind: z.literal('chancery').optional() });
 
 /**
  * Atto ostile o di pressione che la fazione ha visto nel turno precedente (eventi a lei visibili): minacce, sanzioni, blocchi,
  * scontri, strike, cyber e SOF attribuiti, dimostrazioni di forza, linee rosse superate. Lo usa il decisore a regole.
  */
-export const INCIDENT_KINDS = ['threat', 'sanction', 'blockade', 'engagement', 'strike', 'cyber', 'sof', 'show_of_force', 'red_line'] as const;
+export const INCIDENT_KINDS = ['threat', 'sanction', 'blockade', 'engagement', 'strike', 'cyber', 'sof', 'show_of_force', 'red_line', 'ultimatum'] as const;
 export const Incident = z.object({
   turn: Turn, kind: z.enum(INCIDENT_KINDS), from: FactionId, to: FactionId,
   zoneId: ZoneId.optional(),
   /** id della linea rossa (red_line) o dell'ordine che ha causato l'atto */
   ref: z.string().optional(),
+  /** per red_line: testo e risposta scritta della linea rossa (li vede anche il garante di chi l'ha vista superare) */
+  text: z.string().optional(), response: z.string().optional(),
 });
 
 export const FactionKnowledge = z.object({
@@ -92,14 +102,48 @@ export const FactionKnowledge = z.object({
   letters: z.array(DiploLetter).default([]),
   /** atti ostili o di pressione visti nel turno precedente (prima quelli che riguardano la fazione) */
   incidents: z.array(Incident).default([]),
-  /** fiducia e tensione della fazione verso le altre (la sua riga della matrice delle relazioni: il suo atteggiamento) */
-  ownRelations: z.record(FactionId, z.object({ trust: z.number(), tension: z.number() })).default({}),
+  /** capitale diplomatico, ricariche, rapporti e ultimatum della fazione (la sua parte: mai quella degli altri) */
+  diplomacy: z.object({
+    capital: z.number(), rent: z.number(), improvingSlots: z.number().int(),
+    /** 2 per le democrazie con tensione mondiale bassa (le azioni coercitive costano il doppio), altrimenti 1 */
+    coerciveCost: z.number().default(1),
+    improving: z.array(z.object({ target: FactionId, since: Turn })).default([]),
+    /** «azione|destinatario» → primo turno in cui si può ripetere (solo ricariche ancora attive) */
+    cooldowns: z.record(z.string(), z.number()).default({}),
+    /** altra fazione → stato dei rapporti diplomatici con lei (richiamo, espulsione, rottura) */
+    ties: z.record(FactionId, TieStatus).default({}),
+    ultimatums: z.array(Ultimatum).default([]),
+    embargoes: z.array(z.string()).default([]),
+    /** proposte di trattato ricevute, con come risponderebbe il decisore a regole (punteggio e motivi di `acceptance`): suggerimento per il giocatore */
+    proposals: z.array(z.object({ agreementId: z.string(), from: FactionId, type: z.string(), score: z.number(), accept: z.boolean(), reasons: z.array(z.object({ label: z.string(), value: z.number() })) })).default([]),
+  }).optional(),
+  /**
+   * Come il mondo ha reagito (settore 10): le reazioni pubbliche degli Stati agli atti gravi di cui la fazione è attore o vittima, e le votazioni delle
+   * istituzioni che la riguardano (proponente o bersaglio), del turno precedente. Solo conteggi e i cinque più popolosi: gli elenchi interi stanno
+   * negli eventi pubblici.
+   */
+  world: z.object({
+    reactions: z.array(z.object({ turn: Turn, eventId: z.string(), kind: z.string(), actor: FactionId, victim: FactionId, condemn: z.number().int(), support: z.number().int(), silent: z.number().int(), topCondemners: z.array(z.string()).default([]), topSupporters: z.array(z.string()).default([]) })).default([]),
+    votes: z.array(z.object({ turn: Turn, forum: z.string(), subject: z.string(), proposer: FactionId, target: FactionId.optional(), passed: z.boolean(), yes: z.number().int(), no: z.number().int(), abstain: z.number().int() })).default([]),
+  }).optional(),
+  /**
+   * L'opinione della fazione verso le altre (la sua riga: `trust` = opinionOf(lei → altra)) e la tensione di coppia. `opinionOfMe` è
+   * come le altre la vedono, solo a fasce (ostile · fredda · neutra · cordiale · stretta); il numero esatto (`opinionOfMeExact`) solo
+   * con un accordo di intelligence. Le coppie tra terzi non ci sono: si vedono solo dagli atti pubblici.
+   */
+  ownRelations: z.record(FactionId, z.object({ trust: z.number(), tension: z.number(), opinionOfMe: z.enum(OPINION_BANDS).optional(), opinionOfMeExact: z.number().optional() })).default({}),
 });
 
 export const EventType = z.enum(['UNIT_MOVED', 'UNIT_STATUS', 'CONTACT_DETECTED', 'CONTACT_LOST', 'ENGAGEMENT_OPENED', 'ENGAGEMENT_RESOLVED',
   'UNIT_DAMAGED', 'UNIT_DESTROYED', 'UNIT_CREATED', 'MUNITION_EXPENDED', 'DELIVERY_ARRIVED', 'PROCUREMENT_ORDERED',
   'BUDGET_CHANGED', 'RELATION_CHANGED', 'AGREEMENT_CHANGED', 'CRISIS_CHANGED', 'CYBER_EFFECT', 'SOF_RESULT', 'DIPLO_MESSAGE',
-  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT']);
+  'INFRA_STATUS', 'RANDOM_EVENT', 'RED_LINE_CROSSED', 'FACTION_CHANGED', 'INDICATORS_CHANGED', 'TURN_ADVANCED', 'TURN_CLOSED', 'STATEMENT', 'LETTER_SENT',
+  // diplomazia asimmetrica (RELATION_CHANGED resta leggibile per le campagne vecchie e il replay, ma non si emette più)
+  'OPINION_MODIFIER', 'OPINION_DECAYED', 'TENSION_CHANGED', 'WORLD_TENSION_CHANGED',
+  // capitale diplomatico, stato dei rapporti, ultimatum e votazioni delle istituzioni (settore 09)
+  'CAPITAL_CHANGED', 'DIPLOMACY_CHANGED', 'ULTIMATUM_MET', 'ULTIMATUM_EXPIRED', 'INSTITUTION_VOTE',
+  // IA mondiale (settore 10): reazioni degli Stati a un evento grave (un evento aggregato) e sanzioni di blocco
+  'INTERNATIONAL_REACTIONS']);
 export const GameEvent = z.object({
   id: z.string(), turn: Turn, seq: z.number().int(), phase: TurnPhase, type: EventType,
   actor: z.string(), targets: z.array(z.string()), payload: z.record(z.string(), z.unknown()),
@@ -112,8 +156,89 @@ export const DiceRoll = z.object({
   raw: z.array(z.number()), total: z.number(), threshold: z.number().optional(), outcome: z.string(),
 });
 
+/**
+ * Direttiva strategica (docs/wargame/DIPLOMAZIA.md §11): intenzioni di una potenza per i prossimi turni. Oggi il decisore a regole riceve sempre
+ * quella deterministica (nessuna priorità, nessun effetto); il settore 11 la farà proporre a un LLM. Con tetti: è il motore a limitarla.
+ */
+export const DIRECTIVE_KINDS = ['improve', 'court', 'deter', 'isolate', 'contain'] as const;
+export const Directive = z.object({
+  horizonTurns: z.number().int().min(3).max(6),
+  priorities: z.array(z.object({ kind: z.enum(DIRECTIVE_KINDS), target: FactionId, weight: z.number().min(0).max(1) })).max(4).default([]),
+  zoneInterestDelta: z.record(ZoneId, z.number().min(-0.2).max(0.2)).refine((o) => Object.keys(o).length <= 3, 'al massimo 3 zone').default({}),
+  seekAgreements: z.array(z.object({ type: Agreement.shape.type, with: FactionId })).max(2).default([]),
+  avoid: z.array(FactionId).max(2).default([]),
+  rationale: z.string().max(420).default(''),
+});
+
+/**
+ * Registro di una direttiva (`directives/turn-N/F.json`): la richiesta, la risposta del modello, la proposta letta e la versione **limitata** dal motore,
+ * che è l'unica a contare (il replay rilegge quella, senza chiamare l'LLM). `source: 'none'` = nessuna direttiva (budget finito, modelli in 429,
+ * risposta non valida dopo il repair): effetto nullo, il decisore a regole va come sempre.
+ */
+export const DirectiveRecord = z.object({
+  schemaVersion: z.literal(1), turn: Turn, factionId: FactionId,
+  source: z.enum(['llm', 'none']), model: z.string(), promptHash: z.string(),
+  /** token stimati del contesto costruito dal motore (≤ 1.200) */
+  contextTokens: z.number(),
+  request: z.object({ system: z.string(), user: z.string() }).nullable(),
+  response: z.string().nullable(),
+  /** la proposta del modello, come l'ha letta il motore (prima dei limiti) */
+  proposed: z.unknown().nullable(),
+  limited: Directive.nullable(),
+  /** cosa ha cambiato o scartato il motore (pesi, scarti, bersagli inesistenti…) */
+  limits: z.array(z.string()).default([]),
+  errors: z.array(z.string()).default([]),
+  usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
+});
+
+/** Atti gravi del turno che gli Stati del mondo vedono (engine/world-digest.ts) e a cui reagiscono. */
+export const GRAVE_KINDS = ['strike', 'engagement', 'blockade', 'ultimatum', 'sanction', 'multilateral_sanction', 'break', 'embargo', 'cyber', 'covert'] as const;
+export const GraveEvent = z.object({
+  id: z.string(), kind: z.enum(GRAVE_KINDS), a: z.string(), b: z.string(), severity: z.number(), turn: Turn, zoneId: ZoneId.optional(), text: z.string(),
+});
+/** Reazione di tutti gli Stati a un evento grave: tre elenchi di ISO3 e i modificatori (aggregati, con un tetto) che ne derivano. */
+export const Reaction = z.object({
+  eventId: z.string(), kind: z.enum(GRAVE_KINDS), actor: z.string(), victim: z.string(), severity: z.number(), zoneId: ZoneId.optional(),
+  /** contro chi ha compiuto l'atto · con lui · in silenzio */
+  condemn: z.array(z.string()), support: z.array(z.string()), silent: z.array(z.string()),
+  modifiers: z.array(z.object({ from: z.string(), to: z.string(), kind: z.string(), value: z.number() })),
+});
+/**
+ * Cancellerie (settore 11): la frase di uno Stato su un atto grave. La **posizione** (condanna, sostegno, silenzio) la sceglie il motore dalla reazione;
+ * il ruolo chancery scrive solo il testo (≤ 30 parole) e, se non c'è budget o la frase non passa i controlli, vale la frase-modello della posizione.
+ */
+export const ChanceryPosition = z.enum(['condemn', 'support', 'silence']);
+export const ChanceryStatement = z.object({
+  eventId: z.string(), iso: z.string(), position: ChanceryPosition, text: z.string(), source: z.enum(['ai', 'template']),
+});
+
+/** Una votazione che gli Stati del mondo conoscono (la decisione di un'istituzione: pubblica) */
+export const DigestVote = z.object({
+  id: z.string(), turn: Turn, forum: z.string(), institutionId: z.string(), proposer: z.string(), target: z.string().optional(), topic: z.string(), subject: z.string(),
+  passed: z.boolean(), yes: z.array(z.string()), no: z.array(z.string()), abstain: z.array(z.string()),
+});
+export const WorldRationale = z.object({ rule: z.enum(['reaction', 'block_sanction', 'agenda', 'letter', 'cap']), actor: z.string().optional(), text: z.string() });
+/** Le decisioni del livello C di un turno: un solo file per turno (`decisions/turn-N/_world.json`), mai uno per Stato. */
+export const WorldDecision = z.object({
+  schemaVersion: z.literal(1), turn: Turn,
+  digest: z.object({ events: z.array(GraveEvent), votes: z.array(DigestVote) }),
+  /** azioni dell'agenda lenta e lettere: `actor` è l'ISO3 dello Stato (non ha CD: l'agenda è a tetto) */
+  actions: z.array(z.object({ actor: z.string(), action: DiploAction })),
+  reactions: z.array(Reaction),
+  /** sanzioni di blocco: gli Stati che si adeguano a una risoluzione con sanzioni e quelli che no */
+  blockSanctions: z.array(z.object({ voteId: z.string(), target: z.string(), adopters: z.array(z.string()), holdouts: z.array(z.string()) })).default([]),
+  rationale: z.array(WorldRationale),
+  /** lettere scritte nel turno dagli Stati del mondo al giocatore */
+  letters: z.array(z.object({ actionId: z.string(), actor: z.string(), to: z.string(), kind: z.enum(['reply', 'initiative']), trigger: z.string().optional(), inReplyTo: z.string().optional(), source: z.enum(['ai', 'template']), model: z.string(), errors: z.array(z.string()) })).default([]),
+  /** frasi delle cancellerie sugli atti gravi del turno (settore 11) e, per atto, chi le ha scritte: modello, frasi-modello o un po' di entrambi */
+  statements: z.array(ChanceryStatement).default([]),
+  chancery: z.array(z.object({ eventId: z.string(), source: z.enum(['ai', 'template', 'mixed']), model: z.string(), errors: z.array(z.string()) })).default([]),
+  /** quanti Stati toccava all'agenda, quante azioni candidate e quante tagliate dal tetto globale */
+  stats: z.object({ eligible: z.number().int(), candidates: z.number().int(), capped: z.number().int() }),
+});
+
 /** Regole del decisore a regole (engine/policy.ts), in ordine di priorità: servono alle motivazioni e alle statistiche. */
-export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'ally', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
+export const POLICY_RULES = ['worn', 'red_line', 'threat', 'crisis', 'detente', 'objective', 'directive', 'ally', 'relations', 'cyber', 'agreement', 'routine', 'withdraw'] as const;
 export const Rationale = z.object({ rule: z.enum(POLICY_RULES), text: z.string() });
 
 export const DecisionOutput = z.object({
@@ -137,6 +262,8 @@ export const AgentDecision = DecisionOutput.omit({ orders: true }).extend({
   validation: z.object({ valid: z.boolean(), errors: z.array(z.string()), repairAttempts: z.number(), fallbackUsed: z.boolean() }),
   /** da dove viene ogni ordine militare generato dal motore: una postura per zona o il rientro delle unità logorate ('worn') */
   stanceOrders: z.array(z.object({ orderId: z.string(), stance: z.enum([...STANCES, 'worn']), zoneId: ZoneId.nullable() })).default([]),
+  /** direttiva strategica che ha guidato la decisione (facoltativa: oggi sempre la deterministica, cioè nessuna) */
+  directive: Directive.optional(),
   usage: z.object({ promptTokens: z.number(), completionTokens: z.number(), latencyMs: z.number() }),
   /** lettere scritte nel turno (risposte e iniziative): il testo è negli ordini (azioni LETTER), qui l'esito della scrittura */
   letters: z.array(z.object({
@@ -159,7 +286,35 @@ export const LlmCall = z.object({
   id: z.string(), turn: Turn, role: AgentRole, factionId: FactionId.optional(), model: z.string(), promptHash: z.string(),
   request: z.unknown(), response: z.unknown(), ok: z.boolean(), error: z.string().optional(),
   tokens: z.object({ in: z.number(), out: z.number() }), latencyMs: z.number(),
+  /** la risposta viene dalla cache della campagna (stessa richiesta, `promptHash` uguale): nessuna chiamata al modello */
+  cached: z.boolean().optional(),
 });
+
+/**
+ * Contatori delle chiamate LLM di una campagna (`llm-usage.json`, docs/wargame/AGENTS.md «Budget»): per turno e per giorno (UTC).
+ * `calls` sono le richieste arrivate a un modello (anche quelle risposte con 429); `admitted` le richieste ammesse dal budget del turno
+ * (una richiesta con i suoi ripieghi di modello vale 1); `skipped` quelle non fatte (budget finito, limite al minuto o al giorno, tutti i modelli in 429).
+ */
+export const LlmCounters = z.object({
+  calls: z.number().int().default(0), admitted: z.number().int().default(0),
+  tokensIn: z.number().int().default(0), tokensOut: z.number().int().default(0),
+  rate429: z.number().int().default(0), fallbacks: z.number().int().default(0), skipped: z.number().int().default(0),
+  cacheHits: z.number().int().default(0), errors: z.number().int().default(0),
+});
+export const LlmTurnCounters = LlmCounters.extend({
+  /** chiamate per ruolo (i repair contano sotto `repair`) */
+  byRole: z.record(z.string(), z.number().int()).default({}),
+  /** chiamate non fatte per priorità (0–5) */
+  skippedByPriority: z.record(z.string(), z.number().int()).default({}),
+});
+export const LlmUsage = z.object({
+  schemaVersion: z.literal(1),
+  turns: z.record(z.string(), LlmTurnCounters).default({}),
+  days: z.record(z.string(), LlmCounters).default({}),
+});
+export type LlmCounters = z.infer<typeof LlmCounters>;
+export type LlmTurnCounters = z.infer<typeof LlmTurnCounters>;
+export type LlmUsage = z.infer<typeof LlmUsage>;
 
 const Section = z.object({ heading: z.string(), body: z.string() });
 export const BRIEFING_HEADINGS = ['Quadro strategico', 'Tracce e movimenti', 'Allarmi intelligence', 'Energia e rotte', 'Stato FOED e prontezza'] as const;
@@ -188,6 +343,14 @@ export type Incident = z.infer<typeof Incident>;
 export type Rationale = z.infer<typeof Rationale>;
 export type PolicyRule = (typeof POLICY_RULES)[number];
 export type AgentDecision = z.infer<typeof AgentDecision>;
+export type Directive = z.infer<typeof Directive>;
+export type DirectiveRecord = z.infer<typeof DirectiveRecord>;
+export type GraveEvent = z.infer<typeof GraveEvent>;
+export type Reaction = z.infer<typeof Reaction>;
+export type ChanceryStatement = z.infer<typeof ChanceryStatement>;
+export type ChanceryPosition = z.infer<typeof ChanceryPosition>;
+export type DigestVote = z.infer<typeof DigestVote>;
+export type WorldDecision = z.infer<typeof WorldDecision>;
 export type AgentMemory = z.infer<typeof AgentMemory>;
 export type LlmCall = z.infer<typeof LlmCall>;
 export type NarrativeDoc = z.infer<typeof NarrativeDoc>;

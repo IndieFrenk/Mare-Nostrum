@@ -1,4 +1,4 @@
-import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, Nation, NationSummary, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
+import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, CountryView, DiceRoll, DiploLetter, DiplomacyOverview, DirectiveRecord, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, Nation, NationSummary, OrdersBody, PendingDelivery, Relation, TurnNarrative, VoteView, WorldState } from '../../wargame-server/src/schemas/index';
 
 export type * from '../../wargame-server/src/schemas/index';
 export type { LlmStatus } from '../../wargame-server/src/agents/llm-status';
@@ -15,11 +15,15 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   return data as T;
 }
 
-export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number }
+/** `acceptance`: come risponderebbe ogni destinatario a una proposta di trattato (punteggio ≥ 0 accetta) e perché; `capitalCost`: CD della bozza */
+export interface AcceptanceView { actionId: string; type: string; target: string; score: number; accept: boolean; reasons: { label: string; value: number }[]; /** falso: una stima (l'opinione del destinatario è nota a fasce) */ exact?: boolean }
+export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number; capitalCost?: number; acceptance?: AcceptanceView[] }
+/** riga del catalogo delle azioni diplomatiche (`GET /diplomacy/catalog`) */
+export interface DiploCatalogRow { kind: string; label: string; cost: number | null; costBy?: Record<string, number>; cooldown: number; coercive: boolean; targets: 'actor' | 'faction' | 'none'; effects: string }
 export interface Overview { campaign: Campaign; indicators: WorldState['globalIndicators']; relations: Record<string, Relation>; pendingDeliveries: PendingDelivery[]; pendingCmo: string[]; infrastructure: { id: string; name: string; type: string; status: string; flowShareIta?: number }[] }
 export interface CatalogView { budget: number; items: (CatalogItem & { available: boolean })[]; bases: { id: string; name: string }[]; deliveries: PendingDelivery[] }
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
-export interface Postmortem { turn: number; decisions: AgentDecision[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
+export interface Postmortem { turn: number; decisions: AgentDecision[]; directives: DirectiveRecord[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
 export type FC = GeoJSON.FeatureCollection;
 /** scheda completa di uno Stato (`GET /nations/:iso3`): dati del registro, istituzioni di cui è membro e coppie storiche */
 export interface NationDetail extends Nation {
@@ -35,6 +39,7 @@ const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
 export const api = {
   scenarios: () => req<{ id: string; name: string }[]>('GET', '/scenarios'),
   nations: () => req<NationSummary[]>('GET', '/nations'),
+  diploCatalog: () => req<DiploCatalogRow[]>('GET', '/diplomacy/catalog'),
   nation: (iso3: string) => req<NationDetail>('GET', `/nations/${encodeURIComponent(iso3)}`),
   campaigns: () => req<{ id: string; name: string; parent: Campaign['parent'] }[]>('GET', '/campaigns'),
   create: (b: { scenarioId: string; name: string; seed?: string; debugGodView?: boolean; cmoOnRequest?: boolean; turnLength?: 'week' | 'month' }) => req<Campaign>('POST', '/campaigns', b),
@@ -50,6 +55,9 @@ export const api = {
   llmStatus: (campaignId?: string | null, fresh = false) => req<LlmStatus>('GET', `/llm/status?${new URLSearchParams({ ...(campaignId ? { campaignId } : {}), ...(fresh ? { fresh: '1' } : {}) })}`),
   validate: (id: string, o: OrdersBody) => req<Validation>('POST', `${c(id)}/orders/validate`, o),
   submit: (id: string, o: OrdersBody) => req<{ validation: Validation }>('POST', `${c(id)}/orders`, o),
+  diploOverview: (id: string) => req<DiplomacyOverview>('GET', `${c(id)}/diplomacy/overview`),
+  diploCountry: (id: string, actor: string) => req<CountryView>('GET', `${c(id)}/diplomacy/country/${encodeURIComponent(actor)}`),
+  votes: (id: string, turn?: number) => req<VoteView[]>('GET', `${c(id)}/institutions/votes${turn === undefined ? '' : `?turn=${turn}`}`),
   letters: (id: string, turn?: number) => req<DiploLetter[]>('GET', `${c(id)}/letters${turn === undefined ? '' : `?turn=${turn}`}`),
   draftLetter: (id: string, b: { target: string; gist: string; tone: LetterTone; inReplyTo?: string }) => req<LetterDraft>('POST', `${c(id)}/letters/draft`, b),
   advance: (id: string) => req<Campaign>('POST', `${c(id)}/advance`),

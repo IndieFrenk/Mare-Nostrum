@@ -64,7 +64,9 @@
          "order_parser",
          "reflection",
          "repair",
-         "diplomat"
+         "diplomat",
+         "strategist",
+         "chancery"
         ]
        },
        {
@@ -74,6 +76,12 @@
      },
      "profileRef": {
       "type": "string"
+     },
+     "tier": {
+      "type": "string",
+      "enum": [
+       "A"
+      ]
      },
      "posture": {
       "type": "integer",
@@ -917,7 +925,12 @@
        "ceasefire",
        "arms_sale",
        "intel_sharing",
-       "secret"
+       "secret",
+       "non_aggression",
+       "guarantee",
+       "military_access",
+       "defense_cooperation",
+       "trade"
       ]
      },
      "parties": {
@@ -1446,6 +1459,10 @@
     },
     "migrationPressure": {
      "type": "number"
+    },
+    "worldTension": {
+     "default": 30,
+     "type": "number"
     }
    },
    "required": [
@@ -1454,6 +1471,287 @@
     "medShippingRisk",
     "migrationPressure"
    ]
+  },
+  "diplomacy": {
+   "type": "object",
+   "properties": {
+    "modifiers": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "to": {
+        "type": "string",
+        "minLength": 2
+       },
+       "kind": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "value": {
+        "type": "number"
+       },
+       "decayPerWeek": {
+        "default": 0,
+        "type": "number",
+        "minimum": 0
+       },
+       "floor": {
+        "type": "number"
+       },
+       "expiresTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "causeRef": {
+        "type": "string"
+       },
+       "visibility": {
+        "default": "public",
+        "anyOf": [
+         {
+          "type": "string",
+          "const": "public"
+         },
+         {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "minLength": 2
+          }
+         }
+        ]
+       },
+       "turn": {
+        "default": 0,
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "id",
+       "from",
+       "to",
+       "kind",
+       "label",
+       "value",
+       "causeRef"
+      ]
+     }
+    },
+    "tension": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "tensionBase": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "capital": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string",
+      "minLength": 2
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "cooldowns": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "improving": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "actor": {
+        "type": "string",
+        "minLength": 2
+       },
+       "target": {
+        "type": "string",
+        "minLength": 2
+       },
+       "since": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "actor",
+       "target",
+       "since"
+      ]
+     }
+    },
+    "ultimatums": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "to": {
+        "type": "string",
+        "minLength": 2
+       },
+       "demand": {
+        "type": "string"
+       },
+       "issuedTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "deadlineTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "pending",
+         "met",
+         "expired"
+        ]
+       },
+       "answered": {
+        "type": "boolean"
+       },
+       "legitimateUntil": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "id",
+       "from",
+       "to",
+       "demand",
+       "issuedTurn",
+       "deadlineTurn",
+       "status"
+      ]
+     }
+    },
+    "ties": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "string",
+      "enum": [
+       "recalled",
+       "expelled",
+       "broken"
+      ]
+     }
+    },
+    "embargoes": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "resolutions": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "forum": {
+        "type": "string"
+       },
+       "institutionId": {
+        "type": "string"
+       },
+       "subject": {
+        "type": "string"
+       },
+       "topic": {
+        "type": "string"
+       },
+       "proposer": {
+        "type": "string",
+        "minLength": 2
+       },
+       "target": {
+        "type": "string",
+        "minLength": 2
+       },
+       "turn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "expiresTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "id",
+       "forum",
+       "institutionId",
+       "subject",
+       "topic",
+       "proposer",
+       "turn",
+       "expiresTurn"
+      ]
+     }
+    }
+   }
   }
  },
  "required": [

@@ -4,6 +4,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import countriesUrl from '../assets/countries.geojson?url';
 import ms from 'milsymbol';
 import type { UiState } from '../state/store';
+import { arc, BLOC_POINT, bandOf, centroids, cssColor, DEFAULT_THRESHOLDS, mixColor, TREATY_CATS, TREATY_TYPE_LABEL, treatyCat } from './diplomacy';
 import { alignmentColor, EU_ISO, FACTIONS, MAP_LABELS, NAMES } from './factions';
 
 type Props = Record<string, any>;
@@ -41,6 +42,11 @@ export class WarMap {
   /** ISO3 → attore (id di fazione se lo Stato è una fazione, altrimenti l'ISO3) dal registro: gli Stati del registro sono cliccabili */
   private actorByIso = new Map<string, string>();
   private nationsRef: UiState['nations'] | null = null;
+  /** attore → ISO3 (il contrario di actorByIso) e centro di ogni Stato (dal geojson dei confini, caricato solo per la modalità «trattati») */
+  private isoByActor = new Map<string, string>();
+  private centers: Map<string, [number, number]> | null = null;
+  private layersRef: UiState['layers'] | null = null;
+  private globeRef: boolean | null = null;
 
   constructor(container: HTMLElement, private h: MapHandlers) {
     maplibregl.setWorkerUrl(maplibreWorkerUrl); // come DeckGLMap upstream: il worker non passa dall'optimizer di Vite
@@ -60,7 +66,7 @@ export class WarMap {
     const m = this.map;
     // confini 1:50m generati da `npm --prefix wargame-server run geo:build`
     m.addSource('countries', { type: 'geojson', data: new URL(countriesUrl, window.location.href).href });
-    for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'contactAreas', 'ranges', 'plans']) m.addSource(id, { type: 'geojson', data: EMPTY });
+    for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'contactAreas', 'ranges', 'plans', 'treaties']) m.addSource(id, { type: 'geojson', data: EMPTY });
     m.addLayer({ id: 'countries-fill', type: 'fill', source: 'countries', paint: { 'fill-color': '#4a4a42' } });
     m.addLayer({ id: 'control-fill', type: 'fill', source: 'control', paint: { 'fill-color': '#8f6a3a', 'fill-opacity': 0.9 } });
     m.addLayer({ id: 'control-line', type: 'line', source: 'control', paint: { 'line-color': '#101418', 'line-width': 0.7, 'line-dasharray': [3, 2] } });
@@ -80,6 +86,10 @@ export class WarMap {
     m.addLayer({ id: 'contact-dot', type: 'circle', source: 'contacts', paint: { 'circle-color': '#ff5d5d', 'circle-radius': 3.5, 'circle-stroke-color': cColor as never, 'circle-stroke-width': 2, 'circle-opacity': ['get', 'confidence'] } });
     m.addLayer({ id: 'ranges-fill', type: 'fill', source: 'ranges', paint: { 'fill-color': ['match', ['get', 'kind'], 'weapon', '#ff5a5a', '#5ac8ff'], 'fill-opacity': 0.08 } });
     m.addLayer({ id: 'ranges-line', type: 'line', source: 'ranges', paint: { 'line-color': ['match', ['get', 'kind'], 'weapon', '#ff5a5a', '#5ac8ff'], 'line-width': 1 } });
+    // trattati (modalità «trattati»): il colore dice la categoria, il tratto (pieno, tratteggiato, punteggiato) il gruppo; i proposti sono più chiari
+    const treatyColor = ['match', ['get', 'cat'], ...TREATY_CATS.flatMap((c) => [c.id, cssColor(`--wg-tr-${c.id}`)]), '#b8b8b0'];
+    for (const [id, dash] of [['solid', undefined], ['dashed', [3, 2]], ['dotted', [0.6, 2]]] as const)
+      m.addLayer({ id: `treaties-${id}`, type: 'line', source: 'treaties', filter: ['==', ['get', 'dash'], id], layout: { 'line-cap': 'butt' }, paint: { 'line-color': treatyColor as never, 'line-width': 2.6, 'line-opacity': ['match', ['get', 'status'], 'proposed', 0.5, 0.95] as never, ...(dash ? { 'line-dasharray': dash as never } : {}) } });
     m.addLayer({ id: 'plans', type: 'line', source: 'plans', paint: { 'line-color': '#f5d77a', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
 
     const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'wg-tip' });
@@ -91,6 +101,7 @@ export class WarMap {
     tip('infra-point', (p) => `${p.name}: ${p.status}`);
     tip('infra-line', (p) => `${p.name}: ${p.status}`);
     tip('crises-fill', (p) => `${p.crises} — escalation ${p.escalation}/10`);
+    for (const id of ['solid', 'dashed', 'dotted']) tip(`treaties-${id}`, (p) => String(p.text));
 
     m.on('click', (e) => {
       const area = m.queryRenderedFeatures(e.point, { layers: ['control-fill'] })[0]?.properties?.faction;
@@ -117,13 +128,22 @@ export class WarMap {
   async render(s: UiState) {
     await this.ready;
     this.last = s;
-    if (s.nations !== this.nationsRef) { this.nationsRef = s.nations; this.actorByIso = new Map(s.nations.map((n) => [n.iso3, n.factionId ?? n.iso3])); }
+    if (s.nations !== this.nationsRef) {
+      this.nationsRef = s.nations;
+      this.actorByIso = new Map(s.nations.map((n) => [n.iso3, n.factionId ?? n.iso3]));
+      this.isoByActor = new Map(s.nations.map((n) => [n.factionId ?? n.iso3, n.iso3]));
+    }
     const m = this.map;
-    m.setProjection({ type: s.globe ? 'globe' : 'mercator' });
+    if (s.globe !== this.globeRef) { this.globeRef = s.globe; m.setProjection({ type: s.globe ? 'globe' : 'mercator' }); }
     const src = (id: string, data: FC) => (m.getSource(id) as maplibregl.GeoJSONSource).setData(data);
-    for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'ranges']) src(id, (s.layers[id] as FC) ?? EMPTY);
-    src('contactAreas', { type: 'FeatureCollection', features: (s.layers.contacts?.features ?? []).map((f) => { const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number]; return { type: 'Feature', properties: f.properties, geometry: circle(lon, lat, Math.max(3, f.properties!.errorKm)) }; }) });
+    // i livelli di gioco si ricaricano solo se sono cambiati (la scheda di un paese o il cambio di modalità non li toccano)
+    if (s.layers !== this.layersRef) {
+      this.layersRef = s.layers;
+      for (const id of ['control', 'zones', 'crises', 'lanes', 'infrastructure', 'contacts', 'ranges']) src(id, (s.layers[id] as FC) ?? EMPTY);
+      src('contactAreas', { type: 'FeatureCollection', features: (s.layers.contacts?.features ?? []).map((f) => { const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates as [number, number]; return { type: 'Feature', properties: f.properties, geometry: circle(lon, lat, Math.max(3, f.properties!.errorKm)) }; }) });
+    }
     this.renderPlans(s);
+    this.renderTreaties(s);
     this.renderMode(s);
     this.renderUnits(s);
     this.renderLabels();
@@ -133,10 +153,12 @@ export class WarMap {
     const m = this.map;
     const rel = s.overview?.relations ?? {};
     const pairs = (value: (f: string) => string) => Object.entries(FACTIONS).filter(([, v]) => v.iso).flatMap(([f, v]) => [v.iso!, value(f)]);
-    const heat = (v: number, lo: number, hi: number, c: [string, string, string]) => { const t = (v - lo) / (hi - lo); const i = t < 0.5 ? 0 : 1; const k = t < 0.5 ? t * 2 : (t - 0.5) * 2; return mix(c[i]!, c[i + 1]!, Math.max(0, Math.min(1, k))); };
+    const heat = (v: number, lo: number, hi: number, c: [string, string, string]) => { const t = (v - lo) / (hi - lo); const i = t < 0.5 ? 0 : 1; const k = t < 0.5 ? t * 2 : (t - 0.5) * 2; return mixColor(c[i]!, c[i + 1]!, Math.max(0, Math.min(1, k))); };
     let value: (f: string) => string;
     let other = '#4a4a42';
-    if (s.mapMode === 'diplomazia') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.trust, -100, 100, ['#8c2323', '#6b6b5e', '#2f8f4f']) : other);
+    let isoPairs: string[] | null = null;
+    if (s.mapMode === 'opinione' || s.mapMode === 'trattati' || s.mapMode === 'voto') ({ value, other, isoPairs } = this.diploColors(s));
+    else if (s.mapMode === 'diplomazia') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.trust, -100, 100, ['#8c2323', '#6b6b5e', '#2f8f4f']) : other);
     else if (s.mapMode === 'tensione') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.tension, 0, 100, ['#3a5a3a', '#b08a2a', '#b02020']) : other);
     else if (s.mapMode === 'crisi') { value = () => '#3b3b36'; other = '#33332f'; }
     else if (s.mapMode === 'allineamento') {
@@ -144,13 +166,78 @@ export class WarMap {
       const byFaction = new Map(s.nations.filter((n) => n.factionId).map((n) => [n.factionId!, n]));
       value = (f) => { const n = byFaction.get(f); return n ? alignmentColor(n.alignment) : other; };
       other = '#3c3c36';
+      isoPairs = s.nations.flatMap((n) => [n.iso3, alignmentColor(n.alignment)]);
     } else value = factionColor;
-    const alignPairs = s.mapMode === 'allineamento' ? s.nations.flatMap((n) => [n.iso3, alignmentColor(n.alignment)]) : null;
-    const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...(alignPairs ?? pairs(value)), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
-    m.setPaintProperty('countries-fill', 'fill-color', expr as never);
+    const arms = [...(isoPairs ?? pairs(value)), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : [])];
+    // `match` vuole almeno una coppia (la modalità «voto» senza votazioni non ne ha): senza, un colore solo
+    const expr = arms.length ? ['match', ['get', 'ISO3166-1-Alpha-3'], ...arms, other] : other;
+    m.setPaintProperty('countries-fill', 'fill-color', expr as never); // un'unica espressione `match` per tutti i 197 Stati, non un layer per paese
     m.setPaintProperty('control-fill', 'fill-color', ['match', ['get', 'faction'], ...Object.keys(FACTIONS).flatMap((f) => [f, value(f)]), other] as never);
     m.setPaintProperty('crises-fill', 'fill-opacity', s.mapMode === 'crisi' ? 0.45 : 0.18);
     m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && (FACTIONS[s.country]?.iso ?? (this.actorByIso.has(s.country) ? s.country : null))) || '__none__']);
+  }
+
+  /** Gli accordi che la modalità «trattati» disegna: quelli dell'Italia, o del paese selezionato (dalla sua scheda). */
+  private treatyView(s: UiState): { center: string; agreements: { type: string; parties: string[]; status: string }[] } {
+    const me = s.campaign?.playerFaction ?? 'ITA';
+    const center = s.country ?? me;
+    if (center === me) return { center, agreements: s.diplo?.agreements ?? [] };
+    return { center, agreements: s.countryDiplo?.actor === center ? s.countryDiplo.agreements : [] };
+  }
+
+  /** Colori per Stato nelle modalità della diplomazia: `isoPairs` per tutti gli Stati del registro, `value` per le aree di controllo delle fazioni. */
+  private diploColors(s: UiState): { value: (f: string) => string; other: string; isoPairs: string[] } {
+    const me = s.campaign?.playerFaction ?? 'ITA';
+    const none = cssColor('--wg-none'); const self = cssColor('--wg-self');
+    let colorOf: (actor: string) => string = () => none;
+    let isoPairs: string[] | null = null;
+    if (s.mapMode === 'opinione') {
+      const d = s.diplo?.opinion;
+      const band = (a: string) => !d ? null : s.opinionDir === 'out' ? (d.out[a] === undefined ? null : bandOf(d.out[a]!, d.thresholds ?? DEFAULT_THRESHOLDS)) : d.in[a] ?? null;
+      colorOf = (a) => { if (a === me) return self; const b = band(a); return b === null ? none : cssColor(`--wg-op-${b}`); };
+    } else if (s.mapMode === 'trattati') {
+      const { center, agreements } = this.treatyView(s);
+      const rank = (c: string) => TREATY_CATS.findIndex((x) => x.id === c);
+      const best = new Map<string, string>();
+      for (const a of agreements) for (const p of a.parties) {
+        if (p === center) continue;
+        const cat = treatyCat(a.type as never);
+        if (!best.has(p) || rank(cat) < rank(best.get(p)!)) best.set(p, cat);
+      }
+      colorOf = (a) => a === center ? self : best.has(a) ? mixColor(none, cssColor(`--wg-tr-${best.get(a)}`), 0.6) : none;
+    } else {
+      const v = s.votes.find((x) => x.id === s.voteId) ?? s.votes[0];
+      const byIso = new Map<string, string>();
+      if (v) for (const [list, name] of [[v.abstain, 'abstain'], [v.no, 'no'], [v.yes, 'yes']] as const) for (const iso of list) byIso.set(iso, cssColor(`--wg-vote-${name}`));
+      isoPairs = [...byIso].flat();
+      colorOf = () => cssColor('--wg-vote-absent');
+      return { value: colorOf, other: cssColor('--wg-vote-absent'), isoPairs };
+    }
+    return { value: colorOf, other: none, isoPairs: [...this.isoByActor].flatMap(([a, iso]) => [iso, colorOf(a)]) };
+  }
+
+  /** Linee dei trattati tra il paese al centro (l'Italia, o quello selezionato) e i suoi partner, ad arco di cerchio massimo. */
+  private renderTreaties(s: UiState) {
+    const src = this.map.getSource('treaties') as maplibregl.GeoJSONSource;
+    if (s.mapMode !== 'trattati') { src.setData(EMPTY); return; }
+    if (!this.centers) {
+      // i confini sono un file locale (lo stesso della mappa): si leggono una volta per ricavare i centri
+      void fetch(new URL(countriesUrl, window.location.href).href).then((r) => r.json()).then((fc: FC) => { this.centers = centroids(fc); if (this.last) this.renderTreaties(this.last); }).catch(() => { this.centers = new Map(); });
+      src.setData(EMPTY);
+      return;
+    }
+    const name = (a: string) => NAMES[a] ?? s.nations.find((n) => (n.factionId ?? n.iso3) === a)?.nameIt ?? a;
+    const at = (a: string) => FACTIONS[a]?.label ?? BLOC_POINT[a] ?? (this.isoByActor.has(a) ? this.centers!.get(this.isoByActor.get(a)!) : undefined);
+    const { center, agreements } = this.treatyView(s);
+    const from = at(center);
+    const features: GeoJSON.Feature[] = [];
+    if (from) for (const a of agreements) for (const p of a.parties) {
+      const to = p === center ? undefined : at(p);
+      if (!to) continue;
+      const cat = TREATY_CATS.find((c) => c.id === treatyCat(a.type as never))!;
+      features.push({ type: 'Feature', properties: { cat: cat.id, dash: cat.dash, status: a.status, text: `${TREATY_TYPE_LABEL[a.type] ?? a.type}: ${name(center)} – ${name(p)}${a.status === 'proposed' ? ' (proposto)' : ''}` }, geometry: { type: 'LineString', coordinates: arc(from, to) } });
+    }
+    src.setData({ type: 'FeatureCollection', features });
   }
 
   private renderPlans(s: UiState) {
@@ -202,10 +289,4 @@ export class WarMap {
       this.labels.push(new maplibregl.Marker({ element: el }).setLngLat(v.label).addTo(this.map));
     }
   }
-}
-
-function mix(a: string, b: string, t: number) {
-  const p = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
-  const [x, y] = [p(a), p(b)];
-  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
 }

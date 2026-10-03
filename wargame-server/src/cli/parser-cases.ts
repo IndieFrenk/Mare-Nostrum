@@ -28,6 +28,11 @@ export const PARSER_CASES: ParserCase[] = [
   { text: 'Manda la Fasan a scortare i mercantili nel Mar Rosso', expect: [{ kinds: ['ESCORT', 'PATROL'], unit: 'ITA-F591', zone: 'MAR_ROSSO' }] },
   { text: 'Chiedi all\'Egitto di collaborare sui flussi migratori e manda la Morosini nel Mar Libico',
     expect: [{ kinds: ['DEMARCHE', 'BACKCHANNEL', 'PROPOSE_AGREEMENT'], target: 'EGY' }, { kinds: PRESENZA, unit: 'ITA-P431', zone: 'MAR_LIBICO' }] },
+  // azioni diplomatiche del catalogo (capitale diplomatico, ultimatum, risoluzioni): aggiunte col settore 09
+  { text: 'Richiama l\'ambasciatore dalla Russia', expect: [{ kinds: ['RECALL_AMBASSADOR'], target: 'RUS' }] },
+  { text: 'Manda un ultimatum alla Russia: ritiri le navi dal Canale di Sicilia entro 2 turni', expect: [{ kinds: ['ULTIMATUM'], target: 'RUS' }] },
+  { text: 'Migliora i rapporti con l\'Egitto', expect: [{ kinds: ['IMPROVE_RELATIONS'], target: 'EGY' }] },
+  { text: 'Porta all\'ONU, all\'Assemblea generale, la condanna delle azioni della Russia', expect: [{ kinds: ['RESOLUTION'], target: 'RUS' }] },
 ];
 
 const zoneOf = (o: OrdersBody['military'][number]) =>

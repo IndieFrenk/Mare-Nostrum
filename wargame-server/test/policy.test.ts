@@ -4,6 +4,7 @@ import { buildKnowledge, incidentsFrom } from '../src/engine/knowledge.js';
 import { decideByRules } from '../src/engine/policy.js';
 import { Rng } from '../src/engine/rng.js';
 import { loadScenario } from '../src/engine/scenario.js';
+import { setRelation } from './helpers.js';
 
 const sc = loadScenario('med-2026');
 const geo = { zones: sc.world.zones, bases: sc.world.bases, infrastructure: sc.world.infrastructure };
@@ -162,7 +163,7 @@ describe('decisore a regole', () => {
         const grc = s.factions.GRC!;
         grc.policy = { ...grc.policy!, cyberPropensity: 1 }; grc.cyber.offense = 10;
         // la Turchia è alleata NATO (accordo di difesa) anche con fiducia pessima
-        s.relations.GRC!.TUR = { ...s.relations.GRC!.TUR!, trust: -90, tension: 95 };
+        setRelation(s, 'GRC', 'TUR', -90, 95);
       },
     });
     for (let n = 0; n < 20; n++) expect(decide(k, `c${n}`).orders.military.filter((o) => o.kind === 'CYBER_OP')).toEqual([]);
@@ -170,13 +171,13 @@ describe('decisore a regole', () => {
       mutate: (s) => {
         const grc = s.factions.GRC!;
         grc.policy = { ...grc.policy!, cyberPropensity: 1 }; grc.cyber.offense = 10;
-        s.relations.GRC!.TUR = { ...s.relations.GRC!.TUR!, trust: -90, tension: 95 };
-        s.relations.GRC!.RUS = { ...s.relations.GRC!.RUS!, trust: -60, tension: 70 };
+        setRelation(s, 'GRC', 'TUR', -90, 95);
+        setRelation(s, 'GRC', 'RUS', -60, 70);
       },
     });
     const d = decide(withEnemy);
     expect(d.orders.military).toEqual([{ id: '', kind: 'CYBER_OP', target: 'RUS', targetRef: 'reti governative', effect: 'espionage' }]);
-    expect(d.rationale).toContainEqual({ rule: 'cyber', text: 'Operazione cyber (espionage) contro RUS: avversario, fiducia -60, tensione 70' });
+    expect(d.rationale).toContainEqual({ rule: 'cyber', text: 'Operazione cyber (espionage) contro RUS: avversario, opinione -60, tensione 70' });
   });
 
   it('nebbia di guerra: la fazione non reagisce a ciò che non conosce', () => {

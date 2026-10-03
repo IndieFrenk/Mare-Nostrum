@@ -13,11 +13,14 @@ military:
 ROE = "WEAPONS_HOLD"|"WEAPONS_TIGHT"|"WEAPONS_FREE"
 diplomacy:
 - DEMARCHE, THREAT, REASSURANCE: {"id","kind","target":"FAZIONE","message":"...","visibility":"public" oppure ["FAZIONE",...]}
-- PROPOSE_AGREEMENT: {"id","kind":"PROPOSE_AGREEMENT","target":["FAZIONE",...],"agreement":{"type":"defense"|"energy"|"basing"|"migration"|"ceasefire"|"arms_sale"|"intel_sharing"|"secret","parties":["FAZIONE",...],"terms":"...","endTurn":numero|null,"visibility":"public" oppure ["FAZIONE",...]}}
+- PROPOSE_AGREEMENT: {"id","kind":"PROPOSE_AGREEMENT","target":["FAZIONE",...],"agreement":{"type":"defense"|"energy"|"basing"|"migration"|"ceasefire"|"arms_sale"|"intel_sharing"|"secret"|"non_aggression"|"guarantee"|"military_access"|"defense_cooperation"|"trade","parties":["FAZIONE",...],"terms":"...","endTurn":numero|null,"visibility":"public" oppure ["FAZIONE",...]}}
 - RESPOND_AGREEMENT: {"id","kind":"RESPOND_AGREEMENT","agreementId":"...","response":"accept"|"reject"|"counter","counterTerms":"..." (facoltativo)}
 - SANCTION, LIFT_SANCTION: {"id","kind","target":"FAZIONE","scope":"..."}
 - BACKCHANNEL: {"id","kind":"BACKCHANNEL","target":"FAZIONE","message":"..."}
-- NATO_ART4, EU_COUNCIL, UNSC_DRAFT: {"id","kind","subject":"..."}
+- RESOLUTION: {"id","kind":"RESOLUTION","forum":"UNSC"|"UNGA"|"EU_COUNCIL"|"NATO"|"ARAB_LEAGUE"|"AU","subject":"...","topic":"aggression"|"sanctions"|"humanitarian"|"maritime"|"nonproliferation"|"other","target":"FAZIONE" (facoltativo)}
+- IMPROVE_RELATIONS, STOP_IMPROVE, RECALL_AMBASSADOR, EXPEL_DIPLOMATS, BREAK_RELATIONS, RESTORE_RELATIONS, ARMS_EMBARGO, LIFT_ARMS_EMBARGO: {"id","kind","target":"FAZIONE"}
+- ULTIMATUM: {"id","kind":"ULTIMATUM","target":"FAZIONE","demand":"...","deadlineTurns":1-4}
+- MEDIATE: {"id","kind":"MEDIATE","crisisId":"...","parties":["FAZIONE","FAZIONE"]}
 - ENERGY_DEAL: {"id","kind":"ENERGY_DEAL","target":"FAZIONE","infrastructureId":"...","terms":"..."}
 - AID: {"id","kind":"AID","target":"FAZIONE","amount":milioni_di_euro,"type":"economic"|"military"}
 "target" è UNA sola fazione (stringa), tranne in PROPOSE_AGREEMENT dove è un elenco.

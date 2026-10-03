@@ -27,19 +27,37 @@ export const LetterAction = z.object({
   model: z.string().optional(),
 });
 
+/** Sedi delle risoluzioni (engine/institutions.ts) e temi del voto: decidono chi vota come (§9). */
+export const RESOLUTION_FORUMS = ['UNSC', 'UNGA', 'EU_COUNCIL', 'NATO', 'ARAB_LEAGUE', 'AU'] as const;
+export const VOTE_TOPICS = ['aggression', 'sanctions', 'humanitarian', 'maritime', 'nonproliferation', 'other'] as const;
+export const ResolutionForum = z.enum(RESOLUTION_FORUMS);
+export const VoteTopic = z.enum(VOTE_TOPICS);
+
+/**
+ * Azioni diplomatiche nuove (settore 09): stesse per umano e IA. `target` è una fazione o, per gli Stati del mondo senza fazione,
+ * l'ISO3 (nessuna lettera, aiuto o accordo energetico agli Stati senza fazione).
+ */
+const DIPLO_NEW = [
+  z.object({ id: z.string(), kind: z.enum(['IMPROVE_RELATIONS', 'STOP_IMPROVE', 'RECALL_AMBASSADOR', 'EXPEL_DIPLOMATS', 'BREAK_RELATIONS', 'RESTORE_RELATIONS', 'ARMS_EMBARGO', 'LIFT_ARMS_EMBARGO']), target: FactionId }),
+  z.object({ id: z.string(), kind: z.literal('ULTIMATUM'), target: FactionId, demand: z.string(), deadlineTurns: z.number().int().min(1).max(4) }),
+  z.object({ id: z.string(), kind: z.literal('MEDIATE'), crisisId: z.string(), parties: z.array(FactionId).length(2) }),
+  z.object({ id: z.string(), kind: z.literal('RESOLUTION'), forum: ResolutionForum, subject: z.string(), topic: VoteTopic.default('other'), target: FactionId.optional() }),
+] as const;
+
 const DIPLO_BASE = [
   z.object({ id: z.string(), kind: z.enum(['DEMARCHE', 'THREAT', 'REASSURANCE']), target: FactionId, message: z.string(), visibility: Visibility }),
   z.object({ id: z.string(), kind: z.literal('PROPOSE_AGREEMENT'), target: z.array(FactionId), agreement: Agreement.omit({ id: true, status: true, startTurn: true }) }),
   z.object({ id: z.string(), kind: z.literal('RESPOND_AGREEMENT'), agreementId: z.string(), response: z.enum(['accept', 'reject', 'counter']), counterTerms: z.string().optional() }),
   z.object({ id: z.string(), kind: z.enum(['SANCTION', 'LIFT_SANCTION']), target: FactionId, scope: z.string() }),
   z.object({ id: z.string(), kind: z.literal('BACKCHANNEL'), target: FactionId, message: z.string() }),
+  /** alias in lettura delle risoluzioni (RESOLUTION con sede NATO / UE / CdS): restano per gli ordini già salvati */
   z.object({ id: z.string(), kind: z.enum(['NATO_ART4', 'EU_COUNCIL', 'UNSC_DRAFT']), subject: z.string() }),
   z.object({ id: z.string(), kind: z.literal('ENERGY_DEAL'), target: FactionId, infrastructureId: z.string(), terms: z.string() }),
   z.object({ id: z.string(), kind: z.literal('AID'), target: FactionId, amount: MEur, type: z.enum(['economic', 'military']) }),
 ] as const;
-export const DiploAction = z.discriminatedUnion('kind', [...DIPLO_BASE, LetterAction]);
+export const DiploAction = z.discriminatedUnion('kind', [...DIPLO_BASE, ...DIPLO_NEW, LetterAction]);
 /** Azioni diplomatiche che una fazione IA può mettere direttamente negli ordini (le lettere passano da letterIntents). */
-export const DiploActionNoLetter = z.discriminatedUnion('kind', [...DIPLO_BASE]);
+export const DiploActionNoLetter = z.discriminatedUnion('kind', [...DIPLO_BASE, ...DIPLO_NEW]);
 
 export const ProcurementOrder = z.object({ id: z.string(), itemId: z.string(), qty: z.number().int().min(1), destinationBaseId: z.string() });
 export const PublicStatement = z.object({ id: z.string(), audience: z.string(), text: z.string(), tone: z.enum(['conciliatory', 'firm', 'threatening']) });
@@ -65,6 +83,8 @@ export type Order = z.infer<typeof Order>;
 export type Stance = z.infer<typeof Stance>;
 export type ZoneStance = z.infer<typeof ZoneStance>;
 export type DiploAction = z.infer<typeof DiploAction>;
+export type ResolutionForum = z.infer<typeof ResolutionForum>;
+export type VoteTopic = z.infer<typeof VoteTopic>;
 export type LetterAction = z.infer<typeof LetterAction>;
 export type ProcurementOrder = z.infer<typeof ProcurementOrder>;
 export type PublicStatement = z.infer<typeof PublicStatement>;

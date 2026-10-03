@@ -86,17 +86,17 @@ CdS 2026: i 5 permanenti + Danimarca, Grecia, Pakistan, Panama, Somalia (2025–
 `opinion(A→B)` = quanto A apprezza B, da −100 a +100 = `clamp(base(A,B) + Σ modificatori(A→B))`.
 
 ### 5.1 Base (statica)
-Funzione pura dei dati del §4, calcolata all'avvio e tenuta in cache: **non va nello snapshot**. Ogni componente è un motivo (`reasons[]`). Pesi in `PARAMS.opinion`:
+Funzione pura dei dati del §4, calcolata all'avvio e tenuta in cache: **non va nello snapshot**. Ogni componente è un motivo (`reasons[]`). Pesi in `PARAMS.opinion.base`. I valori della tabella sono quelli **tarati** nel settore 08 (erano 25 / 15 / 5 / −25…+25 / −10…+10 / 0…+15 nella prima stesura: con quei pesi anche le coppie amiche toccavano il tetto +100, dove un modificatore dinamico non ha più effetto). Taratura su tutte le coppie: media +1,9, deviazione 14, 14 coppie su 38.612 a ±100, correlazione con la somiglianza del punto ideale ONU 0,86.
 
-| Componente | Intervallo indicativo |
+| Componente | Intervallo |
 |---|---|
-| Alleanza difensiva in comune | +25 |
-| Stessa unione (UE) / stessa organizzazione regionale | +15 / +5 |
+| Alleanza difensiva in comune | +20 |
+| Stessa unione (UE) / stessa organizzazione regionale | +10 / +4 |
 | Blocchi contrapposti (es. NATO e CSTO) | −10 |
-| Distanza di allineamento (o di punto ideale ONU) | −25 … +25 |
-| Somiglianza di regime | −10 … +10 |
-| Dipendenza commerciale di A da B | 0 … +15 |
-| Coppia storica (`pairs.json`) | il valore della coppia |
+| Distanza di allineamento (60% punto ideale ONU, 40% poli) | −20 … +20 |
+| Somiglianza di regime | −6 … +6 |
+| Dipendenza commerciale di A da B | 0 … +12 |
+| Coppia storica (`pairs.json`, direzionale) | il valore della coppia |
 
 ### 5.2 Modificatori (dinamici)
 ```ts
@@ -131,7 +131,7 @@ Valori iniziali (da tarare con `balance`):
 Il decadimento si scala sulla durata del turno (mese = 4 settimane). I modificatori scaduti si tolgono nella fase OPEN con **un solo evento aggregato** (`OPINION_DECAYED`).
 
 ### 5.3 Tensione di coppia
-Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli incidenti, scende ogni turno verso un valore di fondo dato dalle crisi in comune. Memorizzata **solo dove è diversa dal fondo**.
+Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli incidenti, scende ogni turno (0,5 punti a settimana) verso un **fondo**: il maggiore tra la tensione strutturale della coppia (20 se non è nello scenario, altrimenti il valore dello scenario) e 3 × l'escalation della crisi più grave che le coinvolge entrambe. Memorizzata **solo dove è diversa dal fondo**.
 
 ### 5.4 Compatibilità
 - `relations[a][b].trust` resta per le coppie di fazioni come **valore derivato** = `opinion(a→b)`, ricalcolato dal reducer, così `policy.ts`, Console Ordini e UI continuano a funzionare. Il codice nuovo usa l'helper `opinionOf(state, a, b)`.
@@ -139,7 +139,7 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 - **Migrazione delle campagne vecchie**: `trust` attuale − base = un modificatore permanente «Storia recente».
 
 ### 5.5 Memorizzazione
-`WorldState.diplomacy = { modifiers, tension, improving, worldTension, capital, cooldowns, ultimatums }`: tutto sparso, mai la matrice completa. Obiettivo: **≤ 300 KB in più per snapshot** con 197 Stati.
+`WorldState.diplomacy = { modifiers, tension, tensionBase, improving, capital, cooldowns, ultimatums }`: tutto sparso, mai la matrice completa (`improving`, `capital`, `cooldowns` e `ultimatums` arrivano con il settore 09). `tensionBase` è la tensione strutturale delle coppie dello scenario diverse dal predefinito (il fondo del §5.3). **La tensione mondiale sta solo in `globalIndicators.worldTension`** (§6), non anche in `diplomacy`. Obiettivo: **≤ 300 KB in più per snapshot** con 197 Stati.
 
 ### 5.6 Nebbia
 - Ogni Stato conosce **la propria riga** (la sua opinione degli altri).
@@ -148,7 +148,7 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 ## 6. Tensione mondiale
 
-`worldTension` 0–100, in `globalIndicators`. Sale con: escalation massima delle crisi, scontri, strike, blocchi, ultimatum, segnali nucleari. Scende da sola ogni turno senza incidenti.
+`worldTension` 0–100, in `globalIndicators`. Sale con: escalation massima delle crisi, scontri, strike, blocchi, ultimatum, segnali nucleari. Scende da sola ogni turno senza incidenti. A fine turno si avvicina del 30% al valore di regime dato dalle crisi (8 + 3,5 × escalation massima + 1,5 × media: al massimo 63, quindi non resta mai a 100) e ogni incidente aggiunge la sua quota (scontro +3, strike +6, blocco +2, minaccia +1, ultimatum +5; tetto +15 a turno). Valore iniziale dello scenario 30 (crisi del Mar Rosso a 5: fascia «normale»). Un evento `WORLD_TENSION_CHANGED` per turno con le cause; Brent, TTF e rischio navale si muovono di 0,06 $ / 0,1 €/MWh / 0,15 punti per punto di tensione.
 
 | Fascia | Effetti |
 |---|---|
@@ -176,6 +176,16 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 - **Legittimità**: una BLOCKADE o una EXCLUSION_ZONE senza risoluzione, ultimatum scaduto o tensione mondiale ≥ 50 costa CD, credibilità e opinione presso i terzi.
 
+**Come è fatto (settore 09).** Il catalogo è in `engine/diplo-actions.ts` (`DIPLO_CATALOG`, costi in CD e ricariche; tabella nel README). Scelte dove il documento lasciava libertà:
+- **Rendita**: max(0,5; log₁₀(PIL in mld $) − 0,35 + 2 se seggio permanente) × credibilità/60 (tra 0,5× e 1,5×) a settimana; gli attori non statali (LNA) hanno 0,8 fisso; i blocchi 0. Partenza: 4 settimane di rendita. Il turno mensile vale 4 settimane. Esempi con credibilità 60: ITA 3,0 · USA 6,1 · FRA 5,2 · CHN 5,9 · TUR 2,8 · MLT 1,0.
+- **Ricarica N** = si può ripetere verso lo stesso destinatario da T+N (1 = una volta a turno); la lettera e la risposta a un trattato non hanno ricarica; la mediazione ha una ricarica per crisi e la risoluzione per sede.
+- **Slot di «migliorare le relazioni»**: rendita ≥ 5 → 4, ≥ 3 → 3, altrimenti 2. Il modificatore `improve` è uno per coppia (+2 a turno, tetto +30); dopo `STOP_IMPROVE` decade di 0,5 a settimana.
+- **Costo doppio** (§6): per le azioni *coercitive* (minaccia, sanzioni, richiamo, espulsione, rottura, embargo, ultimatum) delle democrazie (governo `democracy` o democrazia ≥ 6) con tensione mondiale < 25. Non ho aggiunto un modificatore d'opinione presso le altre democrazie: il costo in CD basta.
+- **Legittimità**: leggo «senza risoluzione approvata, ultimatum scaduto o tensione mondiale ≥ 50» come *senza nessuna di queste tre cose* (sono le eccezioni che tolgono il costo). Il costo si paga solo se nella zona ci sono unità di altri.
+- **Ultimatum**: richiede una tensione di coppia ≥ 30. Il destinatario lo «soddisfa» se prima della scadenza compie un atto di distensione verso chi lo ha mandato (rassicurazione, canale riservato, lettera cordiale/conciliante, accordo accettato, miglioramento delle relazioni): `relate(..., { detente: true })` segna l'ultimatum come `answered`, e alla scadenza (fase OPEN) esce `ULTIMATUM_MET` o `ULTIMATUM_EXPIRED` (legittimità per 6 turni; la tensione mondiale sale di 5 come incidente di fine turno).
+- **Accordi con più parti**: «Trattato attivo» (+10) lega il primo (il proponente) a ogni altra parte, fino a 8; un accordo di non aggressione si viola con uno strike o un blocco tra le parti.
+- **`military_access`** e **`defense_cooperation`**: l'effetto nel motore è che la presenza del partner non è pressione (niente −2/−5 di una dimostrazione di forza o di un blocco, nessuna violazione); le zone non hanno proprietario nello schema, quindi non c'è un divieto di transito da togliere.
+
 ## 8. Accettazione
 
 `acceptance(target, proposta, proponente) → { score, accept, reasons: [{ label, value }] }`, **deterministica** (niente dadi: deve essere spiegabile). Motivi:
@@ -193,6 +203,8 @@ Resta simmetrica (è un fatto della coppia, non un sentimento). Sale con gli inc
 
 Accetta se `score ≥ 0`. Il giocatore vede punteggio e motivi **prima** di inviare, nel dry-run di `validate` (come il tooltip di HOI4). Le stesse regole valgono per le fazioni IA e per gli Stati del mondo.
 
+**Come è fatto (settore 09).** `engine/acceptance.ts`, pesi in `PARAMS.acceptance`: base per tipo (ceasefire +8 … basing −12), disponibilità di partenza −5, opinione × 0,5, allineamento ±10, minaccia comune (+12 per rivale in comune, tetto 24, «rivale» = opinione ≤ −25 da entrambi, solo per i trattati di sicurezza), commercio (quota × 0,3, ≤ +8), tensione mondiale (sicurezza: +5 da 40, +8 da 55, −3 sotto 25; commercio −4 da 55), istituzioni (+2 ciascuna, ≤ 6), conflitto (−12: un trattato di sicurezza del destinatario con un rivale del proponente, oppure un nemico del destinatario tra le parti), potenza relativa (protezione: +8 se il proponente ha ≥ 5× il PIL, −4 se ≤ 1/5), credibilità ((c − 50) × 0,1, ±5), proposta già respinta (−12 per 3 turni, chiave `rej|proponente|destinatario|tipo` in `diplomacy.cooldowns`), tregua (+1,5 per punto di escalation della crisi in comune). I motivi sono una lista di `{ label, value }` e il punteggio è la loro somma (arrotondata a 0,1). La Knowledge della fazione porta `diplomacy.proposals` (suggerimento `acceptance` per ogni proposta ricevuta): il decisore a regole risponde con quello, il giocatore lo vede nel pannello Diplomazia; il dry-run di `validate` lo calcola per le proposte della bozza, anche verso Stati senza fazione.
+
 ## 9. Istituzioni e votazioni
 
 - **AG ONU**: votano tutti (sì · no · astensione). Il voto dipende da opinione verso proponente e bersaglio, allineamento, coesione del blocco e tema.
@@ -201,6 +213,8 @@ Accetta se `score ≥ 0`. Il giocatore vede punteggio e motivi **prima** di invi
 - **NATO**: consenso.
 - **Effetti di ogni voto**: modificatori verso chi ha votato contro, credibilità del proponente, legittimità (§7), un evento `INSTITUTION_VOTE` con l'esito per Stato (serve alla mappa).
 - **Test di realismo**: una risoluzione dell'AG che condanna l'invasione di uno Stato da parte di un membro permanente deve dare un esito vicino a quello di marzo 2022 (141 sì, 5 no, 35 astenuti): sì tra 120 e 160, no ≤ 15.
+
+**Come è fatto (settore 09).** `engine/institutions.ts`, parametri in `PARAMS.votes`: il voto di uno Stato è un punteggio (`voteScore`) = 0,4 × opinione verso il proponente − 0,3 × opinione verso il bersaglio + 0,4 × (distanza dal bersaglio − distanza dal proponente)/2 sull'asse del voto ONU + 0,5 × coesione del blocco (alleanza o unione condivisa col proponente +coesione, col bersaglio −coesione, limitata a ±1) + tema (norma di base + componente occidentale × −punto ideale: aggression 0,3/0,15, sanctions −0,1/0,45, humanitarian 0,5/0, maritime 0,25/0,1, nonproliferation 0,15/0,3). Sì ≥ 0,15, no ≤ −0,4, altrimenti astensione; il proponente vota sì e il bersaglio no. Regole dal campo `decision` del registro (`tally`): `unsc` 9 voti e nessun veto (un permanente vota no, e quindi pone il veto, solo se punteggio ≤ −0,7 o è il bersaglio; altrimenti si astiene); `majority` sì > no; `qmv` QMV (55% degli Stati e 65% della popolazione) per `humanitarian` e `other`, unanimità per gli altri temi; `consensus` nessun no. Taratura (proponente ITA, bersaglio RUS, tema `aggression`): **143 sì, 6 no, 44 astenuti** in AG (riferimento 141/5/35); in CdS veto russo. Effetti: risoluzione approvata = mandato per 8 turni (`diplomacy.resolutions`), +3 credibilità (−2 se respinta), «condanna pubblica» (−5, tensione +3) contro il bersaglio, −3 verso il proponente per i no più popolosi (≤ 20). Le vecchie `NATO_ART4`, `EU_COUNCIL` e `UNSC_DRAFT` si leggono ancora come `RESOLUTION` con sede NATO, UE e CdS (tema `other`).
 
 ## 10. IA mondiale (livello C, `engine/world-ai.ts`)
 
@@ -213,7 +227,19 @@ A ogni turno, solo da eventi **pubblici** e da quanto riguarda lo Stato stesso (
 
 **Prestazioni**: O(Stati × eventi pubblici). Obiettivo: **turno del motore ≤ 3 s** sul server (4 core, senza GPU) con 197 Stati.
 
+**Come è fatto (settore 10).** `engine/world-digest.ts` + `engine/world-ai.ts` + `engine/world-apply.ts`; parametri in `PARAMS.worldAi`. Scelte dove il documento lasciava libertà:
+- **Digest**: atti pubblici gravi da `diploActs()` (nota → tipo, gravità: strike 5, scontro/ultimatum/rottura/sanzioni multilaterali 4, blocco/sanzioni/embargo/cyber/operazione scoperta 3) e dalle `INSTITUTION_VOTE` pubbliche; soglia `reactionSeverity` 3, al massimo 6 atti per turno. Gli atti non pubblici stanno in `involving[attore]` solo per i destinatari.
+- **Reazione** = funzione di una *simpatia* (opinione verso vittima − verso attore, vicinanza sull'asse del voto ONU, coesione dei blocchi in comune): condanna ≥ 0,25, sostegno ≤ −0,25, silenzio in mezzo. Non c'è un tiro. L'attore, la vittima e il giocatore non reagiscono. Modificatori: condanna → l'attore vede peggio chi condanna (−3) e la vittima meglio (+3); sostegno → l'attore vede meglio chi lo sostiene (+3); al massimo 12 per atto, prima le fazioni, solo per i 3 atti più gravi.
+- **Voti**: nessun codice nuovo (settore 09); il collegamento è che le `INSTITUTION_VOTE` entrano nel digest e le sanzioni approvate scatenano l'adeguamento.
+- **Risposte**: già in aggiudicazione (settore 09); gli Stati propongono solo trattati commerciali, e solo se `acceptance()` dice che il partner accetterebbe; i trattati tra due Stati senza fazione non cambiano l'opinione.
+- **Sanzioni di blocco**: istituzioni con effetto `common_sanctions` o `veto_members` vincolano; chi ha votato sì (per il CdS: tutti gli Stati ONU con opinione del bersaglio ≤ 25) adotta con probabilità = coesione; un evento per risoluzione.
+- **Agenda**: ordine di priorità dentro lo Stato STOP_IMPROVE → RECALL_AMBASSADOR → REASSURANCE → commercio → IMPROVE_RELATIONS; poi tetto globale (azioni verso fazioni e giocatore per prime). L'indice è la posizione in ordine di ISO3 tra gli Stati senza fazione; `% 4` sul turno.
+- **Lettere**: solo risposte e inneschi forti (ultimatum italiano, sanzioni subite, accordo accettato); il giocatore può scrivere a ogni Stato.
+- **Livelli A e B**: le soglie sull'opinione sono rinominate e confermate (40 / −20 / 60: alleati 0–13, stretti 0–5, avversari 0–5 sulle fazioni di `med-2026`); isolamento: ≥ 10 Stati e ≥ 30% dei reagenti che condannano un atto della fazione, o una condanna approvata → i profili prudenti cercano la distensione. Direttiva: bonus 15 per punto di peso, malus 30 per `avoid`.
+
 ## 11. Agenti LLM a budget
+
+> **Realizzato nel settore 11** (PR «Agenti LLM a budget: strateghi, cancellerie e profili di provider»; dettagli in `AGENTS.md`). Scelte oltre la spec: `LLM_BUDGET_CALLS` predefinito 10 solo nelle campagne a regole (in modalità `llm` nessun tetto); il limite al minuto aspetta un posto fino a `LLM_MAX_WAIT_MS` (45 s), un modello in pausa dopo un 429 no; le cancellerie scrivono al massimo 4 atti a turno e 8 Stati per atto; il ruolo strategist si applica alle potenze che decidono a regole; i profili possono avere anche `rpd`, `responseFormat` e `apiKeyEnv` (nome della variabile con la chiave, mai la chiave). Parametro del ragionamento minimo di Gemini: `reasoning_effort` (`none` per i modelli 2.5, `minimal`/`low` per i 3).
 
 **Principio**: l'LLM non decide mai un esito. Propone **intenzioni** (direttive) o scrive **testi**; il motore li valida, li limita, li registra, e il replay li rilegge senza LLM.
 

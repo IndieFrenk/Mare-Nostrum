@@ -15,7 +15,12 @@
     "ceasefire",
     "arms_sale",
     "intel_sharing",
-    "secret"
+    "secret",
+    "non_aggression",
+    "guarantee",
+    "military_access",
+    "defense_cooperation",
+    "trade"
    ]
   },
   "parties": {

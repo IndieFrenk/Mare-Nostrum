@@ -1,5 +1,5 @@
 import type { AgentMemory } from '../schemas/index.js';
-import type { AgentsPort, LetterJob, LetterResult } from '../engine/turn-machine.js';
+import type { AgentsPort, ChanceryJob, ChanceryResult, LetterJob, LetterResult, StrategistJob, StrategistResult } from '../engine/turn-machine.js';
 import type { JsonStore } from '../store/json-store.js';
 
 /** Rilegge decisioni, narrativa e memoria salvate: nessuna chiamata LLM. */
@@ -23,7 +23,8 @@ export class ReplayAgents implements AgentsPort {
 
   async debrief({ campaign }: Parameters<AgentsPort['debrief']>[0]) {
     const n = (await this.store.getNarrative(this.sourceId, campaign.currentTurn))!;
-    return { debriefing: n.debriefing!, news: n.news };
+    // le notizie delle cancellerie le rifà il motore dalle frasi registrate: qui non si riprendono due volte
+    return { debriefing: n.debriefing!, news: n.news.filter((x) => x.kind !== 'chancery') };
   }
 
   async reflect({ factionId, campaign, memory }: Parameters<AgentsPort['reflect']>[0]): Promise<AgentMemory> {
@@ -38,12 +39,33 @@ export class ReplayAgents implements AgentsPort {
     return Promise.all(jobs.map(async (j) => {
       const n = used.get(j.factionId) ?? 0; used.set(j.factionId, n + 1);
       const d = await this.store.getDecision(this.sourceId, j.knowledge.turn, j.factionId);
-      const a = d?.orders.diplomacy.filter((x) => x.kind === 'LETTER')[n];
+      // gli Stati del mondo non hanno una decisione propria: le loro lettere stanno nel file del livello C
+      const w = d ? null : await this.store.getWorldDecision(this.sourceId, j.knowledge.turn);
+      const a = (d ? d.orders.diplomacy : (w?.actions ?? []).filter((x) => x.actor === j.factionId).map((x) => x.action)).filter((x) => x.kind === 'LETTER')[n];
       if (!a || a.kind !== 'LETTER') throw new Error(`lettera mancante ${j.factionId} → ${j.to} T${j.knowledge.turn}`);
-      const info = d!.letters.find((l) => l.actionId === a.id);
+      const info = (d ? d.letters : w!.letters).find((l) => l.actionId === a.id);
       return { subject: a.subject, body: a.body, tone: a.tone, source: info?.source ?? (a.model === 'template' ? 'template' : 'ai'), model: a.model ?? 'replay', errors: info?.errors ?? [] };
     }));
   }
+
+  /** Le frasi delle cancellerie registrate nel file del livello C: nessuna chiamata LLM. */
+  async chancery(jobs: ChanceryJob[]): Promise<ChanceryResult[]> {
+    const w = jobs.length ? await this.store.getWorldDecision(this.sourceId, jobs[0]!.turn) : null;
+    return jobs.map((j) => {
+      const info = w?.chancery.find((x) => x.eventId === j.event.id);
+      return { eventId: j.event.id, statements: (w?.statements ?? []).filter((x) => x.eventId === j.event.id), source: info?.source ?? 'template', model: info?.model ?? 'replay', errors: info?.errors ?? [] };
+    });
+  }
+
+  /** La direttiva registrata (versione limitata dal motore): nessuna chiamata LLM; senza file, nessuna direttiva. */
+  async strategize(job: StrategistJob): Promise<StrategistResult> {
+    const d = await this.store.getDirective(this.sourceId, job.turn, job.factionId);
+    if (!d) return { proposed: null, source: 'none', model: 'replay', promptHash: '', request: null, response: null, errors: [], usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 } };
+    return { proposed: d.limited, source: d.source, model: d.model, promptHash: d.promptHash, request: d.request, response: d.response, errors: d.errors, usage: d.usage };
+  }
+
+  /** Decisioni del livello C registrate: il motore le ricalcola (stesso dado) e controlla che siano identiche. */
+  recordedWorld(turn: number) { return this.store.getWorldDecision(this.sourceId, turn); }
 
   /** Decisione registrata: il motore ricalcola quelle a regole (stesso dado) e controlla che siano identiche a queste. */
   recordedDecision(turn: number, factionId: string) { return this.store.getDecision(this.sourceId, turn, factionId); }

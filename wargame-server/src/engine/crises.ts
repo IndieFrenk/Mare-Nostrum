@@ -1,6 +1,7 @@
-import type { GameEvent } from '../schemas/index.js';
+import type { GameEvent, WorldState } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { evaluate } from './conditions.js';
+import { diploActs } from './opinion.js';
 import { PARAMS } from './params.js';
 
 /** OPEN: deriva delle crisi con 2d6 ed eventi casuali pesati per zona/tensione. */
@@ -22,10 +23,9 @@ export function deescalateByAgreement(ctx: TurnCtx, ag: { id: string; type: stri
   }
 }
 
-/** Azioni distensive (RELATION_CHANGED con detente) del turno precedente tra due fazioni coinvolte nella crisi. */
+/** Azioni distensive (atti diplomatici con `detente`) del turno precedente tra due fazioni coinvolte nella crisi. */
 export function detenteActions(prevEvents: GameEvent[], involved: string[]) {
-  return prevEvents.filter((e) => e.type === 'RELATION_CHANGED' && (e.payload as { detente?: boolean }).detente
-    && involved.includes(String(e.payload.a)) && involved.includes(String(e.payload.b))).length;
+  return diploActs(prevEvents).filter((x) => x.detente && involved.includes(x.a) && involved.includes(x.b)).length;
 }
 
 /** Probabilità di raffreddamento di una crisi: base se il turno prima è stato quieto (× (1 + calma)) più il bonus delle azioni distensive. */
@@ -82,11 +82,25 @@ export function recoverInfrastructure(ctx: TurnCtx) {
   }
 }
 
+/** Zona della linea rossa dalla sua condizione (la prima zona nominata: crisi, unità o infrastruttura). */
+function redLineZone(s: WorldState, trigger: string): string | undefined {
+  const u = /units\(\w+,\s*(\w+)\)/.exec(trigger)?.[1]; if (u && s.zones[u]) return u;
+  const c = /crisis\((\w+)\)/.exec(trigger)?.[1]; if (c && s.crises[c]) return s.crises[c]!.zoneIds[0];
+  const i = /infra\((\w+)\)/.exec(trigger)?.[1]; if (i && s.infrastructure[i]) return s.infrastructure[i]!.zoneId;
+  return undefined;
+}
+
+/** I garanti di una fazione (trattato `guarantee`: il primo è il garante, gli altri i garantiti): chi risponde alle sue linee rosse insieme a lei. */
+export const guarantorsOf = (s: WorldState, f: string): string[] =>
+  Object.values(s.agreements).filter((a) => a.status === 'active' && a.type === 'guarantee' && a.parties[0] !== f && a.parties.slice(1).includes(f)).map((a) => a.parties[0]!).sort();
+
 export function checkRedLines(ctx: TurnCtx) {
   for (const f of Object.values(ctx.state.factions)) {
     for (const rl of f.redLines) {
       if (f.crossedRedLines.includes(rl.id) || !evaluate(ctx.state, rl.trigger)) continue;
-      ctx.emit('RED_LINE_CROSSED', f.id, { redLineId: rl.id, text: rl.text, response: rl.response }, { visibility: [f.id] });
+      // il garante di un trattato `guarantee` vede la linea rossa del garantito superata e può rispondere come lui
+      const zoneId = redLineZone(ctx.state, rl.trigger);
+      ctx.emit('RED_LINE_CROSSED', f.id, { redLineId: rl.id, text: rl.text, response: rl.response, ...(zoneId ? { zoneId } : {}) }, { visibility: [f.id, ...guarantorsOf(ctx.state, f.id)] });
       ctx.emit('FACTION_CHANGED', f.id, { factionId: f.id, delta: { posture: -1 }, patch: { crossedRedLines: [...f.crossedRedLines, rl.id] } }, { visibility: [f.id] });
     }
   }

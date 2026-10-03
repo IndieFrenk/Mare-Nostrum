@@ -36,7 +36,7 @@ test('un turno completo con LLM mock, senza rete verso servizi esterni', async (
   p = await at(34.5, 39.1);
   await page.mouse.click(p.x, p.y);
   await expect(page.locator('.wg-country header')).toContainText('TURCHIA');
-  await page.getByRole('button', { name: 'Rassicurare' }).click();
+  await page.getByRole('button', { name: /^Rassicurazione/ }).click();
   await page.getByRole('button', { name: /^Briefing/ }).click(); // i pulsanti del menu aprono/chiudono il pannello
 
   await page.getByRole('button', { name: 'Esegui turno' }).click();

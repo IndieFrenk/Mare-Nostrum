@@ -253,7 +253,9 @@
         "order_parser",
         "reflection",
         "repair",
-        "diplomat"
+        "diplomat",
+        "strategist",
+        "chancery"
        ]
       },
       {
@@ -263,6 +265,12 @@
     },
     "profileRef": {
      "type": "string"
+    },
+    "tier": {
+     "type": "string",
+     "enum": [
+      "A"
+     ]
     },
     "posture": {
      "type": "integer",
@@ -843,7 +851,12 @@
        "ceasefire",
        "arms_sale",
        "intel_sharing",
-       "secret"
+       "secret",
+       "non_aggression",
+       "guarantee",
+       "military_access",
+       "defense_cooperation",
+       "trade"
       ]
      },
      "parties": {
@@ -992,6 +1005,10 @@
       "items": {
        "type": "string"
       }
+     },
+     "kind": {
+      "type": "string",
+      "const": "chancery"
      }
     },
     "required": [
@@ -1117,7 +1134,8 @@
        "cyber",
        "sof",
        "show_of_force",
-       "red_line"
+       "red_line",
+       "ultimatum"
       ]
      },
      "from": {
@@ -1133,6 +1151,12 @@
      },
      "ref": {
       "type": "string"
+     },
+     "text": {
+      "type": "string"
+     },
+     "response": {
+      "type": "string"
      }
     },
     "required": [
@@ -1141,6 +1165,323 @@
      "from",
      "to"
     ]
+   }
+  },
+  "diplomacy": {
+   "type": "object",
+   "properties": {
+    "capital": {
+     "type": "number"
+    },
+    "rent": {
+     "type": "number"
+    },
+    "improvingSlots": {
+     "type": "integer",
+     "minimum": -9007199254740991,
+     "maximum": 9007199254740991
+    },
+    "coerciveCost": {
+     "default": 1,
+     "type": "number"
+    },
+    "improving": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "target": {
+        "type": "string",
+        "minLength": 2
+       },
+       "since": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "target",
+       "since"
+      ]
+     }
+    },
+    "cooldowns": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string"
+     },
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "ties": {
+     "default": {},
+     "type": "object",
+     "propertyNames": {
+      "type": "string",
+      "minLength": 2
+     },
+     "additionalProperties": {
+      "type": "string",
+      "enum": [
+       "recalled",
+       "expelled",
+       "broken"
+      ]
+     }
+    },
+    "ultimatums": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "to": {
+        "type": "string",
+        "minLength": 2
+       },
+       "demand": {
+        "type": "string"
+       },
+       "issuedTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "deadlineTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "status": {
+        "type": "string",
+        "enum": [
+         "pending",
+         "met",
+         "expired"
+        ]
+       },
+       "answered": {
+        "type": "boolean"
+       },
+       "legitimateUntil": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "id",
+       "from",
+       "to",
+       "demand",
+       "issuedTurn",
+       "deadlineTurn",
+       "status"
+      ]
+     }
+    },
+    "embargoes": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "proposals": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "agreementId": {
+        "type": "string"
+       },
+       "from": {
+        "type": "string",
+        "minLength": 2
+       },
+       "type": {
+        "type": "string"
+       },
+       "score": {
+        "type": "number"
+       },
+       "accept": {
+        "type": "boolean"
+       },
+       "reasons": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "label": {
+           "type": "string"
+          },
+          "value": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "label",
+          "value"
+         ]
+        }
+       }
+      },
+      "required": [
+       "agreementId",
+       "from",
+       "type",
+       "score",
+       "accept",
+       "reasons"
+      ]
+     }
+    }
+   },
+   "required": [
+    "capital",
+    "rent",
+    "improvingSlots"
+   ]
+  },
+  "world": {
+   "type": "object",
+   "properties": {
+    "reactions": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "turn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "eventId": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "actor": {
+        "type": "string",
+        "minLength": 2
+       },
+       "victim": {
+        "type": "string",
+        "minLength": 2
+       },
+       "condemn": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "support": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "silent": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "topCondemners": {
+        "default": [],
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "topSupporters": {
+        "default": [],
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "turn",
+       "eventId",
+       "kind",
+       "actor",
+       "victim",
+       "condemn",
+       "support",
+       "silent"
+      ]
+     }
+    },
+    "votes": {
+     "default": [],
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "turn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+       },
+       "forum": {
+        "type": "string"
+       },
+       "subject": {
+        "type": "string"
+       },
+       "proposer": {
+        "type": "string",
+        "minLength": 2
+       },
+       "target": {
+        "type": "string",
+        "minLength": 2
+       },
+       "passed": {
+        "type": "boolean"
+       },
+       "yes": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "no": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       },
+       "abstain": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+       }
+      },
+      "required": [
+       "turn",
+       "forum",
+       "subject",
+       "proposer",
+       "passed",
+       "yes",
+       "no",
+       "abstain"
+      ]
+     }
+    }
    }
   },
   "ownRelations": {
@@ -1157,6 +1498,19 @@
       "type": "number"
      },
      "tension": {
+      "type": "number"
+     },
+     "opinionOfMe": {
+      "type": "string",
+      "enum": [
+       "ostile",
+       "fredda",
+       "neutra",
+       "cordiale",
+       "stretta"
+      ]
+     },
+     "opinionOfMeExact": {
       "type": "number"
      }
     },

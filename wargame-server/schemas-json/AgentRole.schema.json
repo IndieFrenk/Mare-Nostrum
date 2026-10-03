@@ -9,6 +9,8 @@
   "order_parser",
   "reflection",
   "repair",
-  "diplomat"
+  "diplomat",
+  "strategist",
+  "chancery"
  ]
 }

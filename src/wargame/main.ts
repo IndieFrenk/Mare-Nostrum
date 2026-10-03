@@ -1,20 +1,28 @@
 // Mare Nostrum — entry della variante "wargame" (AGPL-3.0, fork di World Monitor).
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
-import { api } from './api-client';
-import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, loadNation, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
+import { api, type LlmStatus } from './api-client';
+import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, openCampaign, rememberedCampaign, runTurn, selectCountry, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
-import { FACTIONS } from './layers/factions';
 import { WarMap } from './layers/map';
-import { countryCard, orderToZone, selectionCard } from './panels/hud';
+import { countryCard } from './panels/country';
+import { orderToZone, selectionCard } from './panels/hud';
+import { legend } from './panels/legend';
 import { set, state, subscribe, type UiState } from './state/store';
 import { WARGAME_VARIANT } from './variant';
 
 const root = document.getElementById('wg-app')!;
-const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', letters: '✉', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
+const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', states: '◎', letters: '✉', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
 let map: WarMap | null = null;
 const mapEl = h('div', { id: 'wg-map' });
 const hud = h('div', { id: 'wg-hud' });
+
+/** Una riga sul budget delle chiamate: profilo, chiamate del turno, 429, ripieghi e chiamate saltate (da /llm/status). */
+function budgetLine(b: NonNullable<LlmStatus['budget']>) {
+  const t = b.campaign?.turn;
+  return [`Budget LLM: profilo ${b.profile}`, b.callsPerTurn === null ? 'chiamate per turno senza tetto' : `${t?.admitted ?? 0}/${b.callsPerTurn} chiamate nel turno`,
+    t ? `${t.tokensIn}+${t.tokensOut} token · ${t.rate429} 429 · ${t.fallbacks} ripieghi · ${t.skipped} saltate` : null, b.campaign ? `oggi ${b.campaign.today.calls} chiamate` : null].filter(Boolean).join(' · ');
+}
 
 /** Pallino dello stato dei modelli: verde (rispondono), giallo (manca un modello o lenti), rosso (irraggiungibili). Clic: ricontrolla. */
 function llmDot(s: UiState) {
@@ -30,10 +38,33 @@ function llmDot(s: UiState) {
       l.missing.length ? `Modelli mancanti sul server: ${l.missing.join(', ')}` : null,
       l.listed === null && l.reachable ? 'Il server non elenca i modelli (/models): presenza non verificata.' : null,
       l.factionMode === 'rules' ? 'Fazioni: regole del motore (l\'LLM scrive lettere, notizie e briefing e interpreta la Console Ordini).' : l.factionMode === 'llm' ? 'Fazioni: agenti LLM.' : null,
+      l.budget ? budgetLine(l.budget) : null,
       `Modelli per ruolo:\n${roles}`,
       `Controllato alle ${new Date(l.checkedAt).toLocaleTimeString('it-IT')} · clic per ricontrollare`,
     ].filter(Boolean).join('\n');
   return h('button', { class: `wg-llm ${cls}`, title, 'aria-label': title, onclick: () => void checkLlm(true) }, h('i', {}), l.mode === 'mock' ? 'mock' : !l.reachable ? 'LLM spenti' : l.missing.length ? `${l.missing.length} mancanti` : 'LLM');
+}
+
+const n1 = (n: number) => n.toLocaleString('it-IT', { maximumFractionDigits: 1 });
+const sg = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${n1(Math.abs(v))}`;
+
+/** Capitale diplomatico: valore e rendita a turno; slot di «Migliorare le relazioni» e costo doppio delle azioni coercitive nel suggerimento. */
+function cdRes(d: NonNullable<UiState['diplo']>) {
+  const c = d.capital;
+  const title = [`Capitale diplomatico: ${n1(c.value)} CD`, `Rendita: ${n1(c.rent)} a settimana × ${c.weeks} a turno = +${n1(c.rent * c.weeks)} a turno`,
+    `Slot «Migliorare le relazioni»: ${c.improving.length}/${c.improvingSlots}${c.improving.length ? ` (${c.improving.map((x) => x.target).join(', ')})` : ''}, 1 CD a turno ciascuno`,
+    c.coerciveCost > 1 ? 'Tensione mondiale bassa: le azioni coercitive di una democrazia costano il doppio.' : null].filter(Boolean).join('\n');
+  return h('div', { class: 'wg-res', title, tabindex: '0', 'aria-label': title }, h('small', {}, 'CD'), h('b', {}, `${n1(c.value)} (+${n1(c.rent * c.weeks)}/turno)`));
+}
+
+/** Tensione mondiale 0–100: valore e fascia scritti, barra a quattro fasce con l'indicatore, cause dell'ultimo turno nel suggerimento. */
+function tensionRes(d: NonNullable<UiState['diplo']>) {
+  const t = d.tension;
+  const title = [`Tensione mondiale ${n1(t.value)}/100: ${t.band.label}. ${t.band.effect}`, ...t.bands.map((b) => `${b.from}–${b.to} ${b.label}: ${b.effect}`),
+    t.causes.length ? `Ultimo turno${t.from !== null ? ` (da ${n1(t.from)})` : ''}:\n${t.causes.map((c) => `  ${sg(c.value)} ${c.label}`).join('\n')}` : 'Nessuna variazione registrata nell\'ultimo turno.'].join('\n');
+  return h('div', { class: 'wg-res wg-tension', title, tabindex: '0', 'aria-label': title },
+    h('small', {}, 'Tensione mondiale'), h('b', { style: `color:var(--wg-tension-${t.band.index})` }, `${n1(t.value)} · ${t.band.label}`),
+    h('span', { class: 'wg-tbar' }, t.bands.map((b) => h('i', { style: `flex:${b.to - b.from + 1};background:var(--wg-tension-${b.index})` })), h('u', { style: `left:${Math.max(0, Math.min(100, t.value))}%` })));
 }
 
 function topbar(s: UiState) {
@@ -45,7 +76,9 @@ function topbar(s: UiState) {
   const res = (label: string, value: string, title: string) => h('div', { class: 'wg-res', title }, h('small', {}, label), h('b', {}, value));
   return h('header', { id: 'wg-top' },
     h('button', { class: 'wg-flag', title: 'Italia', onclick: () => set({ country: 'ITA' }) }, 'ITA'),
-    f ? [res('FOED', meur(f.budget.discretionary), 'Fondo Operazioni & Emergenze Difesa'), res('Stabilità', String(f.stability), 'Stabilità interna'), res('Credibilità', String(f.credibility), 'Credibilità militare e diplomatica')] : null,
+    f ? res('FOED', meur(f.budget.discretionary), 'Fondo Operazioni & Emergenze Difesa') : null,
+    s.diplo ? [cdRes(s.diplo), tensionRes(s.diplo)] : null,
+    f ? [res('Stabilità', String(f.stability), 'Stabilità interna'), res('Credibilità', String(f.credibility), 'Credibilità militare e diplomatica')] : null,
     g ? [res('TTF', `${g.ttfEurMwh} €/MWh`, 'Prezzo gas'), res('Brent', `${g.brentUsd} $`, 'Prezzo petrolio'), res('Rotte', `${g.medShippingRisk}/100`, 'Rischio navigazione'), res('Migrazioni', `${g.migrationPressure}/100`, 'Pressione migratoria')] : null,
     h('div', { class: 'wg-spacer' }),
     h('div', { class: 'wg-date' }, h('b', {}, c.date), h('small', {}, `T${c.currentTurn} · ${c.phase}`)),
@@ -76,6 +109,13 @@ function drawer(s: UiState) {
     h('div', { class: 'panel-content' }, p.render(s, { flyTo: (lon, lat) => map?.flyTo(lon, lat), rerender: () => set({}) })));
 }
 
+const MODE_TITLE: Partial<Record<UiState['mapMode'], string>> = {
+  allineamento: 'Polo prevalente: Occidente (blu), Cina (oro), Russia (rosso), non allineato (grigio); più forte = più allineato',
+  opinione: 'Opinione tra l\'Italia e ogni Stato: scala blu (buona) – grigio – arancio (cattiva), per fasce',
+  trattati: 'Trattati dell\'Italia, o del paese selezionato: una linea per partner, per tipo',
+  voto: 'Esito per Stato dell\'ultima votazione in Assemblea o Consiglio: sì, no, astenuto, assente',
+};
+
 function render(s: UiState) {
   const parts: (Node | null)[] = [
     topbar(s),
@@ -84,8 +124,9 @@ function render(s: UiState) {
     drawer(s),
     s.country ? countryCard(s, s.country) : null,
     selectionCard(s),
+    legend(s),
     h('div', { id: 'wg-modes' },
-      (['politica', 'diplomazia', 'tensione', 'crisi', 'allineamento'] as const).map((m) => h('button', { class: s.mapMode === m ? 'on' : '', title: m === 'allineamento' ? 'Polo prevalente: Occidente (blu), Cina (oro), Russia (rosso), non allineato (grigio); più forte = più allineato' : undefined, onclick: () => set({ mapMode: m }) }, m)),
+      (['politica', 'diplomazia', 'tensione', 'crisi', 'allineamento', 'opinione', 'trattati', 'voto'] as const).map((m) => h('button', { class: s.mapMode === m ? 'on' : '', 'aria-pressed': String(s.mapMode === m), title: MODE_TITLE[m], onclick: () => set({ mapMode: m }) }, m)),
       h('button', { onclick: () => set({ globe: !s.globe }) }, s.globe ? 'Mappa piana' : 'Globo'),
       h('button', { onclick: leaveCampaign }, 'Campagne')),
     h('div', { id: 'wg-log' }, s.error ? h('span', { class: 'wg-err' }, s.error)
@@ -110,7 +151,7 @@ async function lobby() {
     list?.length ? [h('h3', {}, 'Campagne esistenti'), h('ul', {}, list.map((c) => h('li', {}, h('a', { href: '#', onclick: (e: Event) => { e.preventDefault(); void openCampaign(c.id); } }, c.name), c.parent ? ` (ramo di ${c.parent.campaignId} T${c.parent.turn})` : '')))] : null));
 }
 
-const MAP_KEYS = ['layers', 'knowledge', 'selection', 'draft', 'mapMode', 'globe', 'country', 'overview', 'nations'] as const;
+const MAP_KEYS = ['layers', 'knowledge', 'selection', 'draft', 'mapMode', 'globe', 'country', 'overview', 'nations', 'diplo', 'countryDiplo', 'votes', 'voteId', 'opinionDir'] as const;
 let last: Partial<UiState> = {};
 subscribe((s) => {
   if (!s.campaignId || !s.campaign) { map?.map.remove(); map = null; void lobby(); return; }
@@ -119,7 +160,7 @@ subscribe((s) => {
     map = new WarMap(mapEl, {
       selectUnit: (id, add) => { set({ stack: null }); void selectUnit(id, add); },
       openStack: (ids) => set({ stack: ids }),
-      openCountry: (f) => { set({ country: f }); if (f && !FACTIONS[f]) void loadNation(f); },
+      openCountry: selectCountry,
       orderToZone,
     });
   }

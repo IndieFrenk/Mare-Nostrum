@@ -1,0 +1,37 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "eventId": {
+   "type": "string"
+  },
+  "iso": {
+   "type": "string"
+  },
+  "position": {
+   "type": "string",
+   "enum": [
+    "condemn",
+    "support",
+    "silence"
+   ]
+  },
+  "text": {
+   "type": "string"
+  },
+  "source": {
+   "type": "string",
+   "enum": [
+    "ai",
+    "template"
+   ]
+  }
+ },
+ "required": [
+  "eventId",
+  "iso",
+  "position",
+  "text",
+  "source"
+ ]
+}

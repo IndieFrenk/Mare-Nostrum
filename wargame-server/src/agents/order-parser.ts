@@ -24,7 +24,7 @@ const ITEMS: Record<string, number> = { ...PARSER_CAPS, unitIds: 5, assetIds: 2,
  */
 export const PARSER_LENGTHS: Record<string, number> = {
   message: 160, ambiguities: 150, terms: 120, counterTerms: 120, text: 160, subject: 100, objective: 100, scope: 80,
-  audience: 60, targetRef: 40, protect: 40, id: 12, ids: 24,
+  audience: 60, targetRef: 40, protect: 40, demand: 100, id: 12, ids: 24,
 };
 /** chiavi per le munizioni di uno STRIKE (record) */
 const MAX_PROPERTIES = 3;
@@ -124,6 +124,6 @@ export async function parseOrders(provider: LlmProvider, log: LlmCall[], c: Camp
     schemaName: 'ParsedOrders', jsonSchema: PARSER_SCHEMA, keepLengths: true, meta: { text: p.recognition.text, original: text, legal: p.legal, recognized: p.recognition.hits },
   }, ParsedLenient);
   const recognized = p.recognition.hits;
-  if (!r.value) return { orders: { military: [], diplomacy: [], procurement: [], statements: [] }, zoneStances: [], ambiguities: ['Impossibile interpretare la direttiva: usare il costruttore strutturato.', ...nameAmbiguities(p.recognition)], recognized };
+  if (!r.value) return { orders: { military: [], diplomacy: [], procurement: [], statements: [] }, zoneStances: [], ambiguities: [r.skipped ? `Chiamate LLM non disponibili (${r.errors[0]?.replace(/^chiamata LLM non fatta: /, '') ?? r.skipped}): usare il costruttore strutturato.` : 'Impossibile interpretare la direttiva: usare il costruttore strutturato.', ...nameAmbiguities(p.recognition)], recognized };
   return { ...r.value, ambiguities: [...r.value.ambiguities, ...nameAmbiguities(p.recognition)], recognized };
 }

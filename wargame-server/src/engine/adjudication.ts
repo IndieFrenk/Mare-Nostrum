@@ -1,8 +1,10 @@
-import type { FactionOrders, Order } from '../schemas/index.js';
+import type { FactionOrders, Order, WorldDecision, WorldState } from '../schemas/index.js';
 import type { TurnCtx } from './context.js';
 import { detectInteractions, openEngagement } from './combat.js';
 import { checkRedLines } from './crises.js';
-import { resolveDiplomacy, resolveStatement } from './diplomacy.js';
+import { resolveDiplomacy, resolveStatement, violateTreaties } from './diplomacy.js';
+import { applyWorldDecision } from './world-apply.js';
+import { legitimacyCost } from './legitimacy.js';
 import { moveUnit, returnToBase } from './movement.js';
 import { PARAMS } from './params.js';
 import { placeOrder } from './procurement.js';
@@ -11,7 +13,7 @@ import { validateOrders } from './validators.js';
 const ACTIONS = new Set(['STRIKE', 'SOF_OP', 'CYBER_OP']);
 
 /** Esecuzione simultanea: diplomazia → acquisti → movimenti → azioni → interazioni → linee rosse. */
-export function adjudicate(ctx: TurnCtx, all: FactionOrders[]) {
+export function adjudicate(ctx: TurnCtx, all: FactionOrders[], world: WorldDecision | null = null) {
   const orders = [...all].sort((a, b) => a.factionId.localeCompare(b.factionId));
   const rejected: { factionId: string; id: string; errors: string[] }[] = [];
   const ok = (o: FactionOrders, body: Partial<FactionOrders>, id: string) => {
@@ -24,6 +26,8 @@ export function adjudicate(ctx: TurnCtx, all: FactionOrders[]) {
     for (const d of o.diplomacy) if (ok(o, { diplomacy: [d] }, d.id)) resolveDiplomacy(ctx, o.factionId, d);
     for (const st of o.statements) resolveStatement(ctx, o.factionId, st);
   }
+  // IA mondiale (livello C): reazioni, sanzioni di blocco e agenda lenta degli Stati senza fazione, dopo le fazioni
+  if (world) rejected.push(...applyWorldDecision(ctx, world));
   for (const o of orders) {
     const seen = new Map<string, number>();
     for (const p of o.procurement) if (ok(o, { procurement: [p] }, p.id)) { const n = seen.get(p.itemId) ?? 0; placeOrder(ctx, o.factionId, p, n); seen.set(p.itemId, n + 1); }
@@ -33,6 +37,12 @@ export function adjudicate(ctx: TurnCtx, all: FactionOrders[]) {
   detectInteractions(ctx);
   checkRedLines(ctx);
   return rejected;
+}
+
+/** `to` ha concesso l'accesso militare a `from` (trattato `military_access`, il primo è chi concede) o sono legati da una cooperazione di difesa. */
+export function hasAccess(s: WorldState, from: string, to: string) {
+  return Object.values(s.agreements).some((a) => a.status === 'active' && a.parties.includes(from) && a.parties.includes(to)
+    && ((a.type === 'military_access' && a.parties[0] === to) || (a.type === 'defense_cooperation' && a.parties.length <= 3)));
 }
 
 function posture(ctx: TurnCtx, f: string, m: Order) {
@@ -58,10 +68,13 @@ function posture(ctx: TurnCtx, f: string, m: Order) {
     default: {
       if (!('zoneId' in m)) break;
       units.forEach((u) => moveUnit(ctx, u, m.zoneId, m.kind === 'EVACUATION' ? 'flank' : 'cruise', m.id)); setTask();
-      const present = [...new Set(Object.values(s.units).filter((u) => u.zoneId === m.zoneId && u.status === 'deployed' && u.factionId !== f).map((u) => u.factionId))];
+      // chi ha concesso l'accesso militare (o è alleato stretto) non vede nella presenza una pressione
+      const present = [...new Set(Object.values(s.units).filter((u) => u.zoneId === m.zoneId && u.status === 'deployed' && u.factionId !== f).map((u) => u.factionId))].filter((o) => !hasAccess(s, f, o));
       if (m.kind === 'SHOW_OF_FORCE') { ctx.emit('FACTION_CHANGED', f, { factionId: f, delta: { credibility: 1 } }); present.forEach((o) => ctx.relate(f, o, -2, 5, `dimostrazione di forza in ${m.zoneId}`, { propagate: false })); }
       if (m.kind === 'BLOCKADE' || m.kind === 'EXCLUSION_ZONE') {
         present.forEach((o) => ctx.relate(f, o, -5, 10, `${m.kind} in ${m.zoneId}`));
+        legitimacyCost(ctx, f, present, m.zoneId, m.id);
+        present.forEach((o) => violateTreaties(ctx, f, o, `${m.kind} in ${m.zoneId}`));
         Object.values(s.crises).filter((c) => c.zoneIds.includes(m.zoneId)).forEach((c) => ctx.escalate(c.id, 1, `${m.kind} di ${f}`, { byOrders: true }));
       }
       if (m.kind === 'EVACUATION') ctx.emit('FACTION_CHANGED', f, { factionId: f, delta: { credibility: 2 } }, { causedBy: { orderId: m.id } });
@@ -84,7 +97,7 @@ function action(ctx: TurnCtx, f: string, m: Order) {
       for (const id of m.unitIds) { const take = Math.min(left, s.units[id].loadout[mun] ?? 0); if (take) { ctx.emit('MUNITION_EXPENDED', f, { factionId: f, unitId: id, munitionId: mun, qty: take }, { visibility: [f] }); left -= take; } }
     }
     ctx.spend(f, -(PARAMS.sortieCost.STRIKE + Object.entries(m.munitions).reduce((a, [k, q]) => a + (ctx.catalog.munitions[k]?.cost ?? 1) * q, 0)), 'operations', m.id, `Strike su ${m.targetRef}`);
-    if (victim) ctx.relate(f, victim, -25, 25, `strike su ${m.targetRef}`, { incident: true });
+    if (victim) { ctx.relate(f, victim, -25, 25, `strike su ${m.targetRef}`, { incident: true }); violateTreaties(ctx, f, victim, `strike su ${m.targetRef}`); }
     Object.values(s.crises).filter((c) => c.zoneIds.includes(zoneId)).forEach((c) => ctx.escalate(c.id, 2, `strike di ${f} su ${m.targetRef}`, { byOrders: true }));
     const player = ctx.campaign.playerFaction;
     const defenders = Object.values(s.units).filter((u) => u.factionId === victim && u.zoneId === zoneId && u.status !== 'destroyed').map((u) => u.id);

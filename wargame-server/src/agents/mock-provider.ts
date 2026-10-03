@@ -33,6 +33,8 @@ function generate(role: string, m: M): unknown {
     case 'order_parser': return parser(m);
     case 'reflection': return reflection(m);
     case 'diplomat': return letter(m);
+    case 'strategist': return strategist(m);
+    case 'chancery': return chancery(m);
     default: return {};
   }
 }
@@ -67,6 +69,12 @@ function faction(m: M) {
   const others = legal.factions as string[];
   const target = others[h % Math.max(1, others.length)];
   const diplomacy: M[] = target ? [{ id: 'd1', kind: h % 3 === 0 ? 'DEMARCHE' : 'REASSURANCE', target, message: 'Richiamo alla moderazione nelle aree di crisi.', visibility: 'public' }] : [];
+  // azioni del catalogo (settore 09), con il capitale che hanno: migliorare le relazioni ogni tanto, una risoluzione umanitaria all'AG più di rado
+  const costs = (legal.costiDiplomatici ?? {}) as Record<string, number>;
+  let cd = Number(legal.capitaleDiplomatico ?? 0) - (diplomacy.length ? 1 : 0);
+  const partner = others[(h >> 2) % Math.max(1, others.length)];
+  if (partner && partner !== target && h % 5 === 1 && Number(legal.slotMiglioramento ?? 0) > 0 && cd >= (costs.IMPROVE_RELATIONS ?? 1)) { diplomacy.push({ id: 'd2', kind: 'IMPROVE_RELATIONS', target: partner }); cd -= costs.IMPROVE_RELATIONS ?? 1; }
+  if (h % 11 === 3 && cd >= (costs.RESOLUTION ?? 5)) diplomacy.push({ id: 'd3', kind: 'RESOLUTION', forum: 'UNGA', subject: 'Appello alla moderazione e al rispetto del diritto marittimo', topic: 'maritime' });
   for (const ag of legal.pendingAgreements as string[]) diplomacy.push({ id: `r-${ag}`, kind: 'RESPOND_AGREEMENT', agreementId: ag, response: h % 2 ? 'accept' : 'reject' });
   const lot = (legal.procurement as M[]).find((i) => i.id.startsWith('LOT_'));
   const procurement = lot && legal.ownBases.length && legal.budgetMEur > 300 && h % 3 === 1 ? [{ id: 'p1', itemId: lot.id, qty: 1, destinationBaseId: legal.ownBases[0] }] : [];
@@ -110,6 +118,11 @@ function parser(m: M) {
   // una postura nella zona (il motore mette per prime le unità nominate), e per il rientro alla base niente (JSON troncato:
   // completa il motore). Senza unità nominate: postura se il testo chiede forze in una zona.
   if (zone && stance !== 'withdraw' && (units.length || /presenza|pattugl|dimostr|scort/.test(text))) zoneStances.push({ zoneId: zone, stance, intensity: !units.length && /più|rafforz/.test(text) ? 2 : 1 });
+  // azioni nuove del catalogo: il mock ne dà alcune (le altre le completa il motore, come per il cyber)
+  const target1 = factions.length === 1 ? factions[0] : undefined;
+  if (target1 && /richiam\w* l'ambasciatore/.test(text)) diplomacy.push({ id: 'd-recall', kind: 'RECALL_AMBASSADOR', target: target1 });
+  if (target1 && /ultimatum/.test(text)) diplomacy.push({ id: 'd-ult', kind: 'ULTIMATUM', target: target1, demand: 'Ritirare le forze dalla zona contestata', deadlineTurns: Number(/entro (\d)/.exec(text)?.[1] ?? 2) });
+  if (target1 && /migliora\w* (i rapporti|le relazioni)/.test(text)) diplomacy.push({ id: 'd-imp', kind: 'IMPROVE_RELATIONS', target: target1 });
   const dkind = /rassicur/.test(text) ? 'REASSURANCE' : /minacc/.test(text) ? 'THREAT' : /chied|sollecit|protest/.test(text) ? 'DEMARCHE' : null;
   if (dkind) for (const f of factions) diplomacy.push({ id: `d-${f}`, kind: dkind, target: f, message: 'Richiesta formale del Governo italiano.', visibility: 'public' });
   // aiuti: le frasi diplomatiche i modelli locali le sbagliano di rado; per il cyber nessuna CYBER_OP (la completa il motore)
@@ -139,4 +152,41 @@ function letter(m: M) {
     : `desidero farLe conoscere il pensiero del mio Governo. ${m.gist ?? 'La situazione nel Mediterraneo richiede prudenza da parte di tutti.'} Confido che i nostri Governi sapranno mantenere aperto il dialogo.`;
   const subject = m.replySubject ? `Risposta: ${String(m.replySubject).replace(/^(Risposta:\s*)+/i, '')}`.slice(0, 120) : ['Dialogo sulle questioni di comune interesse', 'Sicurezza del Mediterraneo', 'Cooperazione e stabilità regionale'][h % 3];
   return { subject, body: `${open}\n${core}\nVoglia accogliere i sensi della mia più alta considerazione.`, tone };
+}
+
+/**
+ * Direttiva plausibile e deterministica dalle righe d'opinione che il motore ha messo nel contesto: pressione sul più ostile, avvicinamento al più
+ * amichevole, a volte un accordo commerciale e un po' più di interesse per una zona. Solo id del contesto: il motore la accetta senza scarti.
+ */
+function strategist(m: M) {
+  const h = hashString(`${m.seed}:${m.factionId}:${m.turn}:direttiva`);
+  const rows = (m.rows as M[]).filter((r) => r.x !== m.factionId);
+  const worst = [...rows].sort((a, b) => a.opinion - b.opinion || a.x.localeCompare(b.x))[0];
+  const best = [...rows].sort((a, b) => b.opinion - a.opinion || a.x.localeCompare(b.x))[0];
+  const priorities: M[] = [];
+  if (worst && worst.opinion < 0) priorities.push({ kind: h % 2 ? 'deter' : 'contain', target: worst.x, weight: 0.5 });
+  if (best && best.opinion > -20 && best.x !== worst?.x) priorities.push({ kind: h % 3 === 0 ? 'court' : 'improve', target: best.x, weight: 0.6 });
+  const zones = (m.zones as string[]);
+  return {
+    horizonTurns: 3 + (h % 4),
+    priorities,
+    zoneInterestDelta: zones.length && h % 2 === 0 ? { [zones[h % zones.length]!]: 0.1 } : {},
+    seekAgreements: best && best.opinion > 0 && h % 3 === 1 ? [{ type: 'trade', with: best.x }] : [],
+    avoid: [],
+    rationale: `Linea per i prossimi turni: ${worst && worst.opinion < 0 ? 'fermezza con i rivali' : 'distensione'} e rapporti più stretti con i partner.`,
+  };
+}
+
+/** Frasi delle cancellerie dal contesto: una per Stato dell'elenco, con la posizione data dal motore, senza cifre né nomi di persone. */
+function chancery(m: M) {
+  const noun: Record<string, string> = { strike: "l'attacco", engagement: 'lo scontro armato', blockade: 'il blocco navale', ultimatum: "l'ultimatum", sanction: 'le sanzioni', multilateral_sanction: 'le sanzioni multilaterali', break: 'la rottura delle relazioni', embargo: "l'embargo sulle armi", cyber: "l'attacco cyber", covert: "l'operazione clandestina" };
+  const n = noun[String(m.event.kind)] ?? "l'accaduto";
+  return {
+    statements: (m.states as M[]).map((s) => ({
+      iso: s.iso, position: s.position,
+      text: s.position === 'condemn' ? `${s.name} deplora ${n} di ${m.actorName} ai danni di ${m.victimName} e chiede il rispetto del diritto internazionale.`
+        : s.position === 'support' ? `${s.name} sostiene la posizione di ${m.actorName} dopo ${n} e chiede moderazione a tutte le parti.`
+        : `${s.name} osserva con cautela gli sviluppi dopo ${n} e invita al dialogo.`,
+    })),
+  };
 }

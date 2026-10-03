@@ -193,7 +193,10 @@ export function rulesDecision(i: DecideInput, rng: Rng): AgentDecision {
     knowledge: i.knowledge, rng,
     geo: { zones: i.scenario.world.zones, bases: i.scenario.world.bases, infrastructure: i.scenario.world.infrastructure },
     names: Object.fromEntries(Object.values(i.state.factions).map((x) => [x.id, x.name])),
+    ...(i.directive ? { directive: i.directive } : {}),
   });
   const errors = pipe.check(out);
-  return pipe.finish(out, { model: RULES_MODEL, promptHash: '', usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, repairAttempts: 0, errors });
+  const d = pipe.finish(out, { model: RULES_MODEL, promptHash: '', usage: { promptTokens: 0, completionTokens: 0, latencyMs: 0 }, repairAttempts: 0, errors });
+  // la direttiva che ha guidato la scelta si registra solo se c'è (oggi mai: la deterministica è «nessuna direttiva»)
+  return i.directive ? { ...d, directive: i.directive } : d;
 }

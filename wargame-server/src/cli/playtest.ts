@@ -54,12 +54,18 @@ function llmCalls(id: string, t: number): Record<string, number> | null {
   const f = path.join(config.dataDir, id, 'llm-log', `turn-${String(t).padStart(4, '0')}.jsonl`);
   if (!existsSync(path.join(config.dataDir, id))) return null;
   const out: Record<string, number> = {};
-  if (existsSync(f)) for (const l of readFileSync(f, 'utf8').split('\n').filter(Boolean)) { const r = (JSON.parse(l) as J).role as string; out[r] = (out[r] ?? 0) + 1; }
+  if (existsSync(f)) for (const l of readFileSync(f, 'utf8').split('\n').filter(Boolean)) { const e = JSON.parse(l) as J; if (e.cached) continue; out[e.role as string] = (out[e.role as string] ?? 0) + 1; }
   return out;
 }
 const add = (into: Record<string, number>, from: Record<string, number>) => { for (const [k, v] of Object.entries(from)) into[k] = (into[k] ?? 0) + v; return into; };
 const top = (m: Record<string, number>, n: number) => Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, n);
+// budget LLM (settore 11): chiamate ammesse, inviate, saltate e 429 per turno, da GET /llm/status; somme per ruolo e per priorità
+const budgetTotal = { admitted: 0, calls: 0, skipped: 0, rate429: 0, fallbacks: 0, tokensIn: 0, tokensOut: 0, cacheHits: 0, max: 0, turns: 0 };
+const budgetByRole: Record<string, number> = {}; const budgetSkippedBy: Record<string, number> = {};
+let budgetCap: number | null | undefined;
+const directivesTotal = { given: 0, none: 0, limited: 0, moves: 0 }; const chanceryTotal = { events: 0, statements: 0, ai: 0, template: 0 };
 const llmTotal: Record<string, number> = {}; const ruleTotal: Record<string, number> = {}; const textTotal: Record<string, number> = {};
+const worldTextTotal: Record<string, number> = {}; const worldKindTotal: Record<string, number> = {}; const phaseTotal: Record<string, number> = {};
 let llmSeen = false;
 
 const turns: J[] = [];
@@ -138,8 +144,36 @@ while (c.currentTurn <= target && c.status === 'active') {
     byText[key] = (byText[key] ?? 0) + 1;
   }
   add(ruleTotal, byRule); add(textTotal, byText);
+  // IA mondiale (livello C): azioni per tipo, reazioni, motivazioni; e il tempo di ogni fase del motore (GET /timings)
+  const world = (pm.world ?? null) as J | null;
+  const worldKinds: Record<string, number> = {};
+  for (const a of ((world?.actions ?? []) as J[])) worldKinds[a.action.kind] = (worldKinds[a.action.kind] ?? 0) + 1;
+  const worldText: Record<string, number> = {};
+  for (const r of ((world?.rationale ?? []) as J[])) { const key = `${r.rule}: ${String(r.text).replace(/\d+(?:[.,]\d+)?/g, 'N')}`; worldText[key] = (worldText[key] ?? 0) + 1; }
+  add(worldTextTotal, worldText); add(worldKindTotal, worldKinds);
+  const phaseMs: Record<string, number> = {};
+  for (const x of (await call('GET', `/campaigns/${c.id}/timings`) as unknown as J[]).filter((x) => x.turn === t)) phaseMs[x.phase] = (phaseMs[x.phase] ?? 0) + x.ms;
+  for (const [ph, ms] of Object.entries(phaseMs)) { phaseTotal[ph] = (phaseTotal[ph] ?? 0) + ms; }
+  const aiAdjMs = (phaseMs.AI_DECISIONS ?? 0) + (phaseMs.ADJUDICATION ?? 0);
+  if (aiAdjMs > 3000) problem(t, `AI_DECISIONS + ADJUDICATION ${aiAdjMs} ms (obiettivo ≤ 3000)`);
   const calls = llmCalls(c.id, t);
   if (calls) { llmSeen = true; add(llmTotal, calls); }
+  // budget LLM del turno (registro della campagna) e direttive/cancellerie
+  const ls = await call('GET', `/llm/status?campaignId=${c.id}`).catch(() => null);
+  const bt = ls?.budget?.campaign?.turns?.[String(t)] as J | undefined;
+  budgetCap = ls?.budget ? ls.budget.callsPerTurn : budgetCap;
+  if (bt) {
+    budgetTotal.turns++; for (const k of ['admitted', 'calls', 'skipped', 'rate429', 'fallbacks', 'tokensIn', 'tokensOut', 'cacheHits'] as const) budgetTotal[k] += bt[k] ?? 0;
+    budgetTotal.max = Math.max(budgetTotal.max, bt.admitted);
+    add(budgetByRole, bt.byRole ?? {}); add(budgetSkippedBy, bt.skippedByPriority ?? {});
+    if (budgetCap !== null && budgetCap !== undefined && bt.admitted > budgetCap) problem(t, `chiamate LLM ammesse ${bt.admitted} oltre il budget di ${budgetCap}`);
+    if (budgetCap !== null && budgetCap !== undefined && bt.calls - bt.rate429 > budgetCap) problem(t, `chiamate LLM ${bt.calls} oltre il budget di ${budgetCap}`);
+  }
+  const dirs = (pm.directives ?? []) as J[];
+  for (const d of dirs) { if (d.limited) { directivesTotal.given++; if ((d.limits as string[]).length) directivesTotal.limited++; } else directivesTotal.none++; }
+  directivesTotal.moves += decisions.reduce((n, d) => n + ((d.rationale ?? []) as J[]).filter((r) => r.rule === 'directive').length, 0);
+  const sts = (world?.statements ?? []) as J[]; chanceryTotal.events += ((world?.chancery ?? []) as J[]).length; chanceryTotal.statements += sts.length;
+  chanceryTotal.ai += sts.filter((x) => x.source === 'ai').length; chanceryTotal.template += sts.filter((x) => x.source === 'template').length;
   const repaired = decisions.filter((d) => d.validation.repairAttempts > 0 && !d.validation.fallbackUsed).length;
   const orderCount = decisions.reduce((n, d) => n + d.orders.military.length + d.orders.diplomacy.length + d.orders.procurement.length + d.orders.statements.length, 0);
   // ordini militari IA che muovono unità vere, e quanti vengono dalle posture per zona (stanceOrders; 'worn' = rientro dei logorati)
@@ -185,16 +219,22 @@ while (c.currentTurn <= target && c.status === 'active') {
     aiOrders: orderCount, rejectedOrders: rejected, cmo,
     unitOrders: { total: unitOrders.length, perFaction: +(unitOrders.length / Math.max(1, decisions.length)).toFixed(2), fromStances: stanceOrders.filter((x) => x.stance !== 'worn').length, worn: stanceOrders.filter((x) => x.stance === 'worn').length, byKind },
     engagements, busyUnits, stances, events: (events as unknown as J[]).length, news: done.news?.length ?? 0, narrativeFallback: fallbackNarr,
-    letters: letterRow,
+    letters: letterRow, budget: bt ?? null,
+    directives: dirs.map((d) => ({ faction: d.factionId, source: d.source, model: d.model, limits: d.limits, errors: d.errors, ...(d.limited ? { horizon: d.limited.horizonTurns, priorities: d.limited.priorities.length } : {}) })),
+    chancery: { events: ((world?.chancery ?? []) as J[]).length, statements: sts.length, ai: sts.filter((x) => x.source === 'ai').length },
+    world: world ? { actions: (world.actions as J[]).length, byKind: worldKinds, reactions: (world.reactions as J[]).length, stats: world.stats, letters: (world.letters as J[]).length, topRationale: top(worldText, 3) } : null, phaseMs,
     foed: ita.budget.discretionary, stability: ita.stability, crises: Object.fromEntries(Object.entries(s.crises as Record<string, J>).map(([id, cr]) => [id, cr.escalation])),
   };
   turns.push(row);
   console.log(`  ${row.seconds} s · decisioni a regole ${rules.length}, LLM ok al 1° colpo ${firstTry}, riparate ${repaired}, fallback ${fallback.length}, dottrina ${doctrine} · ordini IA ${orderCount} (rifiutati ${rejected}) · CMO ${cmo} · notizie ${row.news} · FOED ${Math.round(ita.budget.discretionary)} · crisi ${JSON.stringify(row.crises)}`);
+  if (bt) console.log(`  budget LLM: ${bt.admitted}/${budgetCap ?? '∞'} ammesse (inviate ${bt.calls}, saltate ${bt.skipped} ${JSON.stringify(bt.skippedByPriority)}, 429 ${bt.rate429}, ripieghi ${bt.fallbacks}, in cache ${bt.cacheHits}) · per ruolo ${JSON.stringify(bt.byRole)} · token ${bt.tokensIn}+${bt.tokensOut}`);
+  if (dirs.length || sts.length) console.log(`  direttive: ${dirs.map((d) => `${d.factionId} ${d.limited ? `${d.limited.priorities.length} priorità/${d.limited.horizonTurns} turni${(d.limits as string[]).length ? ` (${(d.limits as string[]).length} limiti)` : ''}` : 'nessuna'}`).join(', ') || '—'} · mosse spinte ${decisions.reduce((n, d) => n + ((d.rationale ?? []) as J[]).filter((r) => r.rule === 'directive').length, 0)} · cancellerie: ${((world?.chancery ?? []) as J[]).length} atti, ${sts.length} frasi (modello ${sts.filter((x) => x.source === 'ai').length}, frasi-modello ${sts.filter((x) => x.source === 'template').length})`);
   console.log(`  chiamate LLM ${calls ? `${Object.values(calls).reduce((a, b) => a + b, 0)} ${JSON.stringify(calls)}` : 'n/d (registro del server non leggibile da qui)'} · motivazioni ${JSON.stringify(byRule)}`);
   for (const [x, n] of row.topRationale) console.log(`    ${n}× ${x}`);
   console.log(`  ordini IA con unità ${unitOrders.length} (${row.unitOrders.perFaction} per fazione) · dalle posture ${row.unitOrders.fromStances} · rientri logorati ${row.unitOrders.worn} · ingaggi ${engagements} · ${Object.entries(byKind).map(([k, n]) => `${k} ${n}`).join(', ')}`);
   console.log(`  unità IA impegnate ${busyUnits} · posture emesse ${stances.emitted} / tradotte ${stances.translated} / senza unità ${stances.noUnits}`);
   if (fallback.length) console.log(`  fallback: ${fallback.join(' | ')}`);
+  if (world) console.log(`  fasi (ms): ${Object.entries(phaseMs).filter(([, ms]) => ms > 0).map(([ph, ms]) => `${ph} ${ms}`).join(' · ')} (AI_DECISIONS + ADJUDICATION ${aiAdjMs}) · livello C: ${(world.actions as J[]).length} azioni ${JSON.stringify(worldKinds)}, ${(world.reactions as J[]).length} reazioni, tocca a ${world.stats.eligible} Stati (${world.stats.candidates} candidate, ${world.stats.capped} oltre il tetto), lettere ${(world.letters as J[]).length}`);
   console.log(`  lettere · inviate ${letterRow.sent.length}, ricevute ${letterRow.received.length}, risposte attese ${replies.length} (arrivate ${replies.filter((r) => r.reply).length}) · iniziative IA ${letterRow.aiInitiative} (dagli inneschi del motore ${letterRow.aiTriggered}) · lettere-modello ${letterRow.template.length}`);
   for (const x of [...letterRow.sent.map((l) => `→ ${l}`), ...letterRow.received.map((l) => `← ${l}`)]) console.log(`    ✉ ${x}`);
   if (letterRow.template.length) console.log(`  lettere-modello: ${letterRow.template.join(' | ')}`);
@@ -206,6 +246,11 @@ const report = { campaign: c.id, factionMode: c.config.factionMode ?? null, tota
   cadence: c.config.agentCadence, turns, problems,
   llmCallsByRole: llmSeen ? llmTotal : null, llmCallsPerTurn: llmSeen ? +(Object.values(llmTotal).reduce((a, b) => a + b, 0) / Math.max(1, turns.length)).toFixed(1) : null,
   rulesDecisions: turns.reduce((a, r) => a + r.rulesDecisions, 0), rationaleByRule: ruleTotal, topRationale: top(textTotal, 10),
+  phaseMsPerTurn: Object.fromEntries(Object.entries(phaseTotal).map(([k, v]) => [k, Math.round(v / Math.max(1, turns.length))])), worldActionsPerTurn: +(Object.values(worldKindTotal).reduce((a, b) => a + b, 0) / Math.max(1, turns.length)).toFixed(1), worldActionsByKind: worldKindTotal, worldTopRationale: top(worldTextTotal, 5),
+  llmBudget: budgetTotal.turns ? { callsPerTurnCap: budgetCap ?? null, admittedPerTurn: +(budgetTotal.admitted / budgetTotal.turns).toFixed(1), callsPerTurn: +(budgetTotal.calls / budgetTotal.turns).toFixed(1), maxAdmittedInATurn: budgetTotal.max,
+    skippedPerTurn: +(budgetTotal.skipped / budgetTotal.turns).toFixed(1), skippedByPriority: budgetSkippedBy, rate429: budgetTotal.rate429, fallbacks: budgetTotal.fallbacks, cacheHits: budgetTotal.cacheHits,
+    tokensInPerTurn: Math.round(budgetTotal.tokensIn / budgetTotal.turns), tokensOutPerTurn: Math.round(budgetTotal.tokensOut / budgetTotal.turns), callsByRole: Object.fromEntries(Object.entries(budgetByRole).map(([k, v]) => [k, +(v / budgetTotal.turns).toFixed(2)])) } : null,
+  directives: directivesTotal, chancery: chanceryTotal,
   unitOrdersPerFactionPerTurn: +unitAvg.toFixed(2), engagements: turns.reduce((a, r) => a + r.engagements, 0), aiInitiativesPerTurnFromT2: +initiativeAvg.toFixed(2) };
 const out = path.join(path.dirname(config.dataDir), 'playtest', `${c.id}.json`);
 mkdirSync(path.dirname(out), { recursive: true });
@@ -213,4 +258,9 @@ writeFileSync(out, JSON.stringify(report, null, 1));
 console.log(`\nFINE: ${turns.length} turni in ${report.totalMinutes} min (${report.secondsPerTurn} s per turno) · problemi: ${problems.length} · ordini IA con unità per fazione per turno ${report.unitOrdersPerFactionPerTurn} · ingaggi ${report.engagements} · iniziative IA per turno (dal T2) ${report.aiInitiativesPerTurnFromT2}`);
 console.log(`chiamate LLM per turno: ${report.llmCallsPerTurn ?? 'n/d'} ${report.llmCallsByRole ? JSON.stringify(report.llmCallsByRole) : ''} · decisioni a regole ${report.rulesDecisions} · motivazioni per regola ${JSON.stringify(ruleTotal)}`);
 for (const [x, n] of report.topRationale) console.log(`  ${n}× ${x}`);
+if (report.llmBudget) console.log(`budget LLM: tetto ${report.llmBudget.callsPerTurnCap ?? '∞'} · ammesse per turno ${report.llmBudget.admittedPerTurn} (massimo ${report.llmBudget.maxAdmittedInATurn}) · inviate ${report.llmBudget.callsPerTurn} · saltate ${report.llmBudget.skippedPerTurn} ${JSON.stringify(report.llmBudget.skippedByPriority)} · 429 ${report.llmBudget.rate429} · ripieghi ${report.llmBudget.fallbacks} · token per turno ${report.llmBudget.tokensInPerTurn}+${report.llmBudget.tokensOutPerTurn}\n  chiamate per ruolo e turno ${JSON.stringify(report.llmBudget.callsByRole)}`);
+console.log(`direttive: ${directivesTotal.given} date (${directivesTotal.limited} con limiti del motore), ${directivesTotal.none} senza · mosse spinte ${directivesTotal.moves} · cancellerie: ${chanceryTotal.events} atti, ${chanceryTotal.statements} frasi (modello ${chanceryTotal.ai}, frasi-modello ${chanceryTotal.template})`);
+console.log(`tempo per fase (ms per turno): ${JSON.stringify(report.phaseMsPerTurn)} · livello C: ${report.worldActionsPerTurn} azioni per turno ${JSON.stringify(report.worldActionsByKind)}`);
+console.log('le 5 motivazioni più frequenti del livello C:');
+for (const [x, n] of report.worldTopRationale) console.log(`  ${n}× ${x}`);
 console.log(`report ${out}`);

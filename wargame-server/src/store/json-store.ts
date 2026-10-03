@@ -2,10 +2,14 @@ import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import * as S from '../schemas/index.js';
-import { fillFromScenario, migrate } from './migrations/index.js';
-import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, LedgerEntry, LlmCall, TurnNarrative, WorldState } from '../schemas/index.js';
+import { fillFromScenario, migrate, migrateDiplomacy } from './migrations/index.js';
+import type { AgentDecision, AgentMemory, Campaign, Contact, DiceRoll, DiploLetter, FactionKnowledge, FactionOrders, GameEvent, DirectiveRecord, LedgerEntry, LlmCall, LlmUsage, TurnNarrative, WorldDecision, WorldState } from '../schemas/index.js';
 
 const pad = (n: number) => String(n).padStart(4, '0');
+const PhaseTimingSchema = z.object({ turn: z.number(), phase: z.string(), ms: z.number() });
+/** Una risposta del modello in cache (`llm-cache.jsonl`): `drop` cancella la voce (risposta poi scartata dal validatore). */
+export const LlmCacheRow = z.object({ h: z.string(), role: z.string().optional(), model: z.string().optional(), text: z.string().optional(), tokens: z.object({ in: z.number(), out: z.number() }).optional(), drop: z.boolean().optional() });
+export type LlmCacheRow = z.infer<typeof LlmCacheRow>;
 
 /** Interfaccia astratta: il motore dipende solo da questa (swap futuro verso SQLite). */
 export interface Store {
@@ -26,6 +30,22 @@ export interface Store {
   saveOrders(id: string, o: FactionOrders): Promise<void>;
   getDecision(id: string, turn: number, faction: string): Promise<AgentDecision | null>;
   saveDecision(id: string, d: AgentDecision): Promise<void>;
+  /** decisioni del livello C (IA mondiale) di un turno: un file solo, `decisions/turn-N/_world.json` */
+  getWorldDecision(id: string, turn: number): Promise<WorldDecision | null>;
+  saveWorldDecision(id: string, d: WorldDecision): Promise<void>;
+  /** direttive strategiche (§11): un file per turno e potenza, `directives/turn-N/F.json`, con richiesta, risposta e versione limitata */
+  getDirective(id: string, turn: number, faction: string): Promise<DirectiveRecord | null>;
+  saveDirective(id: string, d: DirectiveRecord): Promise<void>;
+  /** le direttive registrate in un turno (tutte le potenze) */
+  listDirectives(id: string, turn: number): Promise<DirectiveRecord[]>;
+  /** tempo (ms) di ogni fase del motore, una riga per fase in `timings.jsonl` */
+  appendTimings(id: string, rows: PhaseTiming[]): Promise<void>;
+  getTimings(id: string): Promise<PhaseTiming[]>;
+  /** contatori delle chiamate LLM (`llm-usage.json`) e cache delle risposte per `promptHash` (`llm-cache.jsonl`) */
+  getLlmUsage(id: string): Promise<LlmUsage | null>;
+  saveLlmUsage(id: string, u: LlmUsage): Promise<void>;
+  getLlmCache(id: string): Promise<LlmCacheRow[]>;
+  appendLlmCache(id: string, rows: LlmCacheRow[]): Promise<void>;
   getMemory(id: string, faction: string): Promise<AgentMemory | null>;
   saveMemory(id: string, m: AgentMemory): Promise<void>;
   getNarrative(id: string, turn: number): Promise<TurnNarrative | null>;
@@ -39,6 +59,7 @@ export interface Store {
   fork(id: string, fromTurn: number, newId: string): Promise<Campaign>;
 }
 
+export interface PhaseTiming { turn: number; phase: string; ms: number }
 export interface LockInfo { op: string; since: number; pid: number }
 export class LockError extends Error {
   code = 'CAMPAIGN_LOCKED';
@@ -105,7 +126,9 @@ export class JsonStore implements Store {
     const f = turn === undefined ? this.dir(id, 'state', 'current.json') : this.dir(id, 'state', `turn-${pad(turn)}.json`);
     const s = this.must(await this.read(f, S.WorldState), `stato ${id}/${turn ?? 'current'}`);
     // campagne vecchie: cariche dei leader, profilo del decisore a regole e nomi dallo scenario (solo in memoria)
-    return fillFromScenario(s, (await this.getCampaign(id)).scenarioId);
+    const scenarioId = (await this.getCampaign(id)).scenarioId;
+    // e opinione asimmetrica: «Storia recente» e tensioni sparse per le campagne precedenti ai modificatori
+    return migrateDiplomacy(fillFromScenario(s, scenarioId), scenarioId);
   }
 
   async saveState(id: string, s: WorldState, snapshotTurn?: number) {
@@ -125,6 +148,22 @@ export class JsonStore implements Store {
   saveOrders(id: string, o: FactionOrders) { return this.write(this.dir(id, 'orders', `turn-${pad(o.turn)}`, `${o.factionId}.json`), o, S.FactionOrders); }
   getDecision(id: string, turn: number, f: string) { return this.read(this.dir(id, 'decisions', `turn-${pad(turn)}`, `${f}.json`), S.AgentDecision); }
   saveDecision(id: string, d: AgentDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, `${d.factionId}.json`), d, S.AgentDecision); }
+  getWorldDecision(id: string, turn: number) { return this.read(this.dir(id, 'decisions', `turn-${pad(turn)}`, '_world.json'), S.WorldDecision); }
+  saveWorldDecision(id: string, d: WorldDecision) { return this.write(this.dir(id, 'decisions', `turn-${pad(d.turn)}`, '_world.json'), d, S.WorldDecision); }
+  getDirective(id: string, turn: number, f: string) { return this.read(this.dir(id, 'directives', `turn-${pad(turn)}`, `${f}.json`), S.DirectiveRecord); }
+  saveDirective(id: string, d: DirectiveRecord) { return this.write(this.dir(id, 'directives', `turn-${pad(d.turn)}`, `${d.factionId}.json`), d, S.DirectiveRecord); }
+  async listDirectives(id: string, turn: number) {
+    const dir = this.dir(id, 'directives', `turn-${pad(turn)}`);
+    if (!existsSync(dir)) return [];
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith('.json')).sort();
+    return (await Promise.all(files.map((f) => this.read(path.join(dir, f), S.DirectiveRecord)))).filter((d): d is DirectiveRecord => !!d);
+  }
+  appendTimings(id: string, rows: PhaseTiming[]) { return this.append(this.dir(id, 'timings.jsonl'), rows, PhaseTimingSchema); }
+  getTimings(id: string) { return this.readLines(this.dir(id, 'timings.jsonl'), PhaseTimingSchema); }
+  getLlmUsage(id: string) { return this.read(this.dir(id, 'llm-usage.json'), S.LlmUsage); }
+  saveLlmUsage(id: string, u: LlmUsage) { return this.write(this.dir(id, 'llm-usage.json'), u, S.LlmUsage); }
+  getLlmCache(id: string) { return this.readLines(this.dir(id, 'llm-cache.jsonl'), LlmCacheRow); }
+  appendLlmCache(id: string, rows: LlmCacheRow[]) { return this.append(this.dir(id, 'llm-cache.jsonl'), rows, LlmCacheRow); }
   getMemory(id: string, f: string) { return this.read(this.dir(id, 'memory', `${f}.json`), S.AgentMemory); }
   async saveMemory(id: string, m: AgentMemory) {
     await this.write(this.dir(id, 'memory', `${m.factionId}.json`), m, S.AgentMemory);
@@ -209,6 +248,9 @@ export class JsonStore implements Store {
     await fs.mkdir(this.dir(newId), { recursive: true });
     await copy(this.dir(id), this.dir(newId));
     await fs.rm(this.dir(newId, 'memory'), { recursive: true, force: true }).catch(() => {});
+    // i contatori delle chiamate LLM dei turni successivi al punto di ramo non valgono per il ramo (il budget del turno fromTurn+1 riparte da zero)
+    const usage = await this.getLlmUsage(newId);
+    if (usage) await this.saveLlmUsage(newId, { ...usage, turns: Object.fromEntries(Object.entries(usage.turns).filter(([t]) => Number(t) <= fromTurn)) });
     const srcHist = this.dir(id, 'memory', 'history');
     if (existsSync(srcHist)) {
       const latest = new Map<string, string>();

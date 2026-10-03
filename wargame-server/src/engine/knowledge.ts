@@ -1,6 +1,13 @@
 import type { Contact, DiploLetter, DiploMessage, FactionKnowledge, GameEvent, Incident, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
+import { acceptance } from './acceptance.js';
+import { intelPartners } from './diplo-view.js';
+import { DIPLO_CATALOG, actionCost, improveSlots, weeklyRent } from './diplo-actions.js';
+import { diploActs, opinionBand, opinionOf, tensionOf } from './opinion.js';
 import { hashString } from './rng.js';
+import { worldData } from './world-data.js';
 
+/** tipi di accordo che una fazione conosce anche se non ne è parte (sicurezza: cambiano gli equilibri); i commerciali, migratori ed energetici altrui no */
+const SECURITY_TYPES = new Set<string>(['defense', 'ceasefire', 'non_aggression', 'guarantee', 'defense_cooperation', 'military_access', 'basing', 'arms_sale', 'intel_sharing']);
 const INTENT = ['guerra aperta', 'confronto armato limitato', 'coercizione', 'competizione', 'cooperazione'];
 
 /** Rimuove ogni riferimento alla verità di terra prima che il contatto lasci il motore. */
@@ -13,7 +20,7 @@ export const letterVisibleTo = (l: DiploLetter, f: string) => l.visibility === '
 const visibleTo = (e: GameEvent, f: string) => e.visibility === 'public' || e.visibility.includes(f) || e.actor === f;
 /** nota della relazione (scritta da diplomacy.ts, adjudication.ts, combat.ts) → tipo di atto; le propagazioni agli alleati no */
 const NOTE_KINDS: [RegExp, Incident['kind']][] = [
-  [/^minaccia:/, 'threat'], [/^lettera \(threatening\)/, 'threat'], [/^dichiarazione minacciosa/, 'threat'], [/^sanzioni:/, 'sanction'],
+  [/^minaccia:/, 'threat'], [/^lettera \(threatening\)/, 'threat'], [/^dichiarazione minacciosa/, 'threat'], [/^sanzioni:/, 'sanction'], [/^ultimatum:/, 'ultimatum'],
   [/^(BLOCKADE|EXCLUSION_ZONE) in /, 'blockade'], [/^dimostrazione di forza in /, 'show_of_force'], [/^scontro in /, 'engagement'],
   [/^strike su /, 'strike'], [/^attacco cyber attribuito/, 'cyber'], [/^operazione clandestina scoperta/, 'sof'],
 ];
@@ -27,19 +34,27 @@ const MAX_OTHER_INCIDENTS = 40;
  */
 export function incidentsFrom(events: GameEvent[], factionId: string): Incident[] {
   const out: Incident[] = [];
-  for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
+  // gli atti diplomatici (nuovi OPINION_MODIFIER/TENSION_CHANGED o vecchi RELATION_CHANGED) con la loro nota: uno per evento
+  const acts = new Map(diploActs(sorted).map((x) => [x.event.id, x]));
+  for (const e of sorted) {
     if (!visibleTo(e, factionId)) continue;
     const p = e.payload as Record<string, unknown>;
-    if (e.type === 'RED_LINE_CROSSED' && e.actor === factionId) { out.push({ turn: e.turn, kind: 'red_line', from: e.actor, to: e.actor, ref: String(p.redLineId) }); continue; }
-    if (e.type !== 'RELATION_CHANGED' || typeof p.note !== 'string') continue;
-    const kind = NOTE_KINDS.find(([re]) => re.test(p.note as string))?.[1];
+    // la linea rossa superata: la vede chi la possiede e, con un trattato `guarantee`, il suo garante (che risponde come lui)
+    if (e.type === 'RED_LINE_CROSSED') {
+      out.push({ turn: e.turn, kind: 'red_line', from: e.actor, to: e.actor, ref: String(p.redLineId), text: String(p.text ?? ''), response: String(p.response ?? ''), ...(p.zoneId ? { zoneId: String(p.zoneId) } : {}) });
+      continue;
+    }
+    const act = acts.get(e.id);
+    if (!act) continue;
+    const kind = NOTE_KINDS.find(([re]) => re.test(act.note))?.[1];
     if (!kind) continue;
-    const zoneId = / in ([A-Z_]+)$/.exec(p.note)?.[1];
+    const zoneId = / in ([A-Z_]+)$/.exec(act.note)?.[1];
     const ref = e.causedBy?.orderId;
     const one = (from: string, to: string): Incident => ({ turn: e.turn, kind, from, to, ...(zoneId && kind !== 'threat' ? { zoneId } : {}), ...(ref ? { ref } : {}) });
-    out.push(one(String(p.a), String(p.b)));
+    out.push(one(act.a, act.b));
     // uno scontro lo subiscono entrambe le parti
-    if (kind === 'engagement') out.push(one(String(p.b), String(p.a)));
+    if (kind === 'engagement') out.push(one(act.b, act.a));
   }
   const seen = new Set<string>();
   const unique = out.filter((x) => { const key = `${x.kind}|${x.from}|${x.to}|${x.zoneId ?? ''}|${x.ref ?? ''}`; if (seen.has(key)) return false; seen.add(key); return true; });
@@ -65,11 +80,71 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
     beliefs,
     knownCrises: Object.values(s.crises).filter((c) => c.status !== 'latent' || c.involved.includes(factionId))
       .map((c) => ({ ...c, escalation: Math.round(c.escalation), history: c.history.slice(-3) })),
-    knownAgreements: Object.values(s.agreements).filter((a) => a.visibility === 'public' || a.visibility.includes(factionId) || a.parties.includes(factionId)),
+    // gli accordi propri e quelli riservati a lei; dei pubblici solo quelli di sicurezza con almeno una fazione tra le parti (centinaia di accordi
+    // commerciali tra Stati del mondo sono rumore: appesantirebbero ogni Knowledge a ogni turno)
+    knownAgreements: Object.values(s.agreements).filter((a) => a.parties.includes(factionId) || (a.visibility !== 'public' && a.visibility.includes(factionId))
+      || (a.visibility === 'public' && SECURITY_TYPES.has(a.type) && a.parties.some((p) => !!s.factions[p]))),
     inbox: extra.inbox.filter((m) => m.to === factionId),
     publicNews: extra.news,
     letters: (extra.letters ?? []).filter((l) => letterVisibleTo(l, factionId) && l.turn >= s.turn - 3),
     incidents: incidentsFrom(extra.prevEvents ?? [], factionId),
-    ownRelations: Object.fromEntries(Object.entries(s.relations[factionId] ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([b, r]) => [b, { trust: r.trust, tension: r.tension }])),
+    ownRelations: ownRelations(s, factionId),
+    diplomacy: ownDiplomacy(s, factionId),
+    world: worldView(extra.prevEvents ?? [], factionId),
   };
+}
+
+/**
+ * La riga della fazione: la sua opinione degli altri (`trust` = opinionOf(lei → altra)) e la tensione di coppia. Come le altre
+ * vedono lei si dà solo a fasce; il numero esatto solo con un accordo di intelligence attivo tra le due. Le coppie tra terzi non ci sono.
+ */
+export function ownRelations(s: WorldState, f: string): FactionKnowledge['ownRelations'] {
+  const intel = intelPartners(s, f);
+  return Object.fromEntries(Object.keys(s.relations[f] ?? {}).sort((a, b) => a.localeCompare(b)).map((b) => {
+    const theirs = opinionOf(s, b, f).value;
+    return [b, {
+      trust: opinionOf(s, f, b).value, tension: Math.round(tensionOf(s, f, b) * 10) / 10, opinionOfMe: opinionBand(theirs),
+      ...(intel.has(b) ? { opinionOfMeExact: theirs } : {}),
+    }];
+  }));
+}
+
+/**
+ * Il registro diplomatico della fazione: capitale, rendita e slot, miglioramenti in corso, ricariche ancora attive, rapporti ridotti con le
+ * altre, ultimatum e embarghi che la riguardano; e per ogni proposta di trattato ricevuta il suggerimento `acceptance` (solo per il
+ * giocatore: il decisore a regole la usa per rispondere). Mai le ricariche e il capitale degli altri.
+ */
+export function ownDiplomacy(s: WorldState, f: string): NonNullable<FactionKnowledge['diplomacy']> {
+  const d = s.diplomacy;
+  const mine = (k: string) => k.startsWith(`${f}|`);
+  return {
+    capital: Math.round((d?.capital[f] ?? 0) * 10) / 10, rent: weeklyRent(s, f), improvingSlots: improveSlots(s, f), coerciveCost: actionCost(s, f, { id: '', kind: 'SANCTION', target: f, scope: '' }) / (DIPLO_CATALOG.SANCTION.cost as number),
+    improving: (d?.improving ?? []).filter((x) => x.actor === f).map((x) => ({ target: x.target, since: x.since })),
+    cooldowns: Object.fromEntries(Object.entries(d?.cooldowns ?? {}).filter(([k, until]) => mine(k) && until > s.turn).map(([k, until]) => [k.slice(f.length + 1), until])),
+    ties: Object.fromEntries(Object.entries(d?.ties ?? {}).flatMap(([k, st]) => { const [a, b] = k.split('|') as [string, string]; return a === f ? [[b, st]] : b === f ? [[a, st]] : []; })),
+    ultimatums: (d?.ultimatums ?? []).filter((u) => u.from === f || u.to === f),
+    embargoes: (d?.embargoes ?? []).filter((x) => x.startsWith(`${f}>`) || x.endsWith(`>${f}`)),
+    proposals: Object.values(s.agreements).filter((a) => a.status === 'proposed' && a.parties.includes(f) && a.parties[0] !== f).sort((a, b) => a.id.localeCompare(b.id))
+      .map((a) => ({ agreementId: a.id, from: a.parties[0]!, type: a.type, ...(({ score, accept, reasons }) => ({ score, accept, reasons }))(acceptance(s, f, { type: a.type, parties: a.parties }, a.parties[0]!)) })),
+  };
+}
+
+/**
+ * Le reazioni del mondo che riguardano la fazione (come attore o vittima di un atto grave) e le votazioni in cui è proponente o bersaglio, dagli
+ * eventi pubblici del turno precedente (`INTERNATIONAL_REACTIONS`, `INSTITUTION_VOTE`). Mai quelle che non la riguardano.
+ */
+export function worldView(events: GameEvent[], f: string): NonNullable<FactionKnowledge['world']> {
+  const pop = (iso: string) => worldData().nation(iso)?.population ?? 0;
+  const top = (l: string[]) => [...l].sort((a, b) => pop(b) - pop(a) || a.localeCompare(b)).slice(0, 5);
+  const reactions: NonNullable<FactionKnowledge['world']>['reactions'] = [];
+  const votes: NonNullable<FactionKnowledge['world']>['votes'] = [];
+  for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
+    if (e.visibility !== 'public') continue;
+    const p = e.payload as Record<string, any>;
+    if (e.type === 'INTERNATIONAL_REACTIONS' && p.kind !== 'block_sanctions' && (p.actor === f || p.victim === f))
+      reactions.push({ turn: e.turn, eventId: String(p.eventRef), kind: String(p.kind), actor: p.actor, victim: p.victim, condemn: p.condemn.length, support: p.support.length, silent: p.silent.length, topCondemners: top(p.condemn), topSupporters: top(p.support) });
+    if (e.type === 'INSTITUTION_VOTE' && (p.proposer === f || p.target === f))
+      votes.push({ turn: e.turn, forum: String(p.forum), subject: String(p.subject ?? '').slice(0, 120), proposer: p.proposer, ...(p.target ? { target: p.target } : {}), passed: !!p.passed, yes: p.yes.length, no: p.no.length, abstain: p.abstain.length });
+  }
+  return { reactions, votes };
 }

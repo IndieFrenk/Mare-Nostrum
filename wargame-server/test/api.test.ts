@@ -87,4 +87,33 @@ describe('API lettere', () => {
     expect(all.every((x) => x.from === 'ITA' || x.to === 'ITA' || x.visibility === 'public')).toBe(true);
     expect((await j('GET', `/campaigns/${c.id}/letters?turn=2`)).body.every((x: { turn: number }) => x.turn === 2)).toBe(true);
   }, 30_000);
+
+  it('diplomazia (settore 09): catalogo delle azioni, dry-run dell\'accettazione in /validate, registro diplomatico nella knowledge', async () => {
+    const { app } = await buildServer({ dataDir: tmp(), provider: new MockLLMProvider() });
+    const j = async (method: 'GET' | 'POST', url: string, payload?: unknown) => {
+      const r = await app.inject({ method, url: `/api/wg${url}`, payload: payload as object });
+      return { status: r.statusCode, body: r.json() };
+    };
+    const cat = (await j('GET', '/diplomacy/catalog')).body as { kind: string; label: string; cost: number | null; costBy?: Record<string, number>; cooldown: number; coercive: boolean }[];
+    expect(cat.map((x) => x.kind)).toEqual(expect.arrayContaining(['DEMARCHE', 'IMPROVE_RELATIONS', 'RECALL_AMBASSADOR', 'ULTIMATUM', 'MEDIATE', 'RESOLUTION', 'PROPOSE_AGREEMENT']));
+    expect(cat.map((x) => x.kind)).not.toContain('UNSC_DRAFT');
+    expect(cat.find((x) => x.kind === 'DEMARCHE')).toMatchObject({ cost: 1, cooldown: 1, coercive: false });
+    expect(cat.find((x) => x.kind === 'SANCTION')).toMatchObject({ cost: 6, coercive: true });
+    expect(cat.find((x) => x.kind === 'RESOLUTION')!.costBy).toMatchObject({ UNSC: 8, UNGA: 6 });
+    const { body: c } = await j('POST', '/campaigns', { scenarioId: 'med-2026', name: 'diplo', seed: 'diplo' });
+    const k = (await j('GET', `/campaigns/${c.id}/knowledge`)).body;
+    expect(k.diplomacy.capital).toBeGreaterThan(10);
+    expect(k.diplomacy).toMatchObject({ improvingSlots: 3, improving: [], ties: {}, ultimatums: [], embargoes: [] });
+    const prop = (id: string, to: string) => ({ id, kind: 'PROPOSE_AGREEMENT', target: [to], agreement: { type: 'trade', parties: ['ITA', to], terms: 'prova', endTurn: null, visibility: 'public' } });
+    const v = (await j('POST', `/campaigns/${c.id}/orders/validate`, { diplomacy: [prop('p1', 'POL'), prop('p2', 'EGY')] })).body;
+    expect(v.valid).toBe(true);
+    expect(v.capitalCost).toBe(6);
+    expect(v.acceptance.map((a: { actionId: string; target: string }) => [a.actionId, a.target])).toEqual([['p1', 'POL'], ['p2', 'EGY']]);
+    expect(v.acceptance[0].reasons.length).toBeGreaterThan(2);
+    // senza CD: errore chiaro
+    const many = Array.from({ length: 8 }, (_, i) => ({ id: `t${i}`, kind: 'THREAT', target: ['TUR', 'RUS', 'EGY', 'FRA', 'GRC', 'ISR', 'IRN', 'CHN'][i], message: 'x', visibility: 'public' }));
+    const bad = (await j('POST', `/campaigns/${c.id}/orders/validate`, { diplomacy: many })).body;
+    expect(bad.valid).toBe(false);
+    expect(bad.errors.some((e: string) => e.includes('capitale diplomatico insufficiente'))).toBe(true);
+  });
 });

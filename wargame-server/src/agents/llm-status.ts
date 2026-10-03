@@ -1,7 +1,23 @@
+import type { LlmCounters, LlmTurnCounters } from '../schemas/index.js';
+
 /**
  * Stato dei modelli: il PC con Ollama (o OmniRoute) risponde? Quali modelli configurati mancano?
  * Serve alla UI (pallino nella barra in alto) e al server, che rifiuta ▶ invece di giocare un turno tutto in dottrina.
  */
+
+/** Stato del budget delle chiamate LLM (agents/budget.ts): profilo, tetto per turno, limiti per modello e contatori della campagna. */
+export interface BudgetStatus {
+  profile: string; baseUrl: string;
+  /** chiamate per turno (null = nessun tetto) */
+  callsPerTurn: number | null; cache: boolean; maxWaitMs: number;
+  endpoints: { key: string; model: string | null; rpm: number; rpd: number; inLastMinute: number; inLastDay: number; coolingMs: number }[];
+  campaign: null | {
+    id: string; callsPerTurn: number | null;
+    /** i contatori dell'ultimo turno con chiamate (o del turno richiesto) e quante ne restano */
+    turn: (LlmTurnCounters & { turn: number; remaining: number | null }) | null;
+    today: LlmCounters; turns: Record<string, LlmTurnCounters>; days: Record<string, LlmCounters>;
+  };
+}
 
 export interface LlmStatus {
   reachable: boolean;
@@ -25,6 +41,11 @@ export interface LlmStatus {
   offlineAllowed: boolean;
   /** chi decide le mosse delle fazioni (aggiunto dalla rotta /llm/status): in `rules` `models` elenca solo i ruoli che usano l'LLM */
   factionMode?: 'rules' | 'llm';
+  /**
+   * Budget delle chiamate (aggiunto dalla rotta /llm/status, settore 11): profilo, chiamate per turno, limiti per modello e, con `campaignId`, i
+   * contatori della campagna — chiamate, token in/out, 429, ripieghi, chiamate saltate per budget — per turno e per giorno.
+   */
+  budget?: BudgetStatus;
 }
 
 export interface LlmStatusSource {
@@ -34,9 +55,9 @@ export interface LlmStatusSource {
 
 interface Probe { reachable: boolean; listed: string[] | null; latencyMs: number | null; error: string | null; checkedAt: string }
 
-/** Un modello configurato è presente se il server lo elenca (Ollama aggiunge «:latest» ai nomi senza tag). */
+/** Un modello configurato è presente se il server lo elenca (Ollama aggiunge «:latest» ai nomi senza tag, Google il prefisso «models/»). */
 export const missingModels = (models: Record<string, string>, listed: string[] | null) =>
-  listed === null ? [] : [...new Set(Object.values(models))].filter((m) => !listed.includes(m) && !listed.includes(`${m}:latest`)).sort();
+  listed === null ? [] : [...new Set(Object.values(models))].filter((m) => !listed.includes(m) && !listed.includes(`${m}:latest`) && !listed.includes(`models/${m}`)).sort();
 
 /** Sonda di un endpoint OpenAI-compatible: GET {baseUrl}/models con timeout, risultato in cache per `ttlMs`. */
 export class LlmStatusProbe implements LlmStatusSource {

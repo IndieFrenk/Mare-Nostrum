@@ -1,0 +1,91 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "eventId": {
+   "type": "string"
+  },
+  "kind": {
+   "type": "string",
+   "enum": [
+    "strike",
+    "engagement",
+    "blockade",
+    "ultimatum",
+    "sanction",
+    "multilateral_sanction",
+    "break",
+    "embargo",
+    "cyber",
+    "covert"
+   ]
+  },
+  "actor": {
+   "type": "string"
+  },
+  "victim": {
+   "type": "string"
+  },
+  "severity": {
+   "type": "number"
+  },
+  "zoneId": {
+   "type": "string"
+  },
+  "condemn": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "support": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "silent": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "modifiers": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "from": {
+      "type": "string"
+     },
+     "to": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "value": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "from",
+     "to",
+     "kind",
+     "value"
+    ]
+   }
+  }
+ },
+ "required": [
+  "eventId",
+  "kind",
+  "actor",
+  "victim",
+  "severity",
+  "condemn",
+  "support",
+  "silent",
+  "modifiers"
+ ]
+}
