@@ -96,11 +96,14 @@ describe('vista diplomatica: scheda paese', () => {
     ));
     const c = country(s, 'EGY');
     expect(c.opinion.in.exact).toBeUndefined();
-    expect(c.opinion.in.known.map((k) => k.label).sort()).toEqual(['PER-NOI-DEF', 'PUBBLICO-ABC']);
+    // (più la «Situazione 2026» di partenza, pubblica e permanente: solo l'etichetta)
+    expect(c.opinion.in.known.map((k) => k.label).sort()).toEqual(['PER-NOI-DEF', 'PUBBLICO-ABC', 'Situazione 2026']);
     expect(Object.keys(c.opinion.in.known[0]!).sort()).toEqual(['label', 'turnsLeft']);
     const json = JSON.stringify(c);
     expect(json).not.toContain('RISERVATO-XYZ');
-    expect(json).not.toContain(String(opinionOf(s, 'EGY', 'ITA').value));
+    // dell'opinione di lui verso l'Italia la scheda dà solo la fascia e le etichette: nessun campo con il valore
+    expect(Object.keys(c.opinion.in).sort()).toEqual(['band', 'known']);
+    expect(c.opinion.in.band).toBe(Math.max(0, Math.min(4, [-50, -15, 15, 50].filter((t) => opinionOf(s, 'EGY', 'ITA').value >= t).length)));
   });
 
   it('con un accordo di intelligence la scheda dà il numero esatto e i motivi', () => {

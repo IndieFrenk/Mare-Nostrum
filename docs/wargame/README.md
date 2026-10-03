@@ -42,6 +42,7 @@ Ogni numero ha i suoi motivi e ogni azione mostra costo e probabilità di riusci
 
 - **Pannello Istituzioni**: votazioni dell'ultimo turno e passate con conteggi e regola; *Mostra il voto sulla mappa* con un clic; *Proponi risoluzione* mette l'azione `RESOLUTION` nella bozza (costo della sede: UNSC 8, UNGA 6, UE 5, NATO 5, Lega Araba 4, UA 4).
 - **Pannello Reazioni internazionali**: per ogni atto grave chi condanna, chi sostiene, chi tace, con le frasi delle cancellerie se ci sono; senza eventi dice «Nessuna reazione registrata».
+- **Barra in alto**: il capitale diplomatico (valore e rendita a turno) e la tensione mondiale 0–100 con le quattro fasce del §6 (distensione, normale, alta, critica) scritte accanto al valore; il suggerimento (anche con la tastiera) elenca gli effetti di ogni fascia e le cause dell'ultimo turno.
 - API di sola lettura (dalla Knowledge del giocatore): `GET /campaigns/:id/diplomacy/overview`, `GET /campaigns/:id/diplomacy/country/:actor` (id di fazione o ISO3), `GET /campaigns/:id/institutions/votes[?turn=]`. Le fasce bastano per la mappa: niente elenchi da 197 righe con testi lunghi.
 
 ## Con modelli reali (OmniRoute)

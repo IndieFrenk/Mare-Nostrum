@@ -1,7 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /** Con WG_SHOTS=<cartella> il test salva gli screenshot per la PR (scheda con i motivi, modalità Opinione, modalità Voto). */
-const shot = async (page: Page, name: string) => { if (process.env.WG_SHOTS) await page.screenshot({ path: `${process.env.WG_SHOTS}/${name}.png` }); };
+const shot = async (page: Page, name: string) => {
+  if (!process.env.WG_SHOTS) return;
+  // aspetta che la mappa abbia finito di disegnare (confini caricati) prima dello screenshot
+  await page.evaluate(() => new Promise<void>((done) => { const m = (window as unknown as { __wgMap: { loaded: () => boolean; once: (e: string, f: () => void) => void } }).__wgMap; if (m.loaded()) done(); else m.once('idle', () => done()); }));
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${process.env.WG_SHOTS}/${name}.png` });
+};
 const num = (t: string) => Number(t.replace(',', '.'));
 
 async function newCampaign(page: Page, errors: string[]) {
@@ -33,7 +39,11 @@ test('scheda di uno Stato del mondo: motivi dell\'opinione, bozza, accettazione 
   await shot(page, 'scheda-paese');
 
   const left = async () => num((await card.getByText(/CD disponibili dopo la bozza/).innerText()).match(/([\d.,]+) CD disponibili/)![1]!);
+  // barra in alto: capitale diplomatico (valore e rendita a turno) e tensione mondiale con la fascia scritta
+  const topCd = async () => num((await page.locator('.wg-res', { has: page.locator('small', { hasText: /^CD$/ }) }).locator('b').innerText()).match(/^([\d.,]+) \(\+([\d.,]+)\/turno\)$/)![1]!);
+  await expect(page.locator('.wg-tension')).toContainText(/Tensione mondiale\s*\d+(,\d)? · (Distensione|Normale|Alta|Critica)/);
   const before = await left();
+  expect(await topCd()).toBeCloseTo(before, 1);
 
   // azioni dal catalogo con costo e ricarica; entrano nella bozza (niente invio diretto)
   await card.getByRole('button', { name: /^Migliorare le relazioni/ }).click();
@@ -57,6 +67,8 @@ test('scheda di uno Stato del mondo: motivi dell\'opinione, bozza, accettazione 
   await expect(card.getByText(/migliorare le relazioni in corso dal turno 1/)).toBeVisible();
   await expect(card.getByText(/CD disponibili dopo la bozza/)).toBeVisible();
   expect(await left()).toBeLessThan(before);
+  await expect.poll(topCd).toBeLessThan(before); // il CD in alto è sceso: spesi 5 CD (+1 del miglioramento in corso), la rendita ne rida meno
+  expect(await topCd()).toBeCloseTo(await left(), 1);
   await expect(card.locator('.wg-reasons li').filter({ hasText: 'Migliorare le relazioni' }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -67,6 +79,7 @@ test('modalità mappa Opinione, Trattati e Voto: cambio senza errori in console,
   type M = { getPaintProperty: (layer: string, prop: string) => unknown[]; getCanvas: () => HTMLCanvasElement };
   const colors = () => page.evaluate(() => ((window as unknown as { __wgMap: M }).__wgMap.getPaintProperty('countries-fill', 'fill-color') as unknown[]).length);
 
+  await page.getByRole('button', { name: 'Briefing', exact: true }).click(); // chiude il briefing: la mappa resta libera
   // un'unica espressione `match` per tutti gli Stati: ISO3 e colore a coppie, non un layer per paese
   const modes = page.locator('#wg-modes');
   await modes.getByRole('button', { name: 'opinione' }).click();
@@ -91,6 +104,7 @@ test('modalità mappa Opinione, Trattati e Voto: cambio senza errori in console,
   await page.getByRole('button', { name: 'Esegui turno' }).click();
   await expect(page.getByText(/^T2 ·/)).toBeVisible({ timeout: 60_000 });
 
+  await page.getByRole('button', { name: 'Console Ordini', exact: true }).click(); // chiude la Console: la mappa resta libera
   await modes.getByRole('button', { name: 'voto' }).click();
   await expect(page.locator('#wg-legend')).toContainText('Appello umanitario nel Mediterraneo');
   await expect(page.locator('#wg-legend')).toContainText(/approvata|respinta/);
