@@ -7,6 +7,7 @@ import { MockLLMProvider } from './agents/mock-provider.js';
 import { LlmAgents } from './agents/orchestrator.js';
 import { registerRoutes } from './api/routes.js';
 import { Engine } from './engine/turn-machine.js';
+import { worldData } from './engine/world-data.js';
 import { JsonStore } from './store/json-store.js';
 
 /** Stato dei modelli per il provider in uso: sonda HTTP per l'endpoint reale, sempre raggiungibile per il mock. */
@@ -17,6 +18,7 @@ export function llmStatusFor(provider: LlmProvider, o: { allowOffline?: boolean 
 }
 
 export async function buildServer(opts: { dataDir?: string; provider?: LlmProvider; logger?: boolean; allowOffline?: boolean; llmStatus?: LlmStatusSource } = {}) {
+  worldData(); // carica e valida i 197 Stati all'avvio: un file rotto ferma il server subito, non a metà partita
   const app = Fastify({ logger: opts.logger ?? false });
   await app.register(cors, { origin: [config.corsOrigin, /^http:\/\/(localhost|127\.0\.0\.1):\d+$/] });
   const provider = opts.provider ?? (config.mock ? new MockLLMProvider() : new OpenAiCompatProvider());

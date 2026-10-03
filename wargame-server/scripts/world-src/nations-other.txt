@@ -1,0 +1,5 @@
+# Osservatori e Stati non membri ONU (4): Santa Sede, Palestina, Taiwan, Kosovo. Colonne come in nations-africa.txt; «-» = punto ideale assente (non votano all'Assemblea).
+VAT|VA|Santa Sede|Città del Vaticano|Il Papa della Chiesa cattolica|EU-S|the|3.0|0.001|0.0|0.0|0.1|n|70/5/5|-|i:9:0|ITA:70
+PSE|PS|Palestina|Ramallah|Il Presidente dello Stato di Palestina|AS-W|tra|3.5|5.4|12|0.0|40|n|20/10/10|-|i:9:0|ISR:55 JOR:8 TUR:5 EGY:4 ARE:3
+TWN|TW|Taiwan|Taipei|Il Presidente della Repubblica di Cina (Taiwan)|AS-E|dem|8.9|23.4|800|16.5|169|n|90/0/0|-|i:9:9|CHN:25 USA:15 JPN:7 KOR:5 SGP:4
+XKX|XK|Kosovo|Pristina|Il Presidente della Repubblica del Kosovo|EU-S|hyb|5.5|1.6|10|0.1|5|n|75/5/0|-|i:8:0|DEU:10 CHN:10 ALB:8 TUR:8 ITA:7

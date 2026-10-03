@@ -1,0 +1,212 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "iso3": {
+   "type": "string",
+   "pattern": "^[A-Z]{3}$"
+  },
+  "iso2": {
+   "type": "string",
+   "pattern": "^[A-Z]{2}$"
+  },
+  "nameIt": {
+   "type": "string",
+   "minLength": 2
+  },
+  "capital": {
+   "type": "string",
+   "minLength": 2
+  },
+  "leaderTitle": {
+   "type": "string",
+   "minLength": 5
+  },
+  "region": {
+   "type": "string",
+   "enum": [
+    "Africa",
+    "Americas",
+    "Asia",
+    "Europe",
+    "Oceania"
+   ]
+  },
+  "subregion": {
+   "type": "string"
+  },
+  "government": {
+   "type": "string",
+   "enum": [
+    "democracy",
+    "hybrid",
+    "authoritarian",
+    "absolute_monarchy",
+    "theocracy",
+    "military",
+    "transitional"
+   ]
+  },
+  "democracyScore": {
+   "type": "number",
+   "minimum": 0,
+   "maximum": 10
+  },
+  "population": {
+   "type": "number",
+   "minimum": 0
+  },
+  "gdpUsdB": {
+   "type": "number",
+   "minimum": 0
+  },
+  "milexUsdB": {
+   "type": "number",
+   "minimum": 0
+  },
+  "activePersonnelK": {
+   "type": "number",
+   "minimum": 0
+  },
+  "nuclear": {
+   "type": "string",
+   "enum": [
+    "none",
+    "latent",
+    "declared",
+    "nato_sharing"
+   ]
+  },
+  "alignment": {
+   "type": "object",
+   "properties": {
+    "west": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1
+    },
+    "china": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1
+    },
+    "russia": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1
+    }
+   },
+   "required": [
+    "west",
+    "china",
+    "russia"
+   ]
+  },
+  "unIdealPoint": {
+   "type": "number",
+   "minimum": -1,
+   "maximum": 1
+  },
+  "energy": {
+   "type": "object",
+   "properties": {
+    "role": {
+     "type": "string",
+     "enum": [
+      "exporter",
+      "importer",
+      "mixed"
+     ]
+    },
+    "oil": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1
+    },
+    "gas": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1
+    }
+   },
+   "required": [
+    "role",
+    "oil",
+    "gas"
+   ]
+  },
+  "topTrade": {
+   "maxItems": 5,
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "iso3": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+     },
+     "share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     }
+    },
+    "required": [
+     "iso3",
+     "share"
+    ]
+   }
+  },
+  "memberships": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "factionId": {
+   "type": "string"
+  },
+  "sources": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "string"
+   }
+  },
+  "confidence": {
+   "type": "object",
+   "propertyNames": {
+    "type": "string"
+   },
+   "additionalProperties": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1
+   }
+  }
+ },
+ "required": [
+  "iso3",
+  "iso2",
+  "nameIt",
+  "capital",
+  "leaderTitle",
+  "region",
+  "subregion",
+  "government",
+  "democracyScore",
+  "population",
+  "gdpUsdB",
+  "milexUsdB",
+  "activePersonnelK",
+  "nuclear",
+  "alignment",
+  "energy",
+  "topTrade",
+  "memberships",
+  "sources",
+  "confidence"
+ ]
+}

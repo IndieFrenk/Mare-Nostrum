@@ -1,4 +1,4 @@
-import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
+import type { AfterActionReport, AgentDecision, Campaign, CatalogItem, CmoPackage, DiceRoll, DiploLetter, FactionKnowledge, LetterTone, GameEvent, LedgerEntry, Nation, NationSummary, OrdersBody, PendingDelivery, Relation, TurnNarrative, WorldState } from '../../wargame-server/src/schemas/index';
 
 export type * from '../../wargame-server/src/schemas/index';
 export type { LlmStatus } from '../../wargame-server/src/agents/llm-status';
@@ -21,6 +21,12 @@ export interface CatalogView { budget: number; items: (CatalogItem & { available
 export interface PendingCmo { id: string; turn: number; zoneId: string; scale: string; cmoPackage: CmoPackage }
 export interface Postmortem { turn: number; decisions: AgentDecision[]; rolls: DiceRoll[]; events: GameEvent[]; state: WorldState; branches: { id: string; name: string; parent: Campaign['parent'] }[] }
 export type FC = GeoJSON.FeatureCollection;
+/** scheda completa di uno Stato (`GET /nations/:iso3`): dati del registro, istituzioni di cui è membro e coppie storiche */
+export interface NationDetail extends Nation {
+  sourceLegend: Record<string, string>; asOf: string;
+  institutions: { id: string; name: string; nameIt: string; kind: string; decision: string; cohesion: number; members: number }[];
+  pairs: { dir: 'out' | 'in'; with: string; value: number; label: string }[];
+}
 /** bozza di «Interpreta»: ordini, avvisi, nomi riconosciuti e ordini nati dalle posture per zona */
 export interface ParsedDraft { orders: OrdersBody; ambiguities: string[]; validation: Validation; recognized: { alias: string; id: string; kind: string }[]; stanceOrders: { orderId: string; stance: string; zoneId: string | null }[] }
 export interface LetterDraft { target: string; inReplyTo?: string; subject: string; body: string; tone: LetterTone; source: 'ai' | 'template'; model: string; errors: string[] }
@@ -28,6 +34,8 @@ export interface LetterDraft { target: string; inReplyTo?: string; subject: stri
 const c = (id: string) => `/campaigns/${encodeURIComponent(id)}`;
 export const api = {
   scenarios: () => req<{ id: string; name: string }[]>('GET', '/scenarios'),
+  nations: () => req<NationSummary[]>('GET', '/nations'),
+  nation: (iso3: string) => req<NationDetail>('GET', `/nations/${encodeURIComponent(iso3)}`),
   campaigns: () => req<{ id: string; name: string; parent: Campaign['parent'] }[]>('GET', '/campaigns'),
   create: (b: { scenarioId: string; name: string; seed?: string; debugGodView?: boolean; cmoOnRequest?: boolean; turnLength?: 'week' | 'month' }) => req<Campaign>('POST', '/campaigns', b),
   configure: (id: string, b: { turnLength?: 'week' | 'month'; cmoOnRequest?: boolean }) => req<Campaign>('POST', `${c(id)}/config`, b),

@@ -41,3 +41,26 @@ export const NAMES: Record<string, string> = {
 
 /** Paesi UE che non sono fazioni (colore comune nella mappa politica): chi diventa fazione esce da qui (Spagna, Germania, Malta, Cipro). */
 export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CZE', 'DNK', 'EST', 'FIN', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'SWE'];
+
+/** Colori dei tre poli della modalità «Allineamento» (docs/wargame/DIPLOMAZIA.md §4): Occidente, Cina, Russia; il resto è non allineamento. */
+export const POLE_COLORS = { west: '#4a86e8', china: '#e0b030', russia: '#d05050', none: '#8a8a7c' } as const;
+const BASE_FILL = '#4f4f46';
+
+const mixHex = (a: string, b: string, t: number) => {
+  const p = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
+};
+
+/** Polo prevalente di uno Stato e quanto pesa (0–1): il non allineamento prevale quando il resto dei tre poli è più grande. */
+export function prevailingPole(a: { west: number; china: number; russia: number }): { pole: 'west' | 'china' | 'russia' | 'none'; value: number } {
+  const none = Math.max(0, 1 - a.west - a.china - a.russia);
+  const best = (['west', 'china', 'russia'] as const).map((k) => [k, a[k]] as const).sort((x, y) => y[1] - x[1])[0]!;
+  return none >= best[1] ? { pole: 'none', value: none } : { pole: best[0], value: best[1] };
+}
+
+/** Colore per polo prevalente, intensità per il valore. */
+export function alignmentColor(a: { west: number; china: number; russia: number }): string {
+  const { pole, value } = prevailingPole(a);
+  return mixHex(BASE_FILL, POLE_COLORS[pole], pole === 'none' ? 0.35 + 0.25 * value : 0.3 + 0.7 * value);
+}

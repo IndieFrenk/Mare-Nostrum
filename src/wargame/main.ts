@@ -2,8 +2,9 @@
 // Non importa src/main.ts né alcun servizio dati upstream: l'unica sorgente è wargame-server.
 import './wargame.css';
 import { api } from './api-client';
-import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
+import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, loadNation, openCampaign, rememberedCampaign, runTurn, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
+import { FACTIONS } from './layers/factions';
 import { WarMap } from './layers/map';
 import { countryCard, orderToZone, selectionCard } from './panels/hud';
 import { set, state, subscribe, type UiState } from './state/store';
@@ -84,7 +85,7 @@ function render(s: UiState) {
     s.country ? countryCard(s, s.country) : null,
     selectionCard(s),
     h('div', { id: 'wg-modes' },
-      (['politica', 'diplomazia', 'tensione', 'crisi'] as const).map((m) => h('button', { class: s.mapMode === m ? 'on' : '', onclick: () => set({ mapMode: m }) }, m)),
+      (['politica', 'diplomazia', 'tensione', 'crisi', 'allineamento'] as const).map((m) => h('button', { class: s.mapMode === m ? 'on' : '', title: m === 'allineamento' ? 'Polo prevalente: Occidente (blu), Cina (oro), Russia (rosso), non allineato (grigio); più forte = più allineato' : undefined, onclick: () => set({ mapMode: m }) }, m)),
       h('button', { onclick: () => set({ globe: !s.globe }) }, s.globe ? 'Mappa piana' : 'Globo'),
       h('button', { onclick: leaveCampaign }, 'Campagne')),
     h('div', { id: 'wg-log' }, s.error ? h('span', { class: 'wg-err' }, s.error)
@@ -109,7 +110,7 @@ async function lobby() {
     list?.length ? [h('h3', {}, 'Campagne esistenti'), h('ul', {}, list.map((c) => h('li', {}, h('a', { href: '#', onclick: (e: Event) => { e.preventDefault(); void openCampaign(c.id); } }, c.name), c.parent ? ` (ramo di ${c.parent.campaignId} T${c.parent.turn})` : '')))] : null));
 }
 
-const MAP_KEYS = ['layers', 'knowledge', 'selection', 'draft', 'mapMode', 'globe', 'country', 'overview'] as const;
+const MAP_KEYS = ['layers', 'knowledge', 'selection', 'draft', 'mapMode', 'globe', 'country', 'overview', 'nations'] as const;
 let last: Partial<UiState> = {};
 subscribe((s) => {
   if (!s.campaignId || !s.campaign) { map?.map.remove(); map = null; void lobby(); return; }
@@ -118,7 +119,7 @@ subscribe((s) => {
     map = new WarMap(mapEl, {
       selectUnit: (id, add) => { set({ stack: null }); void selectUnit(id, add); },
       openStack: (ids) => set({ stack: ids }),
-      openCountry: (f) => set({ country: f }),
+      openCountry: (f) => { set({ country: f }); if (f && !FACTIONS[f]) void loadNation(f); },
       orderToZone,
     });
   }

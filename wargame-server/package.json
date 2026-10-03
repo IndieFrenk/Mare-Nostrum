@@ -13,6 +13,7 @@
     "smoke-llm": "tsx src/cli/sim.ts --turns 1",
     "schemas:export": "tsx src/cli/export-schemas.ts",
     "geo:build": "tsx scripts/build-geo.ts",
+    "world:build": "tsx scripts/build-world.ts",
     "llm:check": "tsx src/cli/llm-check.ts",
     "bench:models": "tsx src/cli/bench-models.ts",
     "playtest": "tsx src/cli/playtest.ts",

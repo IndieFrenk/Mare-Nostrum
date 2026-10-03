@@ -51,6 +51,11 @@ button { cursor: pointer; } button:hover:not(:disabled) { border-color: var(--go
 .wg-meters { display: grid; gap: 4px; } .wg-meter { position: relative; background: #26271f; min-height: 18px; } .wg-meter b { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #7a2a22, #b89a3a, #3f8f4f); opacity: .7; }
 .wg-meter span { position: relative; z-index: 1; display: block; padding: 1px 6px; font-size: 12px; }
 .wg-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 10px; }
+/* scheda paese in sola lettura (Stati del registro che non sono fazioni) */
+.wg-nation { max-height: calc(100vh - 230px); overflow: auto; } .wg-nation h4 { margin: 10px 10px 4px; }
+.wg-nation-body { display: grid; gap: 3px; } .wg-row2 { display: grid; grid-template-columns: 96px 1fr; gap: 8px; font-size: 12px; } .wg-row2 > :first-child { font-size: 11px; }
+.wg-align { display: flex; height: 12px; background: #26271f; overflow: hidden; } .wg-align i { display: block; height: 100%; }
+.wg-chip { display: inline-block; margin: 0 4px 4px 0; padding: 1px 6px; background: #2c2a20; border: 1px solid #44402f; font-size: 11px; }
 .wg-selection { left: 58px; bottom: 56px; width: 380px; max-height: 40vh; display: flex; flex-direction: column; }
 .wg-selection ul { list-style: none; margin: 0; padding: 4px; overflow: auto; } .wg-selection p { margin: 4px 10px; }
 .wg-selection li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 3px 6px; cursor: pointer; border-bottom: 1px solid #2c2a20; }

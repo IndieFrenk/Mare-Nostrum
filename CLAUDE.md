@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Wargame (Mare Nostrum)
-Spec: [docs/wargame/SPEC.md](docs/wargame/SPEC.md) · Stato: [docs/wargame/PROGRESS.md](docs/wargame/PROGRESS.md) · Recon: [docs/wargame/RECON.md](docs/wargame/RECON.md)
+Spec: [docs/wargame/SPEC.md](docs/wargame/SPEC.md) · Stato: [docs/wargame/PROGRESS.md](docs/wargame/PROGRESS.md) · Recon: [docs/wargame/RECON.md](docs/wargame/RECON.md) · Diplomazia (piano prompt 07–12): [docs/wargame/DIPLOMAZIA.md](docs/wargame/DIPLOMAZIA.md)
 
 Comandi:
 - `npm --prefix wargame-server test` · `npm --prefix wargame-server run typecheck`

@@ -1,0 +1,15 @@
+# Oceania (14 membri ONU). Colonne come in nations-africa.txt.
+AUS|AU|Australia|Canberra|Il Primo Ministro dell'Australia|OC-A|dem|8.7|27|1800|33.8|60|n|95/0/0|-0.8|x:5:9|CHN:29 JPN:11 KOR:6 USA:6 IND:5
+NZL|NZ|Nuova Zelanda|Wellington|Il Primo Ministro della Nuova Zelanda|OC-A|dem|9.6|5.3|250|3.3|10|n|95/0/0|-0.8|i:8:3|CHN:22 AUS:14 USA:11 JPN:6 KOR:4
+FJI|FJ|Figi|Suva|Il Presidente della Repubblica di Figi|OC-M|hyb|5.6|0.93|5.5|0.07|4|n|55/20/0|-0.1|i:9:0|AUS:20 NZL:12 CHN:12 SGP:11 USA:7
+PNG|PG|Papua Nuova Guinea|Port Moresby|Il Primo Ministro di Papua Nuova Guinea|OC-M|hyb|5.7|11|32|0.1|4|n|45/25/0|0.0|x:5:7|AUS:30 CHN:16 JPN:9 SGP:6 MYS:5
+SLB|SB|Isole Salomone|Honiara|Il Primo Ministro delle Isole Salomone|OC-M|hyb|5.5|0.8|1.7|0.0|0|n|35/40/0|0.1|i:9:0|CHN:60 SGP:9 AUS:8 KOR:3 JPN:3
+VUT|VU|Vanuatu|Port Vila|Il Presidente della Repubblica di Vanuatu|OC-M|dem|7.0|0.33|1.1|0.0|0.3|n|45/20/0|0.0|i:9:0|AUS:20 CHN:12 NZL:10 JPN:7 FJI:5
+KIR|KI|Kiribati|Tarawa Sud|Il Presidente della Repubblica di Kiribati|OC-MI|hyb|6.0|0.13|0.3|0.0|0|n|35/40/0|0.1|i:9:0|FJI:25 AUS:20 CHN:15 NZL:10 JPN:5
+MHL|MH|Isole Marshall|Majuro|Il Presidente della Repubblica delle Isole Marshall|OC-MI|dem|7.0|0.04|0.3|0.0|0|n|85/5/0|-0.7|i:9:0|USA:30 JPN:15 CHN:10 SGP:10 KOR:6
+FSM|FM|Micronesia|Palikir|Il Presidente degli Stati Federati di Micronesia|OC-MI|dem|7.0|0.11|0.5|0.0|0|n|80/5/0|-0.6|i:9:0|USA:30 JPN:15 CHN:10 SGP:8 KOR:6
+NRU|NR|Nauru|Yaren|Il Presidente della Repubblica di Nauru|OC-MI|hyb|6.0|0.012|0.15|0.0|0|n|55/15/0|0.0|i:9:0|AUS:50 FJI:10 JPN:8 NZL:6 CHN:5
+PLW|PW|Palau|Ngerulmud|Il Presidente della Repubblica di Palau|OC-MI|dem|7.5|0.018|0.3|0.0|0|n|85/5/0|-0.7|i:9:0|USA:35 JPN:15 SGP:10 CHN:8 KOR:7
+WSM|WS|Samoa|Apia|Il Primo Ministro di Samoa|OC-P|hyb|6.0|0.22|0.9|0.0|0|n|55/20/0|0.0|i:9:0|NZL:30 AUS:15 FJI:10 USA:8 CHN:7
+TON|TO|Tonga|Nuku'alofa|Il Re di Tonga|OC-P|hyb|5.0|0.1|0.5|0.01|0.5|n|45/25/0|0.0|i:9:0|NZL:25 FJI:12 AUS:10 USA:8 CHN:8
+TUV|TV|Tuvalu|Funafuti|Il Primo Ministro di Tuvalu|OC-P|dem|7.0|0.011|0.06|0.0|0|n|55/15/0|0.0|i:9:0|FJI:35 AUS:20 NZL:12 CHN:8 JPN:6
