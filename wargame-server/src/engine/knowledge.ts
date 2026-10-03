@@ -1,5 +1,6 @@
 import type { Contact, DiploLetter, DiploMessage, FactionKnowledge, GameEvent, Incident, IntelReport, NewsItem, WorldState } from '../schemas/index.js';
 import { acceptance } from './acceptance.js';
+import { intelPartners } from './diplo-view.js';
 import { DIPLO_CATALOG, actionCost, improveSlots, weeklyRent } from './diplo-actions.js';
 import { diploActs, opinionBand, opinionOf, tensionOf } from './opinion.js';
 import { hashString } from './rng.js';
@@ -98,12 +99,12 @@ export function buildKnowledge(s: WorldState, factionId: string, contacts: Conta
  * vedono lei si dà solo a fasce; il numero esatto solo con un accordo di intelligence attivo tra le due. Le coppie tra terzi non ci sono.
  */
 export function ownRelations(s: WorldState, f: string): FactionKnowledge['ownRelations'] {
-  const intel = Object.values(s.agreements).filter((a) => a.status === 'active' && a.type === 'intel_sharing' && a.parties.includes(f));
+  const intel = intelPartners(s, f);
   return Object.fromEntries(Object.keys(s.relations[f] ?? {}).sort((a, b) => a.localeCompare(b)).map((b) => {
     const theirs = opinionOf(s, b, f).value;
     return [b, {
       trust: opinionOf(s, f, b).value, tension: Math.round(tensionOf(s, f, b) * 10) / 10, opinionOfMe: opinionBand(theirs),
-      ...(intel.some((a) => a.parties.includes(b)) ? { opinionOfMeExact: theirs } : {}),
+      ...(intel.has(b) ? { opinionOfMeExact: theirs } : {}),
     }];
   }));
 }

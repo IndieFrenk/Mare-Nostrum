@@ -2,11 +2,11 @@ import type { FactionOrders, OrdersBody, WorldState } from '../schemas/index.js'
 import type { Catalog } from './scenario.js';
 import { PARAMS } from './params.js';
 import { LETTER_LIMITS } from '../schemas/index.js';
-import { acceptance, type AcceptanceResult } from './acceptance.js';
+import { acceptanceFor, type FoggedAcceptance } from './diplo-view.js';
 import { DIPLO_CATALOG, actionCost, checkAction, cooldownKeys, isActor, targetsOf } from './diplo-actions.js';
 
-/** `acceptance`: per ogni proposta di trattato, come risponderebbe ogni destinatario (punteggio e motivi, engine/acceptance.ts): il dry-run del §8. */
-export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number; acceptance?: (AcceptanceResult & { actionId: string; type: string })[]; capitalCost?: number }
+/** `acceptance`: per ogni proposta di trattato, come risponderebbe ogni destinatario (punteggio e motivi, engine/acceptance.ts): il dry-run del §8. Una stima se manca l'intelligence sul destinatario (`exact: false`, nebbia §5.6). */
+export interface Validation { valid: boolean; errors: string[]; risks: string[]; estCost: number; acceptance?: (FoggedAcceptance & { actionId: string; type: string })[]; capitalCost?: number }
 
 /** Validazione unica per umano e IA: proprietà, disponibilità, budget, compatibilità. */
 export function validateOrders(s: WorldState, catalog: Catalog, factionId: string, o: OrdersBody | FactionOrders, knownRefs: Set<string> = new Set(), turnLength: 'week' | 'month' = 'week'): Validation {
@@ -96,7 +96,7 @@ export function validateOrders(s: WorldState, catalog: Catalog, factionId: strin
     if (cd && cdSpent > (s.diplomacy?.capital[factionId] ?? 0) + 1e-9) errors.push(`${d.id}: capitale diplomatico insufficiente (${Math.round(cdSpent * 10) / 10} CD in bozza, ${Math.round((s.diplomacy?.capital[factionId] ?? 0) * 10) / 10} disponibili)`);
     if (d.kind === 'PROPOSE_AGREEMENT') {
       const parties = [...new Set([factionId, ...d.target, ...d.agreement.parties])];
-      for (const t of d.target.filter((x) => x !== factionId && isActor(s, x))) verdicts.push({ actionId: d.id, type: d.agreement.type, ...acceptance(s, t, { type: d.agreement.type, parties }, factionId) });
+      for (const t of d.target.filter((x) => x !== factionId && isActor(s, x))) verdicts.push({ actionId: d.id, type: d.agreement.type, ...acceptanceFor(s, factionId, t, { type: d.agreement.type, parties }) });
     }
     if (d.kind === 'LETTER') {
       letters++;
