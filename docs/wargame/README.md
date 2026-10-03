@@ -20,8 +20,29 @@ WARGAME_MOCK=1 npm run wargame:all    # server :8787 + frontend su http://localh
 ## Comandi dell'interfaccia
 - **Clic su una pedina**: seleziona (pila: apre l'elenco). **Maiusc+clic**: selezione multipla.
 - **Tasto destro su una zona di mare** con unità selezionate: ordine di pattugliamento (tratteggio oro sulla mappa).
-- **Clic su un paese**: per le fazioni, scheda con fiducia/tensione, stime e azioni diplomatiche rapide; per **tutti gli altri Stati del registro** (197 in tutto) scheda in sola lettura con i dati del paese (vedi «Dati del mondo»). Dipendenze e Antartide non rispondono.
-- In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi, **allineamento**) e globo/mappa piana. *Allineamento* colora ogni Stato per polo prevalente (blu Occidente, oro Cina, rosso Russia, grigio non allineato), più intenso = più allineato. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
+- **Clic su un paese** (o pannello **Stati** ◎, con ricerca e tastiera): la **scheda paese**, uguale per tutti i 197 Stati del registro (vedi «Diplomazia: come si usa»). Dipendenze e Antartide non rispondono.
+- In basso a destra: modalità mappa (politica, diplomazia, tensione, crisi, **allineamento**, **opinione**, **trattati**, **voto**) e globo/mappa piana. *Allineamento* colora ogni Stato per polo prevalente (blu Occidente, oro Cina, rosso Russia, grigio non allineato), più intenso = più allineato. Le altre tre sono spiegate sotto. Menu a icone a sinistra per tutti i pannelli; **▶** in alto a destra esegue il turno.
+
+## Diplomazia: come si usa
+Ogni numero ha i suoi motivi e ogni azione mostra costo e probabilità di riuscita **prima** di inviarla. Tutto viene dalla Knowledge dell'Italia o è pubblico (nebbia di guerra): di come gli altri ci vedono si conosce la **fascia** (ostile · fredda · neutra · cordiale · stretta), il numero esatto solo con un accordo di intelligence.
+
+![Scheda di uno Stato del mondo con i motivi dell'opinione](img/scheda-paese.png)
+
+- **Scheda paese**: intestazione (bandiera, carica del capo di Stato, governo); **opinione nei due sensi** con la barra e l'elenco dei motivi come in HOI4 («+20 Alleanza difensiva in comune», «−8 Minaccia formale (ancora 8 turni)»); di chi ci vede si leggono la fascia e gli atti pubblici che pesano su di lui; **trattati e appartenenze** (in oro quelli in comune con l'Italia); **azioni** con il costo in CD e la ricarica — quelle non disponibili sono spente e dicono perché; per ogni **proposta di trattato** «Accetterebbe: sì/no (punteggio)» con i motivi (*perché*): è una **stima**, perché l'opinione dell'altro verso di noi è nota solo a fasce; **dati** (popolazione, PIL, spesa militare, nucleare, partner) con la data e il segno ≈ dove la confidenza è sotto 0,7.
+- **Le azioni entrano nella bozza** (stesso schema degli ordini di sempre, niente invio diretto): si rivedono nella *Console Ordini* e partono con *Invia ordini* o ▶. Il capitale mostrato tiene conto della bozza.
+- **Migliorare le relazioni**: costa 1 CD subito e 1 CD a turno, +2 a turno all'opinione dell'altro fino a +30; occupa uno slot (2–4 secondo la potenza). Slot e ultimatum con il conto alla rovescia sono nel pannello **Diplomazia**.
+- **Modalità *Opinione***: colore per fascia (scala blu–arancio, leggibile anche da chi non distingue rosso e verde; la legenda scrive i nomi). L'interruttore *Italia → Stati* / *Stati → Italia* sceglie il verso.
+
+![Modalità Opinione](img/modalita-opinione.png)
+
+- **Modalità *Trattati***: una linea per ogni partner dell'Italia, o del paese che hai selezionato; il colore dice la categoria (difesa, garanzia, accesso e basi, commercio, energia, migrazioni, altri), il tratto (pieno, tratteggiato, punteggiato) il gruppo, la linea chiara «proposto».
+- **Modalità *Voto***: l'esito per Stato dell'ultima votazione in Assemblea o Consiglio (sì · no · astenuto · assente), con titolo, sede, data, regola e conteggi; il selettore sceglie un'altra votazione.
+
+![Modalità Voto](img/modalita-voto.png)
+
+- **Pannello Istituzioni**: votazioni dell'ultimo turno e passate con conteggi e regola; *Mostra il voto sulla mappa* con un clic; *Proponi risoluzione* mette l'azione `RESOLUTION` nella bozza (costo della sede: UNSC 8, UNGA 6, UE 5, NATO 5, Lega Araba 4, UA 4).
+- **Pannello Reazioni internazionali**: per ogni atto grave chi condanna, chi sostiene, chi tace, con le frasi delle cancellerie se ci sono; senza eventi dice «Nessuna reazione registrata».
+- API di sola lettura (dalla Knowledge del giocatore): `GET /campaigns/:id/diplomacy/overview`, `GET /campaigns/:id/diplomacy/country/:actor` (id di fazione o ISO3), `GET /campaigns/:id/institutions/votes[?turn=]`. Le fasce bastano per la mappa: niente elenchi da 197 righe con testi lunghi.
 
 ## Con modelli reali (OmniRoute)
 Gli agenti parlano con un solo endpoint OpenAI-compatible (OmniRoute); per ogni ruolo scegli un modello, un alias o una combo di OmniRoute.
