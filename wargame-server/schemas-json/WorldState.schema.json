@@ -268,6 +268,58 @@
      "capital": {
       "default": "",
       "type": "string"
+     },
+     "policy": {
+      "type": "object",
+      "properties": {
+       "aggressiveness": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "riskTolerance": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "cyberPropensity": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       },
+       "diplomacyStyle": {
+        "type": "string",
+        "enum": [
+         "conciliatory",
+         "formal",
+         "assertive"
+        ]
+       },
+       "zoneInterests": {
+        "type": "object",
+        "propertyNames": {
+         "type": "string"
+        },
+        "additionalProperties": {
+         "type": "number",
+         "minimum": 0,
+         "maximum": 1
+        }
+       },
+       "maxStancesPerTurn": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4
+       }
+      },
+      "required": [
+       "aggressiveness",
+       "riskTolerance",
+       "cyberPropensity",
+       "diplomacyStyle",
+       "zoneInterests",
+       "maxStancesPerTurn"
+      ]
      }
     },
     "required": [

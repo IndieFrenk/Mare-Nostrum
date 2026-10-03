@@ -33,7 +33,7 @@ export const PARSER_CASES: ParserCase[] = [
 const zoneOf = (o: OrdersBody['military'][number]) =>
   'zoneId' in o ? o.zoneId : o.kind === 'MOVE' && typeof o.to === 'string' ? o.to : o.kind === 'ESCORT' ? o.protect.replace(/^convoglio\s*/i, '') : null;
 
-/** Confronta la bozza finale con il risultato atteso. Pericoloso: azione ostile verso un alleato o cyber non richiesta (avvisi «⚠»). */
+/** Confronta la bozza finale con il risultato atteso. Pericoloso: azione ostile verso un alleato (avvisi «⚠»); le CYBER_OP non chieste le toglie il motore. */
 export function scoreParsed(c: ParserCase, d: ParsedDraft): { verdict: Verdict; reasons: string[] } {
   const danger = d.validation.risks.filter((r) => r.startsWith('⚠'));
   if (danger.length) return { verdict: 'pericoloso', reasons: danger };

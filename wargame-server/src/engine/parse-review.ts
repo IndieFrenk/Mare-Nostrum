@@ -37,6 +37,8 @@ export function finishParsed(i: FinishInput): ParsedDraft {
     military: p.military.map((x) => ({ ...x, id: id() })), diplomacy: p.diplomacy.map((x) => ({ ...x, id: id() })),
     procurement: p.procurement.map((x) => ({ ...x, id: id() })), statements: p.statements.map((x) => ({ ...x, id: id() })),
   };
+  // operazioni cyber che il testo non chiede: fuori dalla bozza (i modelli locali ne aggiungevano, anche contro una zona)
+  const uninvited = dropUninvitedCyber(i.text, orders);
   const recognized = i.parsed.recognized ?? recognize(i.text, buildLexicon(k.ownUnits, i.scenario)).hits;
   const explicit = orders.military.flatMap((o) => ('unitIds' in o ? o.unitIds : []));
   const prefer = [...new Set(recognized.filter((h) => h.kind === 'unit').map((h) => h.id))].filter((u) => !explicit.includes(u));
@@ -59,8 +61,21 @@ export function finishParsed(i: FinishInput): ParsedDraft {
     orders, zoneStances: i.parsed.zoneStances, recognized, stanceOrders,
     // avvisi, non errori: la bozza resta modificabile; gli errori veri (es. destinatario che non è una fazione) li dà il validatore
     validation: { ...v, risks: [...review.risks, ...v.risks] },
-    ambiguities: [...i.parsed.ambiguities, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...cyber.notes, ...review.ambiguities],
+    ambiguities: [...i.parsed.ambiguities, ...uninvited, ...t.notes.map((x) => `postura — ${x}`), ...done.notes, ...cyber.notes, ...review.ambiguities],
   };
+}
+
+/**
+ * Toglie dalla bozza le CYBER_OP che la direttiva non chiede (nessuna parola di `CYBER_WORDS`) e restituisce una riga per le
+ * ambiguità per ciascuna. Prima restavano nella bozza con un avviso «⚠ CYBER_OP non richiesta»: il banco con qwen3.5 ne mostrava
+ * ancora, anche con una zona come bersaglio (MAR_ROSSO); una CYBER_OP chiesta ma con un bersaglio che non è una fazione resta
+ * un errore del validatore.
+ */
+export function dropUninvitedCyber(text: string, orders: OrdersBody): string[] {
+  if (CYBER_WORDS.test(plain(text))) return [];
+  const drop = orders.military.filter((o) => o.kind === 'CYBER_OP');
+  orders.military = orders.military.filter((o) => o.kind !== 'CYBER_OP');
+  return drop.map((o) => `CYBER_OP${o.kind === 'CYBER_OP' ? ` (${o.effect}) contro ${o.target}` : ''} tolta dalla bozza: la direttiva non parla di cyber o di operazioni informatiche (probabile errore di interpretazione del modello).`);
 }
 
 /** minuscolo e senza accenti, per cercare i verbi nel testo */
@@ -152,7 +167,7 @@ export function allyReason(s: WorldState, me: string, other: string): string | n
 
 /**
  * Controlli dopo l'LLM sulla bozza di una direttiva (avvisi e ambiguità, non errori): movimento senza unità, azioni
- * ostili verso alleati, operazioni cyber non richieste, verbi diplomatici senza l'azione corrispondente.
+ * ostili verso alleati, verbi diplomatici senza l'azione corrispondente.
  */
 export function reviewParsed(i: ReviewInput): { risks: string[]; ambiguities: string[] } {
   const { state: s, factionId: me, orders } = i;
@@ -202,9 +217,7 @@ export function reviewParsed(i: ReviewInput): { risks: string[]; ambiguities: st
     risks.push(`⚠ ${h.kind} contro ${name(h.target)}, alleato (${why}): azione ostile verso un alleato, verifica che sia davvero voluta.`);
   }
 
-  // 3) operazioni cyber che il testo non chiede
-  if (!CYBER_WORDS.test(text)) for (const o of orders.military) if (o.kind === 'CYBER_OP')
-    risks.push(`⚠ ${o.id}: CYBER_OP contro ${o.target} non richiesta, la direttiva non parla di cyber o operazioni informatiche: probabile errore di interpretazione, toglila.`);
+  // 3) le operazioni cyber che il testo non chiede le ha già tolte `dropUninvitedCyber`
 
   // 4) verbi diplomatici → l'azione corrispondente, verso i paesi nominati
   for (const [re, kinds, label] of DIPLO_VERBS) {

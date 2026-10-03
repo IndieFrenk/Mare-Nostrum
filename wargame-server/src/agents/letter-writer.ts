@@ -4,6 +4,7 @@ import { roleConfig, type LetterJob, type LetterResult } from '../engine/turn-ma
 import type { LlmProvider } from './llm-client.js';
 import { template } from './prompts.js';
 import { callStructured, numbersNotInFacts } from './repair.js';
+import { salutation } from '../engine/diplomacy.js';
 
 /** Uscita del ruolo diplomat: solo testo e tono; destinatario, visibilità ed effetti li decide il motore. */
 export const LetterOut = z.object({
@@ -45,11 +46,11 @@ export const replySubject = (subject: string) => `Risposta: ${subject.replace(/^
 
 /** Lettera-modello breve e cortese, senza numeri: usata se il modello fallisce o inventa numeri. */
 export function templateLetter(job: Pick<LetterJob, 'toTitle' | 'replyTo'>): { subject: string; body: string; tone: 'formal' } {
-  // «Il Presidente della Repubblica di Turchia» → «Signor Presidente»
-  const salutation = `Signor ${job.toTitle.replace(/^(Il|La) /, '').split(/ (?:del|della|dell'|degli|dei) ?/)[0]}`;
+  // «Il Presidente della Repubblica di Turchia» → «Signor Presidente», «Il Re del Marocco» → «Maestà»
+  const open = salutation(job.toTitle);
   const body = job.replyTo
-    ? `${salutation},\nho ricevuto la Sua lettera e La ringrazio per averla voluta indirizzare direttamente a me. Il mio Governo ne sta esaminando i contenuti con la massima attenzione e resta disponibile a proseguire il dialogo per le vie diplomatiche.\nVoglia accogliere i sensi della mia più alta considerazione.`
-    : `${salutation},\ndesidero confermarLe la disponibilità del mio Governo a mantenere aperto un canale di dialogo diretto sulle questioni di comune interesse nel Mediterraneo.\nVoglia accogliere i sensi della mia più alta considerazione.`;
+    ? `${open},\nho ricevuto la Sua lettera e La ringrazio per averla voluta indirizzare direttamente a me. Il mio Governo ne sta esaminando i contenuti con la massima attenzione e resta disponibile a proseguire il dialogo per le vie diplomatiche.\nVoglia accogliere i sensi della mia più alta considerazione.`
+    : `${open},\ndesidero confermarLe la disponibilità del mio Governo a mantenere aperto un canale di dialogo diretto sulle questioni di comune interesse nel Mediterraneo.\nVoglia accogliere i sensi della mia più alta considerazione.`;
   const subject = job.replyTo ? replySubject(job.replyTo.subject) : 'Dialogo sulle questioni di comune interesse';
   return { subject, body, tone: 'formal' };
 }

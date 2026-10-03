@@ -457,6 +457,58 @@
     "capital": {
      "default": "",
      "type": "string"
+    },
+    "policy": {
+     "type": "object",
+     "properties": {
+      "aggressiveness": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "riskTolerance": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "cyberPropensity": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "diplomacyStyle": {
+       "type": "string",
+       "enum": [
+        "conciliatory",
+        "formal",
+        "assertive"
+       ]
+      },
+      "zoneInterests": {
+       "type": "object",
+       "propertyNames": {
+        "type": "string"
+       },
+       "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+       }
+      },
+      "maxStancesPerTurn": {
+       "type": "integer",
+       "minimum": 0,
+       "maximum": 4
+      }
+     },
+     "required": [
+      "aggressiveness",
+      "riskTolerance",
+      "cyberPropensity",
+      "diplomacyStyle",
+      "zoneInterests",
+      "maxStancesPerTurn"
+     ]
     }
    },
    "required": [
@@ -1040,6 +1092,77 @@
      "tone",
      "visibility",
      "source"
+    ]
+   }
+  },
+  "incidents": {
+   "default": [],
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "turn": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "threat",
+       "sanction",
+       "blockade",
+       "engagement",
+       "strike",
+       "cyber",
+       "sof",
+       "show_of_force",
+       "red_line"
+      ]
+     },
+     "from": {
+      "type": "string",
+      "minLength": 2
+     },
+     "to": {
+      "type": "string",
+      "minLength": 2
+     },
+     "zoneId": {
+      "type": "string"
+     },
+     "ref": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "turn",
+     "kind",
+     "from",
+     "to"
+    ]
+   }
+  },
+  "ownRelations": {
+   "default": {},
+   "type": "object",
+   "propertyNames": {
+    "type": "string",
+    "minLength": 2
+   },
+   "additionalProperties": {
+    "type": "object",
+    "properties": {
+     "trust": {
+      "type": "number"
+     },
+     "tension": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "trust",
+     "tension"
     ]
    }
   }

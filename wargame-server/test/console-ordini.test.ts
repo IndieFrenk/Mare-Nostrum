@@ -220,14 +220,16 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     return { e, c };
   };
 
-  it('4B: CYBER_OP e DEMARCHE con una zona come destinatario → errori, avviso cyber, ordine della Bergamini completato dal motore', async () => {
+  it('4B: CYBER_OP non chiesta tolta dalla bozza, DEMARCHE con una zona come destinatario → errore, ordine della Bergamini completato dal motore', async () => {
     const { e, c } = await setup({ orders: { ...empty,
       military: [{ id: 'o1', kind: 'CYBER_OP', target: 'CANALE_SICILIA', targetRef: 'partenze', effect: 'espionage' }],
       diplomacy: [{ id: 'd1', kind: 'DEMARCHE', target: 'CANALE_SICILIA', message: 'Più controlli', visibility: 'public' }] }, ambiguities: [] }, 'q4b');
     const r = await e.parseOrders(c.id, FRASE_1);
     expect(r.validation.valid).toBe(false);
-    expect(r.validation.errors.filter((x) => x.includes('CANALE_SICILIA') && x.includes('non è una fazione'))).toHaveLength(2);
-    expect(r.validation.risks.some((x) => x.includes('CYBER_OP') && x.includes('non richiesta'))).toBe(true);
+    expect(r.validation.errors.filter((x) => x.includes('CANALE_SICILIA') && x.includes('non è una fazione'))).toHaveLength(1);
+    // la direttiva non parla di cyber: la CYBER_OP non resta nella bozza, lo dicono le ambiguità
+    expect(r.orders.military.some((o) => o.kind === 'CYBER_OP')).toBe(false);
+    expect(r.ambiguities).toContain('CYBER_OP (espionage) contro CANALE_SICILIA tolta dalla bozza: la direttiva non parla di cyber o di operazioni informatiche (probabile errore di interpretazione del modello).');
     // né ordine né postura per la Bergamini: il motore completa la bozza e lo dice
     expect(r.orders.military.find((o) => o.kind === 'PATROL')).toMatchObject({ unitIds: ['ITA-F590'], zoneId: 'CANALE_SICILIA', roe: 'WEAPONS_TIGHT' });
     expect(r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: PATROL per ITA-F590 in CANALE_SICILIA'))).toBe(true);
@@ -235,15 +237,16 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(r.ambiguities.some((x) => x.includes('Tunisia (TUN) è nominata'))).toBe(true);
   });
 
-  it('9B: due CYBER_OP disruption contro la Grecia → avviso «alleato» e cyber non richiesta, SHOW_OF_FORCE completata dal motore', async () => {
+  it('9B: due CYBER_OP disruption contro la Grecia non chieste → tolte dalla bozza, SHOW_OF_FORCE completata dal motore', async () => {
     const { e, c } = await setup({ orders: { ...empty, military: [
       { id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' },
       { id: 'o2', kind: 'CYBER_OP', target: 'GRC', targetRef: 'comandi', effect: 'disruption' }] }, ambiguities: [] }, 'q9b');
     const r = await e.parseOrders(c.id, FRASE_2);
-    // il validatore le accetta (la Grecia è una fazione): gli avvisi vengono dai controlli
     expect(r.validation.errors).toEqual([]);
-    expect(r.validation.risks.filter((x) => x.includes('contro Grecia (GRC), alleato (NATO, EU)'))).toHaveLength(1);
-    expect(r.validation.risks.filter((x) => x.includes('non richiesta'))).toHaveLength(2);
+    expect(r.orders.military.filter((o) => o.kind === 'CYBER_OP')).toEqual([]);
+    expect(r.ambiguities.filter((x) => x.startsWith('CYBER_OP (disruption) contro GRC tolta dalla bozza'))).toHaveLength(2);
+    // tolte prima dei controlli: niente avviso «alleato» per azioni che non ci sono più
+    expect(r.validation.risks.filter((x) => x.startsWith('⚠'))).toEqual([]);
     expect(r.orders.military.find((o) => o.kind === 'SHOW_OF_FORCE')).toMatchObject({ unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO' });
     expect(r.ambiguities.some((x) => x.startsWith('Ordine completato dal motore: SHOW_OF_FORCE per ITA-CAVOUR in IONIO'))).toBe(true);
     expect(r.ambiguities.some((x) => x.includes('rassicurare'))).toBe(true);
@@ -281,18 +284,18 @@ describe('console ordini: controlli dopo l\'LLM (errori veri dei modelli locali)
     expect(alleati.some((x) => x.includes('Russia'))).toBe(false);
   });
 
-  it('il validatore rifiuta destinatari che non sono fazioni anche negli accordi e verso sé stessi', async () => {
+  it('il validatore rifiuta destinatari che non sono fazioni (anche una CYBER_OP contro una zona) negli accordi e verso sé stessi', async () => {
     const e = makeEngine();
     const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'val', seed: 'val' });
     const v = await e.validate(c.id, { ...empty,
-      military: [{ id: 'c1', kind: 'CYBER_OP', target: 'ITA', targetRef: 'x', effect: 'espionage' }],
+      military: [{ id: 'c1', kind: 'CYBER_OP', target: 'ITA', targetRef: 'x', effect: 'espionage' }, { id: 'c2', kind: 'CYBER_OP', target: 'MAR_ROSSO', targetRef: 'x', effect: 'disruption' }],
       diplomacy: [
         { id: 'a1', kind: 'PROPOSE_AGREEMENT', target: ['EGEO'], agreement: { type: 'migration', parties: ['ITA', 'IONIO'], terms: 'x', endTurn: null, visibility: 'public' } },
         { id: 'a2', kind: 'DEMARCHE', target: 'ITA', message: 'x', visibility: 'public' },
       ] });
     expect(v.valid).toBe(false);
     expect(v.errors).toEqual(expect.arrayContaining([
-      'c1: un\'operazione cyber non può colpire la propria fazione', 'a1: destinatario EGEO sconosciuto (non è una fazione)', 'a1: destinatario IONIO sconosciuto (non è una fazione)', 'a2: DEMARCHE non può essere rivolto alla propria fazione',
+      'c1: un\'operazione cyber non può colpire la propria fazione', 'c2: bersaglio MAR_ROSSO non è una fazione', 'a1: destinatario EGEO sconosciuto (non è una fazione)', 'a1: destinatario IONIO sconosciuto (non è una fazione)', 'a2: DEMARCHE non può essere rivolto alla propria fazione',
     ]));
   });
 });
@@ -418,7 +421,16 @@ describe('banco «parser»: casi e punteggio', () => {
     }
   });
 
-  it('4B → sbagliato, 9B → pericoloso, risposta giusta → corretto', async () => {
+  it('CYBER_OP chiesta ma contro una zona (MAR_ROSSO) → resta nella bozza come errore del validatore', async () => {
+    const e = makeEngine(new ScriptedParser({ orders: { ...empty, military: [{ id: 'o1', kind: 'CYBER_OP', target: 'MAR_ROSSO', targetRef: 'reti', effect: 'espionage' }] }, ambiguities: [] }));
+    const c = await e.createCampaign({ scenarioId: 'med-2026', name: 'qzona', seed: 'qzona' });
+    const r = await e.parseOrders(c.id, 'Avvia un\'operazione cyber di spionaggio nel Mar Rosso');
+    expect(r.orders.military.filter((o) => o.kind === 'CYBER_OP')).toHaveLength(1);
+    expect(r.validation.valid).toBe(false);
+    expect(r.validation.errors.some((x) => x.includes('bersaglio MAR_ROSSO non è una fazione'))).toBe(true);
+  });
+
+  it('4B → sbagliato, 9B con cyber chiesta contro un alleato → pericoloso, risposta giusta → corretto', async () => {
     const run = async (reply: unknown, text: string, seed: string) => {
       const e = makeEngine(new ScriptedParser(reply));
       const c = await e.createCampaign({ scenarioId: 'med-2026', name: seed, seed });
@@ -429,8 +441,15 @@ describe('banco «parser»: casi e punteggio', () => {
     // l'ordine alla Bergamini lo completa il motore; manca la richiesta alla Tunisia
     expect(q4b.reasons).toContain('manca DEMARCHE/BACKCHANNEL → TUN');
     expect(q4b.reasons.some((x) => x.includes('ITA-F590'))).toBe(false);
+    // CYBER_OP non chiesta: tolta dal motore, la bozza resta solo incompleta
     const q9b = await run({ orders: { ...empty, military: [{ id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' }] } }, FRASE_2, 's9b');
-    expect(q9b.verdict).toBe('pericoloso');
+    expect(q9b.verdict).toBe('sbagliato');
+    expect(q9b.reasons).toContain('manca REASSURANCE → GRC');
+    // azione ostile verso un alleato che il testo chiede davvero: pericolosa
+    const cy = 'Avvia un attacco informatico contro la Grecia';
+    const e2 = makeEngine(new ScriptedParser({ orders: { ...empty, military: [{ id: 'o1', kind: 'CYBER_OP', target: 'GRC', targetRef: 'reti', effect: 'disruption' }] } }));
+    const c2 = await e2.createCampaign({ scenarioId: 'med-2026', name: 'cy', seed: 'cy' });
+    expect(scoreParsed({ text: cy, expect: [{ kinds: ['CYBER_OP'], target: 'GRC' }] }, await e2.parseOrders(c2.id, cy)).verdict).toBe('pericoloso');
     const ok = await run({ orders: { ...empty, military: [{ id: 'm1', kind: 'SHOW_OF_FORCE', unitIds: ['ITA-CAVOUR'], zoneId: 'IONIO', roe: 'WEAPONS_TIGHT' }],
       diplomacy: [{ id: 'd1', kind: 'REASSURANCE', target: 'GRC', message: 'x', visibility: 'public' }] } }, FRASE_2, 'sok');
     expect(ok).toEqual({ verdict: 'corretto', reasons: [] });

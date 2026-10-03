@@ -45,6 +45,9 @@ export class ReplayAgents implements AgentsPort {
     }));
   }
 
+  /** Decisione registrata: il motore ricalcola quelle a regole (stesso dado) e controlla che siano identiche a queste. */
+  recordedDecision(turn: number, factionId: string) { return this.store.getDecision(this.sourceId, turn, factionId); }
+
   async draftLetter(): Promise<never> { throw new Error('bozze non disponibili in replay'); }
 
   async parseOrders(): Promise<never> { throw new Error('parse non disponibile in replay'); }

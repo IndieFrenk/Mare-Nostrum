@@ -1,4 +1,5 @@
-import { AgentMemory, type AgentDecision, type Campaign, type GameEvent, type LlmCall } from '../schemas/index.js';
+import { AgentMemory, type AgentDecision, type Campaign, type GameEvent, type Incident, type LlmCall } from '../schemas/index.js';
+import { PARAMS } from '../engine/params.js';
 import { z } from 'zod';
 import type { LlmProvider } from './llm-client.js';
 import { template } from './prompts.js';
@@ -30,6 +31,26 @@ export function clampMemory(m: AgentMemory): AgentMemory {
 export function quickMemory(memory: AgentMemory, decision: AgentDecision | null, turn: number): AgentMemory {
   const line = `T${turn}: ${decision?.privateIntent ?? 'nessuna decisione'}.`;
   return clampMemory({ ...memory, rollingSummary: `${memory.rollingSummary} ${line}`.trim(), updatedTurn: turn });
+}
+
+const SUFFERED: Partial<Record<Incident['kind'], string>> = {
+  threat: 'minaccia', sanction: 'sanzioni', blockade: 'blocco navale', engagement: 'scontro', strike: 'strike', cyber: 'attacco cyber',
+  sof: 'operazione clandestina', show_of_force: 'dimostrazione di forza',
+};
+
+/**
+ * Memoria senza IA delle fazioni che decidono a regole: una riga per turno con cosa hanno subito (atti ostili visti) e cosa hanno
+ * fatto (motivazioni della decisione), più i torti subiti. Serve al consigliere che scrive le lettere; deterministica (replay).
+ */
+export function rulesMemory(memory: AgentMemory, decision: AgentDecision | null, seen: Incident[], turn: number): AgentMemory {
+  const me = memory.factionId;
+  const hit = seen.filter((x) => x.to === me && x.from !== me && SUFFERED[x.kind]);
+  const what = (x: Incident) => `${SUFFERED[x.kind]} di ${x.from}${x.zoneId ? ` in ${x.zoneId}` : ''}`;
+  const did = decision?.rationale.filter((r) => r.rule !== 'worn').map((r) => r.text).slice(0, 3).join('; ') || decision?.privateIntent || 'nessuna decisione';
+  const line = `T${turn}: subito ${hit.map(what).join(', ') || 'nessun atto ostile'}; fatto: ${did}.`;
+  const severity = PARAMS.policy.severity as Record<string, number>;
+  const grievances = hit.filter((x) => x.kind !== 'show_of_force').map((x) => ({ turn, against: x.from, text: what(x), weight: severity[x.kind] ?? 1 }));
+  return clampMemory({ ...memory, grievances: [...memory.grievances, ...grievances], rollingSummary: `${memory.rollingSummary} ${line}`.trim(), updatedTurn: turn });
 }
 
 export async function reflect(provider: LlmProvider, log: LlmCall[], c: Campaign, i: { factionId: string; decision: AgentDecision | null; visibleEvents: GameEvent[]; memory: AgentMemory }): Promise<AgentMemory> {

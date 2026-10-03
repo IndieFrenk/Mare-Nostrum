@@ -1,4 +1,4 @@
-import type { LlmStatus, Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
+import type { LlmStatus, Campaign, CatalogView, DiploLetter, FactionKnowledge, FC, GameEvent, LedgerEntry, NationDetail, NationSummary, OrdersBody, Overview, PendingCmo, TurnNarrative, Validation } from '../api-client';
 
 export interface UiState {
   campaignId: string | null;
@@ -19,10 +19,14 @@ export interface UiState {
   selectedUnitId: string | null;
   /** selezione multipla (stile grand strategy); selectedUnitId è la prima */
   selection: string[];
-  mapMode: 'politica' | 'diplomazia' | 'tensione' | 'crisi';
+  mapMode: 'politica' | 'diplomazia' | 'tensione' | 'crisi' | 'allineamento';
   globe: boolean;
   drawer: string | null;
+  /** attore selezionato: id di fazione se lo Stato è una fazione, altrimenti l'ISO3 (scheda paese in sola lettura) */
   country: string | null;
+  /** registro dei 197 Stati (dati statici, caricati una volta) e schede complete già lette per ISO3 */
+  nations: NationSummary[];
+  nationDetail: Record<string, NationDetail>;
   /** pedina impilata aperta */
   stack: string[] | null;
   draft: OrdersBody;
@@ -46,7 +50,7 @@ const listeners = new Set<Listener>();
 
 export const state: UiState = {
   campaignId: null, campaign: null, knowledge: null, overview: null, narrative: null, previous: null, ledger: [], catalog: null, events: [], cmo: [], letters: [], lettersSeen: [],
-  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null, llm: null, parseNote: null,
+  layers: {}, selectedUnitId: null, selection: [], mapMode: 'politica', globe: true, drawer: 'briefing', country: null, nations: [], nationDetail: {}, stack: null, draft: emptyDraft(), validation: null, submitted: false, progress: [], busy: false, running: null, error: null, llm: null, parseNote: null,
 };
 
 export function set(patch: Partial<UiState>) {

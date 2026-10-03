@@ -68,8 +68,10 @@ export function postmortemPanel(s: UiState, rerender: () => void) {
       pm.error ? h('p', { class: 'wg-err' }, pm.error) : null,
       pm.data ? [
         h('h4', {}, 'Rami'), h('ul', {}, pm.data.branches.map((b) => h('li', {}, `${b.name}${b.parent ? ` ← ${b.parent.campaignId} T${b.parent.turn}` : ''}`))),
-        ...pm.data.decisions.map((d) => h('details', { class: 'wg-card' }, h('summary', {}, `${d.factionId} · ${d.model} · conf. ${pct(d.confidence)}${d.validation.fallbackUsed ? ' · FALLBACK' : ''}`),
+        ...pm.data.decisions.map((d) => h('details', { class: 'wg-card' }, h('summary', {}, `${d.factionId} · ${d.model === 'regole' ? 'regole del motore' : d.model} · conf. ${pct(d.confidence)}${d.validation.fallbackUsed ? ' · FALLBACK' : ''}`),
           h('p', {}, d.situationAssessment), h('p', {}, h('strong', {}, 'Intento privato: '), d.privateIntent),
+          // decisioni a regole: una motivazione per scelta
+          d.rationale?.length ? h('ul', {}, d.rationale.map((r) => h('li', {}, h('span', { class: 'wg-dim' }, `${r.rule} · `), r.text))) : null,
           h('ul', {}, d.optionsConsidered.map((o) => h('li', {}, `${o.chosen ? '✔ ' : ''}${o.label}: ${o.summary} (guadagno ${o.expectedGain}, rischio ${o.risk})`))),
           h('p', { class: 'wg-dim' }, `${d.orders.military.length} ordini militari, ${d.orders.diplomacy.length} diplomatici, ${d.orders.procurement.length} acquisti · token ${d.usage.promptTokens}+${d.usage.completionTokens}`))),
         h('details', {}, h('summary', {}, `Tiri di dado (${pm.data.rolls.length})`), h('ul', { class: 'wg-dim' }, pm.data.rolls.slice(0, 300).map((r) => h('li', {}, `${r.id} ${r.purpose}: ${r.formula} → ${r.total.toFixed(2)} ${r.outcome}`)))),

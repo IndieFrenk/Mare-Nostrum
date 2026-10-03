@@ -22,6 +22,25 @@ export const IsrAsset = z.object({
   coverage: z.array(ZoneId), revisitTurns: z.number().int().min(1), quality: z.number().min(0).max(1), tasking: ZoneId.nullable(),
 });
 
+/**
+ * Profilo numerico del decisore a regole (engine/policy.ts) delle fazioni non giocate dall'umano: stesso profilo per tutte,
+ * valori diversi. Ricavato da factions/*.md (stile, dottrina, propensione al rischio), obiettivi, linee rosse e basi.
+ */
+export const FactionPolicy = z.object({
+  /** 0–1, propensione alla forza: da PARAMS.policy.forceAt in su risponde alle minacce con SHOW_OF_FORCE o SANCTION, sotto con DEMARCHE o BACKCHANNEL */
+  aggressiveness: z.number().min(0).max(1),
+  /** 0–1, escalation sopportata: alza la soglia da cui i profili poco aggressivi cercano la distensione in una crisi */
+  riskTolerance: z.number().min(0).max(1),
+  /** 0–1, propensione al cyber: probabilità per turno = cyberPropensity × cyber.offense / 10, solo verso avversari */
+  cyberPropensity: z.number().min(0).max(1),
+  /** conciliatory → BACKCHANNEL e lettere concilianti; formal → DEMARCHE e lettere formali; assertive → azioni e lettere più dure */
+  diplomacyStyle: z.enum(['conciliatory', 'formal', 'assertive']),
+  /** interesse 0–1 per zona (le zone assenti valgono 0): pesa crisi, obiettivi, alleati e il pattugliamento di routine */
+  zoneInterests: z.record(ZoneId, z.number().min(0).max(1)),
+  /** posture per zona al massimo per turno (0–4, come il tetto delle decisioni LLM) */
+  maxStancesPerTurn: z.number().int().min(0).max(4),
+});
+
 export const Faction = z.object({
   id: FactionId, name: z.string(), kind: z.enum(['state', 'bloc', 'nonstate']),
   controller: z.enum(['human', 'ai', 'scripted']), agentRole: AgentRole.nullable(), profileRef: z.string(),
@@ -37,6 +56,8 @@ export const Faction = z.object({
   leaderTitle: z.string().default(''),
   /** città da cui si scrivono le lettere (es. «Roma, 9 marzo 2026») */
   capital: z.string().default(''),
+  /** profilo del decisore a regole (assente per il giocatore e i blocchi; le campagne vecchie lo prendono dallo scenario in lettura) */
+  policy: FactionPolicy.optional(),
 });
 
 export const Sensor = z.object({ type: z.enum(['radar', 'sonar', 'esm', 'eo']), rangeKm: z.number(), quality: z.number() });
@@ -132,6 +153,8 @@ export type Visibility = z.infer<typeof Visibility>;
 export type Roe = z.infer<typeof Roe>;
 export type AgentRole = z.infer<typeof AgentRole>;
 export type Faction = z.infer<typeof Faction>;
+export type FactionPolicy = z.infer<typeof FactionPolicy>;
+export type RedLine = z.infer<typeof RedLine>;
 export type Unit = z.infer<typeof Unit>;
 export type UnitType = z.infer<typeof UnitType>;
 export type Base = z.infer<typeof Base>;

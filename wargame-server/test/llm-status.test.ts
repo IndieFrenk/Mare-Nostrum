@@ -38,13 +38,25 @@ describe('stato dei modelli', () => {
     const before = hits;
     const st = (await app.inject({ method: 'GET', url: '/api/wg/llm/status' })).json();
     expect(st).toMatchObject({ reachable: true, mode: 'llm', baseUrl: fakeUrl, missing: ['gemma3:27b'], listed: ['qwen3.5:4b', 'qwen3.5:9b'], cached: false, enforced: true });
-    expect(st.models).toMatchObject({ faction_major: 'qwen3.5:4b', faction_minor: 'qwen3.5:4b', gm_narrator: 'qwen3.5:9b', order_parser: 'qwen3.5:9b', diplomat: 'gemma3:27b' });
+    // modalità predefinita «rules»: solo i ruoli che usano ancora l'LLM (le fazioni decidono con le regole del motore)
+    expect(st.factionMode).toBe('rules');
+    expect(st.models).toEqual({ gm_narrator: 'qwen3.5:9b', intel_analyst: 'qwen3.5:4b', order_parser: 'qwen3.5:9b', repair: 'qwen3.5:4b', diplomat: 'gemma3:27b' });
     expect(typeof st.latencyMs).toBe('number');
     const again = (await app.inject({ method: 'GET', url: '/api/wg/llm/status' })).json();
     expect(again.cached).toBe(true);
     expect(hits - before).toBe(1);
     expect((await app.inject({ method: 'GET', url: '/api/wg/llm/status?fresh=1' })).json().cached).toBe(false);
     expect(hits - before).toBe(2);
+  }));
+
+  it('modalità llm: tutti i ruoli, anche decisioni e riflessione delle fazioni', async () => withModels(async () => {
+    process.env.WARGAME_FACTION_MODE = 'llm';
+    try {
+      const { app } = await buildServer({ dataDir: tmp(), provider: new OpenAiCompatProvider(fakeUrl) });
+      const st = (await app.inject({ method: 'GET', url: '/api/wg/llm/status' })).json();
+      expect(st.factionMode).toBe('llm');
+      expect(st.models).toMatchObject({ faction_major: 'qwen3.5:4b', faction_minor: 'qwen3.5:4b', reflection: 'qwen3.5:4b', gm_narrator: 'qwen3.5:9b', order_parser: 'qwen3.5:9b', diplomat: 'gemma3:27b' });
+    } finally { delete process.env.WARGAME_FACTION_MODE; }
   }));
 
   it('server irraggiungibile: reachable false, ▶ e creazione rifiutati con 503 LLM_UNREACHABLE', async () => {

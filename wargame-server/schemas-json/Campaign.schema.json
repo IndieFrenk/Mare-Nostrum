@@ -329,6 +329,13 @@
      "minimum": 1,
      "maximum": 9007199254740991
     },
+    "factionMode": {
+     "type": "string",
+     "enum": [
+      "rules",
+      "llm"
+     ]
+    },
     "cmoOnRequest": {
      "default": false,
      "type": "boolean"

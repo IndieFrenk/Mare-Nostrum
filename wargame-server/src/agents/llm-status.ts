@@ -23,6 +23,8 @@ export interface LlmStatus {
   enforced: boolean;
   /** WARGAME_ALLOW_OFFLINE=1: si gioca anche senza modelli (turni in dottrina) */
   offlineAllowed: boolean;
+  /** chi decide le mosse delle fazioni (aggiunto dalla rotta /llm/status): in `rules` `models` elenca solo i ruoli che usano l'LLM */
+  factionMode?: 'rules' | 'llm';
 }
 
 export interface LlmStatusSource {

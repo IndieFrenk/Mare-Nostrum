@@ -1,0 +1,26 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "type": "object",
+ "properties": {
+  "west": {
+   "type": "number",
+   "minimum": 0,
+   "maximum": 1
+  },
+  "china": {
+   "type": "number",
+   "minimum": 0,
+   "maximum": 1
+  },
+  "russia": {
+   "type": "number",
+   "minimum": 0,
+   "maximum": 1
+  }
+ },
+ "required": [
+  "west",
+  "china",
+  "russia"
+ ]
+}

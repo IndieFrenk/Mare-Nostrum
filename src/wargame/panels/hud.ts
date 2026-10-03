@@ -1,7 +1,7 @@
-import type { DiploAction, Order } from '../api-client';
+import type { DiploAction, NationDetail, NationSummary, Order } from '../api-client';
 import { selectUnit } from '../actions';
 import { h, pct } from '../dom';
-import { FACTIONS, NAMES } from '../layers/factions';
+import { FACTIONS, NAMES, POLE_COLORS } from '../layers/factions';
 import { composeTo } from './letters';
 import { newId, set, state, type UiState } from '../state/store';
 
@@ -11,8 +11,50 @@ function addDiplo(a: DiploAction) {
   set({ draft: { ...state.draft, diplomacy: [...state.draft.diplomacy, a] }, validation: null, submitted: false });
 }
 
-/** Scheda paese (clic su una nazione): relazioni, stime e azioni diplomatiche rapide. */
+const GOVERNMENT: Record<string, string> = { democracy: 'democrazia', hybrid: 'regime ibrido', authoritarian: 'regime autoritario', absolute_monarchy: 'monarchia assoluta', theocracy: 'teocrazia', military: 'regime militare', transitional: 'fase di transizione' };
+const NUCLEAR: Record<string, string> = { none: 'nessuna', latent: 'latente (potrebbe dotarsene)', declared: 'dichiarata', nato_sharing: 'ospita armi USA (condivisione NATO)' };
+const num = (n: number, digits = 1) => n.toLocaleString('it-IT', { maximumFractionDigits: n >= 100 ? 0 : digits });
+
+/** Barra dell'allineamento: Occidente, Cina, Russia e il resto (non allineato), con i valori in chiaro. */
+function alignmentBar(a: NationSummary['alignment']) {
+  const none = Math.max(0, 1 - a.west - a.china - a.russia);
+  const seg = (k: keyof typeof POLE_COLORS, v: number, label: string) => v > 0.004 ? h('i', { style: `width:${(v * 100).toFixed(1)}%;background:${POLE_COLORS[k]}`, title: `${label} ${Math.round(v * 100)}%` }) : null;
+  return h('div', {},
+    h('div', { class: 'wg-align' }, seg('west', a.west, 'Occidente'), seg('china', a.china, 'Cina'), seg('russia', a.russia, 'Russia'), seg('none', none, 'Non allineato')),
+    h('small', { class: 'wg-dim' }, `Occidente ${Math.round(a.west * 100)}% · Cina ${Math.round(a.china * 100)}% · Russia ${Math.round(a.russia * 100)}% · non allineato ${Math.round(none * 100)}%`));
+}
+
+/**
+ * Scheda in sola lettura di uno Stato che non è una fazione (clic sulla mappa): dati del registro, allineamento, appartenenze e
+ * partner commerciali. Sono dati pubblici e **stime**: la confidenza è nel registro (le azioni diplomatiche arrivano con la fase 12).
+ */
+export function nationCard(s: UiState, iso3: string) {
+  const sum = s.nations.find((n) => n.iso3 === iso3);
+  const d: NationDetail | undefined = s.nationDetail[iso3];
+  const name = (iso: string) => s.nations.find((n) => n.iso3 === iso)?.nameIt ?? iso;
+  const close = h('button', { onclick: () => set({ country: null }) }, '×');
+  if (!sum) return h('div', { class: 'wg-float wg-country wg-nation' }, h('header', {}, iso3, close), h('p', { class: 'wg-dim' }, 'Stato non nel registro.'));
+  const head = h('header', {}, h('i', { style: `background:${POLE_COLORS.none}` }), sum.nameIt.toUpperCase(), close);
+  const row = (label: string, value: string) => h('div', { class: 'wg-row2' }, h('span', { class: 'wg-dim' }, label), h('span', {}, value));
+  if (!d) return h('div', { class: 'wg-float wg-country wg-nation' }, head, alignmentBar(sum.alignment), h('p', { class: 'wg-dim' }, `${GOVERNMENT[sum.government]} · ${num(sum.population)} M abitanti · PIL ${num(sum.gdpUsdB, 0)} mld $`), h('p', { class: 'wg-dim' }, 'Caricamento della scheda…'));
+  const conf = Object.values(d.confidence);
+  const lo = Math.round(Math.min(...conf) * 100); const hi = Math.round(Math.max(...conf) * 100);
+  return h('div', { class: 'wg-float wg-country wg-nation' }, head,
+    h('div', { class: 'wg-nation-body' },
+      row('Capitale', d.capital), row('Capo di Stato', d.leaderTitle), row('Governo', `${GOVERNMENT[d.government]} (democrazia ${d.democracyScore.toFixed(1)}/10)`),
+      row('Popolazione', `${num(d.population)} M`), row('PIL', `${num(d.gdpUsdB, 0)} mld $`),
+      row('Spesa militare', d.milexUsdB > 0 ? `${num(d.milexUsdB)} mld $${d.gdpUsdB > 0 ? ` (${(d.milexUsdB / d.gdpUsdB * 100).toFixed(1)}% del PIL)` : ''} · ${num(d.activePersonnelK)} mila militari` : '—'),
+      row('Armi nucleari', NUCLEAR[d.nuclear] ?? d.nuclear)),
+    h('h4', {}, 'Allineamento'), alignmentBar(d.alignment),
+    d.topTrade.length ? [h('h4', {}, 'Primi partner commerciali'), h('p', {}, d.topTrade.map((t) => `${name(t.iso3)} ${Math.round(t.share * 100)}%`).join(' · '))] : null,
+    d.institutions.length ? [h('h4', {}, 'Appartenenze'), h('p', {}, d.institutions.map((i) => h('span', { class: 'wg-chip', title: `${i.nameIt} · ${i.members} membri · decisione: ${i.decision}` }, i.id.replace(/_/g, ' ')))) ] : null,
+    d.factionId ? null : h('p', { class: 'wg-dim' }, 'Stato del mondo senza forze in gioco: opinione, trattati e azioni arrivano con i prossimi settori.'),
+    h('p', { class: 'wg-dim', title: Object.entries(d.sourceLegend).map(([k, v]) => `${k}: ${v}`).join('\n') }, `Dati stimati (affidabilità ${lo}–${hi}%): sono ordini di grandezza, non misure.`));
+}
+
+/** Scheda paese (clic su una nazione): relazioni, stime e azioni diplomatiche rapide; per gli Stati che non sono fazioni, scheda in sola lettura. */
 export function countryCard(s: UiState, f: string) {
+  if (!FACTIONS[f] && f !== 'ITA') return nationCard(s, f);
   const rel = s.overview?.relations[f];
   const b = s.knowledge?.beliefs[f];
   const msg = h('input', { placeholder: 'Messaggio (facoltativo)' });

@@ -68,7 +68,16 @@
     "OPV":             { "name": "Pattugliatore", "type": "opv", "domain": "sea", "sig": [5,5,4], "sensors": [["radar",80,0.55]], "op": 0.3, "atk": 1, "def": 1, "loadout": {} },
     "FAC_IRGC":        { "name": "Motovedette veloci IRGC", "type": "opv", "domain": "sea", "sig": [3,4,3], "sensors": [["radar",40,0.5]], "op": 0, "atk": 2, "def": 0, "loadout": { "ASM_GENERIC": 16 } },
     "MILITIA":         { "name": "Brigata/milizia", "type": "ground_bn", "domain": "land", "sig": [4,2,4], "sensors": [["eo",15,0.4]], "op": 0, "atk": 1, "def": 1, "loadout": {} },
-    "DRONE_SWARM":     { "name": "Lanciatori droni/missili a lungo raggio", "type": "drone_flight", "domain": "air", "sig": [2,0,3], "sensors": [["eo",40,0.5]], "op": 0, "atk": 2, "def": 0, "loadout": { "SHAHED": 60, "ASM_GENERIC": 8 } }
+    "DRONE_SWARM":     { "name": "Lanciatori droni/missili a lungo raggio", "type": "drone_flight", "domain": "air", "sig": [2,0,3], "sensors": [["eo",40,0.5]], "op": 0, "atk": 2, "def": 0, "loadout": { "SHAHED": 60, "ASM_GENERIC": 8 } },
+    "F100":            { "name": "Fregata classe Álvaro de Bazán (F-100)", "type": "frigate", "domain": "sea", "sig": [6,5,5], "sensors": [["radar",350,0.9],["sonar",40,0.7]], "op": 0, "atk": 3, "def": 5, "loadout": { "SM2": 32, "HARPOON": 8 } },
+    "JCI":             { "name": "LHD Juan Carlos I", "type": "lhd", "domain": "sea", "sig": [9,6,7], "sensors": [["radar",250,0.75]], "op": 0, "atk": 1, "def": 2, "loadout": {} },
+    "S80":             { "name": "Sottomarino S-80 Plus", "type": "submarine", "domain": "subsurface", "sig": [1,1,1], "sensors": [["sonar",50,0.8]], "op": 0, "atk": 3, "def": 1, "loadout": { "TORP_GENERIC": 18 } },
+    "SIGMA":           { "name": "Fregata SIGMA 10513/9813", "type": "frigate", "domain": "sea", "sig": [5,5,5], "sensors": [["radar",180,0.7],["sonar",30,0.6]], "op": 0, "atk": 2, "def": 3, "loadout": { "EXOCET": 4, "SAM_GENERIC": 12 } },
+    "F3000S":          { "name": "Fregata classe Al Riyadh (F3000S)", "type": "frigate", "domain": "sea", "sig": [6,5,5], "sensors": [["radar",250,0.8],["sonar",30,0.6]], "op": 0, "atk": 3, "def": 4, "loadout": { "ASTER15": 16, "EXOCET": 8 } },
+    "BAYNUNAH":        { "name": "Corvetta classe Baynunah", "type": "frigate", "domain": "sea", "sig": [5,5,4], "sensors": [["radar",150,0.7]], "op": 0, "atk": 2, "def": 2, "loadout": { "EXOCET": 8, "SAM_GENERIC": 8 } },
+    "AL_ZUBARAH":      { "name": "Corvetta classe Al Zubarah", "type": "frigate", "domain": "sea", "sig": [5,5,5], "sensors": [["radar",300,0.85]], "op": 0, "atk": 3, "def": 4, "loadout": { "ASTER30_B1NT": 16, "EXOCET": 8 } },
+    "K130":            { "name": "Corvetta classe Braunschweig (K130)", "type": "frigate", "domain": "sea", "sig": [4,5,4], "sensors": [["radar",150,0.75]], "op": 0, "atk": 2, "def": 2, "loadout": { "ASM_GENERIC": 4, "SAM_GENERIC": 21 } },
+    "F125":            { "name": "Fregata classe Baden-Württemberg (F125)", "type": "frigate", "domain": "sea", "sig": [6,5,5], "sensors": [["radar",250,0.85]], "op": 0, "atk": 2, "def": 3, "loadout": { "HARPOON": 8, "SAM_GENERIC": 42 } }
   },
   "items": [
     { "id": "LOT_METEOR", "name": "MBDA Meteor", "kind": "munition_lot", "lotSize": 10, "munitionId": "METEOR", "cost": 25, "leadTimeTurns": 1 },

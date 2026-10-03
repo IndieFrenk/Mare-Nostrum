@@ -4,7 +4,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import countriesUrl from '../assets/countries.geojson?url';
 import ms from 'milsymbol';
 import type { UiState } from '../state/store';
-import { EU_ISO, FACTIONS, MAP_LABELS, NAMES } from './factions';
+import { alignmentColor, EU_ISO, FACTIONS, MAP_LABELS, NAMES } from './factions';
 
 type Props = Record<string, any>;
 type FC = GeoJSON.FeatureCollection;
@@ -38,6 +38,9 @@ export class WarMap {
   private markers: maplibregl.Marker[] = [];
   private labels: maplibregl.Marker[] = [];
   private last: UiState | null = null;
+  /** ISO3 → attore (id di fazione se lo Stato è una fazione, altrimenti l'ISO3) dal registro: gli Stati del registro sono cliccabili */
+  private actorByIso = new Map<string, string>();
+  private nationsRef: UiState['nations'] | null = null;
 
   constructor(container: HTMLElement, private h: MapHandlers) {
     maplibregl.setWorkerUrl(maplibreWorkerUrl); // come DeckGLMap upstream: il worker non passa dall'optimizer di Vite
@@ -93,9 +96,15 @@ export class WarMap {
       const area = m.queryRenderedFeatures(e.point, { layers: ['control-fill'] })[0]?.properties?.faction;
       if (area) return this.h.openCountry(String(area));
       const iso = m.queryRenderedFeatures(e.point, { layers: ['countries-fill'] })[0]?.properties?.['ISO3166-1-Alpha-3'];
-      const f = Object.entries(FACTIONS).find(([, v]) => v.iso === iso)?.[0] ?? null;
+      // fazione, oppure Stato del registro (scheda in sola lettura); i territori senza Stato (dipendenze, Antartide) non rispondono
+      const f = Object.entries(FACTIONS).find(([, v]) => v.iso === iso)?.[0] ?? (iso ? this.actorByIso.get(String(iso)) : undefined) ?? null;
       this.h.openCountry(f);
     });
+    m.on('mousemove', 'countries-fill', (e) => {
+      const iso = e.features?.[0]?.properties?.['ISO3166-1-Alpha-3'];
+      m.getCanvas().style.cursor = iso && (this.actorByIso.has(String(iso)) || Object.values(FACTIONS).some((v) => v.iso === iso)) ? 'pointer' : '';
+    });
+    m.on('mouseleave', 'countries-fill', () => { m.getCanvas().style.cursor = ''; });
     m.on('contextmenu', (e) => {
       e.preventDefault();
       const zone = m.queryRenderedFeatures(e.point, { layers: ['zones-fill'] })[0]?.properties?.id;
@@ -108,6 +117,7 @@ export class WarMap {
   async render(s: UiState) {
     await this.ready;
     this.last = s;
+    if (s.nations !== this.nationsRef) { this.nationsRef = s.nations; this.actorByIso = new Map(s.nations.map((n) => [n.iso3, n.factionId ?? n.iso3])); }
     const m = this.map;
     m.setProjection({ type: s.globe ? 'globe' : 'mercator' });
     const src = (id: string, data: FC) => (m.getSource(id) as maplibregl.GeoJSONSource).setData(data);
@@ -129,12 +139,18 @@ export class WarMap {
     if (s.mapMode === 'diplomazia') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.trust, -100, 100, ['#8c2323', '#6b6b5e', '#2f8f4f']) : other);
     else if (s.mapMode === 'tensione') value = (f) => (f === 'ITA' ? '#3f8f4f' : rel[f] ? heat(rel[f]!.tension, 0, 100, ['#3a5a3a', '#b08a2a', '#b02020']) : other);
     else if (s.mapMode === 'crisi') { value = () => '#3b3b36'; other = '#33332f'; }
-    else value = factionColor;
-    const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...pairs(value), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
+    else if (s.mapMode === 'allineamento') {
+      // tutti gli Stati del registro: polo prevalente (blu Occidente, oro Cina, rosso Russia, grigio non allineato), intensità per il valore
+      const byFaction = new Map(s.nations.filter((n) => n.factionId).map((n) => [n.factionId!, n]));
+      value = (f) => { const n = byFaction.get(f); return n ? alignmentColor(n.alignment) : other; };
+      other = '#3c3c36';
+    } else value = factionColor;
+    const alignPairs = s.mapMode === 'allineamento' ? s.nations.flatMap((n) => [n.iso3, alignmentColor(n.alignment)]) : null;
+    const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...(alignPairs ?? pairs(value)), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
     m.setPaintProperty('countries-fill', 'fill-color', expr as never);
     m.setPaintProperty('control-fill', 'fill-color', ['match', ['get', 'faction'], ...Object.keys(FACTIONS).flatMap((f) => [f, value(f)]), other] as never);
     m.setPaintProperty('crises-fill', 'fill-opacity', s.mapMode === 'crisi' ? 0.45 : 0.18);
-    m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && FACTIONS[s.country]?.iso) || '__none__']);
+    m.setFilter('countries-sel', ['==', ['get', 'ISO3166-1-Alpha-3'], (s.country && (FACTIONS[s.country]?.iso ?? (this.actorByIso.has(s.country) ? s.country : null))) || '__none__']);
   }
 
   private renderPlans(s: UiState) {

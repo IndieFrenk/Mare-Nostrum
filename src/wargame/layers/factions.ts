@@ -15,14 +15,52 @@ export const FACTIONS: Record<string, { iso: string | null; color: string; label
   LBY_GNU: { iso: 'LBY', color: '#7e8f3c', label: [14.2, 27.5] },
   LBY_LNA: { iso: null, color: '#8f6a3a', label: [21.5, 29.2] },
   IRN: { iso: 'IRN', color: '#3a7a5a', label: [54, 32.5] },
+  // paesi decisi a regole (controller «scripted»)
+  ESP: { iso: 'ESP', color: '#d08c2e', label: [-3.7, 40.2] },
+  MAR: { iso: 'MAR', color: '#9c3f5c', label: [-6.3, 31.8] },
+  MLT: { iso: 'MLT', color: '#b8b2d6', label: [14.4, 35.6] },
+  CYP: { iso: 'CYP', color: '#6fb3a6', label: [32.9, 35.4] },
+  LBN: { iso: 'LBN', color: '#8fbf5a', label: [35.6, 33.9] },
+  SYR: { iso: 'SYR', color: '#8a6db0', label: [39.8, 35.4] },
+  JOR: { iso: 'JOR', color: '#a0785a', label: [38.2, 30.0] },
+  SAU: { iso: 'SAU', color: '#1f6f8b', label: [42.5, 22.8] },
+  ARE: { iso: 'ARE', color: '#b0647a', label: [54.6, 23.2] },
+  QAT: { iso: 'QAT', color: '#7a2f4f', label: [51.2, 25.7] },
+  DEU: { iso: 'DEU', color: '#9aa3b5', label: [10.4, 51.1] },
 };
 
 /** Etichette brevi sulla mappa. */
-export const MAP_LABELS: Record<string, string> = { LBY_GNU: 'Tripolitania', LBY_LNA: 'Cirenaica' };
+export const MAP_LABELS: Record<string, string> = { LBY_GNU: 'Tripolitania', LBY_LNA: 'Cirenaica', ARE: 'Emirati' };
 
 export const NAMES: Record<string, string> = {
   ITA: 'Italia', USA: 'Stati Uniti', FRA: 'Francia', GBR: 'Regno Unito', TUR: 'Turchia', RUS: 'Russia', CHN: 'Cina', GRC: 'Grecia', EGY: 'Egitto',
   ISR: 'Israele', ALG: 'Algeria', TUN: 'Tunisia', LBY_GNU: 'Libia (GNU)', LBY_LNA: 'Libia (LNA)', IRN: 'Iran',
+  ESP: 'Spagna', MAR: 'Marocco', MLT: 'Malta', CYP: 'Cipro', LBN: 'Libano', SYR: 'Siria', JOR: 'Giordania', SAU: 'Arabia Saudita',
+  ARE: 'Emirati Arabi Uniti', QAT: 'Qatar', DEU: 'Germania',
 };
 
-export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CYP', 'CZE', 'DNK', 'EST', 'FIN', 'DEU', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'MLT', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE'];
+/** Paesi UE che non sono fazioni (colore comune nella mappa politica): chi diventa fazione esce da qui (Spagna, Germania, Malta, Cipro). */
+export const EU_ISO = ['AUT', 'BEL', 'BGR', 'HRV', 'CZE', 'DNK', 'EST', 'FIN', 'HUN', 'IRL', 'LVA', 'LTU', 'LUX', 'NLD', 'POL', 'PRT', 'ROU', 'SVK', 'SVN', 'SWE'];
+
+/** Colori dei tre poli della modalità «Allineamento» (docs/wargame/DIPLOMAZIA.md §4): Occidente, Cina, Russia; il resto è non allineamento. */
+export const POLE_COLORS = { west: '#4a86e8', china: '#e0b030', russia: '#d05050', none: '#8a8a7c' } as const;
+const BASE_FILL = '#4f4f46';
+
+const mixHex = (a: string, b: string, t: number) => {
+  const p = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return `#${x.map((v, i) => Math.round(v + (y[i]! - v) * t).toString(16).padStart(2, '0')).join('')}`;
+};
+
+/** Polo prevalente di uno Stato e quanto pesa (0–1): il non allineamento prevale quando il resto dei tre poli è più grande. */
+export function prevailingPole(a: { west: number; china: number; russia: number }): { pole: 'west' | 'china' | 'russia' | 'none'; value: number } {
+  const none = Math.max(0, 1 - a.west - a.china - a.russia);
+  const best = (['west', 'china', 'russia'] as const).map((k) => [k, a[k]] as const).sort((x, y) => y[1] - x[1])[0]!;
+  return none >= best[1] ? { pole: 'none', value: none } : { pole: best[0], value: best[1] };
+}
+
+/** Colore per polo prevalente, intensità per il valore. */
+export function alignmentColor(a: { west: number; china: number; russia: number }): string {
+  const { pole, value } = prevailingPole(a);
+  return mixHex(BASE_FILL, POLE_COLORS[pole], pole === 'none' ? 0.35 + 0.25 * value : 0.3 + 0.7 * value);
+}
