@@ -168,7 +168,9 @@ export class WarMap {
       other = '#3c3c36';
       isoPairs = s.nations.flatMap((n) => [n.iso3, alignmentColor(n.alignment)]);
     } else value = factionColor;
-    const expr = ['match', ['get', 'ISO3166-1-Alpha-3'], ...(isoPairs ?? pairs(value)), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : []), other];
+    const arms = [...(isoPairs ?? pairs(value)), ...(s.mapMode === 'politica' ? [EU_ISO, '#586a82'] : [])];
+    // `match` vuole almeno una coppia (la modalità «voto» senza votazioni non ne ha): senza, un colore solo
+    const expr = arms.length ? ['match', ['get', 'ISO3166-1-Alpha-3'], ...arms, other] : other;
     m.setPaintProperty('countries-fill', 'fill-color', expr as never); // un'unica espressione `match` per tutti i 197 Stati, non un layer per paese
     m.setPaintProperty('control-fill', 'fill-color', ['match', ['get', 'faction'], ...Object.keys(FACTIONS).flatMap((f) => [f, value(f)]), other] as never);
     m.setPaintProperty('crises-fill', 'fill-opacity', s.mapMode === 'crisi' ? 0.45 : 0.18);

@@ -48,7 +48,7 @@ const costLabel = (cat: DiploCatalogRow[], kind: string) => { const r = cat.find
 const describe = (o: { kind: string } & Record<string, unknown>) => o.kind === 'LETTER' ? `✉ LETTERA a ${o.target} «${o.subject}» (${o.visibility === 'public' ? 'pubblica' : 'riservata'})` : `${o.kind} ${['unitIds', 'assetIds'].map((k) => (o[k] as string[] | undefined)?.join(',')).filter(Boolean).join(' ')} ${o.zoneId ?? o.to ?? o.targetRef ?? o.target ?? o.itemId ?? ''} ${o.roe ?? ''}`;
 
 /** CD della bozza: costi dal catalogo (per le azioni a costo variabile il costo più basso: la cifra esatta la dà «Valida») */
-function draftCost(s: UiState): number {
+export function draftCost(s: UiState): number {
   let n = 0;
   for (const d of s.draft.diplomacy) { const r = s.diploCatalog.find((x) => x.kind === d.kind); if (r) n += r.cost ?? (d.kind === 'RESOLUTION' ? r.costBy?.[(d as { forum: string }).forum] : d.kind === 'PROPOSE_AGREEMENT' ? r.costBy?.[(d as { agreement: { type: string } }).agreement.type] : undefined) ?? 0; else if (d.kind === 'LETTER') n += 1; }
   return n;

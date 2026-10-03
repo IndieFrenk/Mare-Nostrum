@@ -5,13 +5,14 @@ import { api, type LlmStatus } from './api-client';
 import { checkLlm, configure, createCampaign, leaveCampaign, llmBlocked, openCampaign, rememberedCampaign, runTurn, selectCountry, selectUnit, unreadLetters } from './actions';
 import { h, meur } from './dom';
 import { WarMap } from './layers/map';
-import { countryCard, orderToZone, selectionCard } from './panels/hud';
+import { countryCard } from './panels/country';
+import { orderToZone, selectionCard } from './panels/hud';
 import { legend } from './panels/legend';
 import { set, state, subscribe, type UiState } from './state/store';
 import { WARGAME_VARIANT } from './variant';
 
 const root = document.getElementById('wg-app')!;
-const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', letters: '✉', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
+const ICONS: Record<string, string> = { briefing: '☰', orders: '✎', oob: '⚓', intel: '◉', news: '▤', crises: '⚠', diplomacy: '⚖', states: '◎', letters: '✉', foed: '€', procurement: '⚙', cmo: '⚔', postmortem: '⌛' };
 let map: WarMap | null = null;
 const mapEl = h('div', { id: 'wg-map' });
 const hud = h('div', { id: 'wg-hud' });
